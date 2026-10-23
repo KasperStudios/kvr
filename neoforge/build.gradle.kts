@@ -12,6 +12,13 @@ val common: Project = requireNotNull(stonecutter.node.sibling("")?.project) {
     "No common project for $project"
 }
 
+// Data pack layout / JSON shape comes from the common node's versions/<mc>/gradle.properties
+extra["kvr.recipe_folder"] = common.mod.prop("recipe_folder")
+extra["kvr.loot_folder"] = common.mod.prop("loot_folder")
+extra["kvr.ingredient_style"] = common.mod.prop("ingredient_style")
+extra["kvr.result_key"] = common.mod.prop("result_key")
+apply(from = rootProject.file("gradle/kvr-recipes.gradle.kts"))
+
 version = "${mod.version}+$minecraft"
 base {
     archivesName.set("${mod.id}-$loader")

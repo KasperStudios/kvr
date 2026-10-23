@@ -1,6 +1,7 @@
 package com.kasperstudios.kvr.fabric;
 
 import com.kasperstudios.kvr.KVR;
+import com.kasperstudios.kvr.items.KVRContent;
 import com.kasperstudios.kvr.platform.KVRGuiProvider;
 import com.kasperstudios.kvr.platform.KVRPlatform;
 import com.kasperstudios.kvr.platform.KVRPlatformProvider;
@@ -16,6 +17,7 @@ public final class KVRFabric implements ModInitializer {
         KVRPlatform platform = new FabricPlatform();
         KVRPlatformProvider.install(platform);
         KVRRegistryProvider.install(new FabricRegistrar());
+        KVRContent.init();
         if (platform.isClient()) {
             KVRGuiProvider.install(new SimpleKVRGui(platform.name()));
         }

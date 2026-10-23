@@ -42,14 +42,19 @@ packages all Matrix entries, and the core tests pass on every node.
       `SimpleKVRGui` installed on the client side, each with a provider.
 - [x] Fabric and NeoForge entrypoints installing the facades and booting `KVR.init()`.
 - [x] Tests: bootstrap seam, registry-path validation (incl. path traversal), GUI facade,
-      module isolation (16 tests x 3 versions).
+      module isolation, hardware tiers/spec matrix/chassis rule/build aggregation/palette
+      (38 tests x 4 versions, 152 total).
+- [x] Block 2a content: 34 items (25 module items, 5 chassis, UpOre raw/ingot, upgrader template) and
+      the `up_ore` block, registered through the loader facade; version-shaped recipes + ore loot table;
+      generated 16x16 textures/models with no external assets.
 - [x] Runtime verification: `kvr-fabric-0.1.0+1.21.1.jar` loads on a real Fabric 1.21.1 dedicated
       server and logs `KVR OS core 0.1.0 booting on fabric (dedicated server)`.
 - [x] Architectury platform-side implementations (`...platform.fabric.*ProviderImpl`,
       `...platform.neoforge.*ProviderImpl`) for the transformed facade calls.
 
 ### In progress
-- [ ] Block 2 (items, crafts, hardware tiers) — not started.
+- [ ] Block 2b: assembly screen, disassembly, tier-upgrade screen (ore cost belongs there - a vanilla
+      smithing/crafting slot cannot consume 16 items), chassis painting, ore worldgen.
 
 ### Planned / TODO
 - [ ] Blocks 3-5 from `SPEC.md` section 7 (energy/dock plate, spatial engine, QuickJS + apps).
@@ -214,6 +219,16 @@ kvr/
   build time; a wrong name makes FML silently report "1 invalid mod files" with no reason at INFO level.
 - **Maven version ranges with identical bounds are invalid** (`[1.20.4, 1.20.4]` -> FML 2 throws
   `InvalidVersionSpecificationException`). Use half-open ranges: `mod.mc_dep_forgelike=[1.20.4,1.20.5)`.
+- **Content mods need Fabric API, not just the loader**: without `fabric-api` the vanilla registries are
+  already frozen when `ModInitializer` runs and constructing an `Item`/`Block` throws
+  `This registry can't create intrusive holders`. KVR declares `fabric-api` as a dependency and the
+  test server must have it in `mods/`.
+- **Never construct items/blocks eagerly at class init**: NeoForge builds mod instances before
+  registries are open. `KVRContent` stores factories and lets each loader execute them at its own
+  registration point (Fabric: mod init, NeoForge: `RegisterEvent`), memoized so lookups stay cheap.
+- **MC 1.21.9+ requires explicit ids in item/block properties** (`properties.setId(ResourceKey...)`),
+  otherwise NeoForge 21.11 dies with `NullPointerException: Item id not set` during `RegisterEvent`.
+  Handled by a Stonecutter branch in `KVRContent`.
 - **FML loader range differs per era**: NeoForge 20.4 uses FML 2 (`loaderVersion = "[2,)"`), 21.x uses
   FML 4/10 (`"[4,)"`). Both are templated per version (`mod.fml_loader_range`, `mod.neoforge_range`).
 - **NeoForge < 20.5 has no `ModContainer`/`IEventBus` constructor injection**: the entrypoint needs
@@ -288,6 +303,11 @@ neoforge 1.20.4/1.21.1/1.21.11 — all boot KVR with no errors.
 
 ## 19. Lessons / New Rules
 
+- Recipes are version-shaped data, not code: the folder name (`recipes` → `recipe`), the ingredient
+  form (`{"item": id}` → `"id"`) and the result key (`item` → `id`) all moved between 1.20.4 and
+  1.21.11. They are generated per version by `gradle/kvr-recipes.gradle.kts` from the tier ladder.
+- A vanilla crafting/smithing slot consumes one item per slot, so a "16 UpOre" cost cannot be a recipe.
+  Item costs above 9 belong in a custom screen that consumes from the inventory.
 - Verify a version-matrix assumption (does this loader/version combination exist?) before writing
   build config: 1.20.1 has no NeoForge, and yarn mapping patches stop at 1.21, which is why the
   project uses mojmap everywhere.

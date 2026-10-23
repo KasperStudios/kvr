@@ -18,7 +18,8 @@ Block 2; the packet facade is deferred until the first real payload exists.
 
 ## Building
 
-Requires JDK 21 (and JDK 17+ available for the 1.20.1 target).
+Requires JDK 21. The Fabric jar needs **Fabric API** at runtime (registry freeze relaxation for
+content mods); NeoForge needs nothing extra.
 
 ```bash
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk

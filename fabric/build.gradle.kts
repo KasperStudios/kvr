@@ -12,6 +12,13 @@ val common: Project = requireNotNull(stonecutter.node.sibling("")?.project) {
     "No common project for $project"
 }
 
+// Data pack layout / JSON shape comes from the common node's versions/<mc>/gradle.properties
+extra["kvr.recipe_folder"] = common.mod.prop("recipe_folder")
+extra["kvr.loot_folder"] = common.mod.prop("loot_folder")
+extra["kvr.ingredient_style"] = common.mod.prop("ingredient_style")
+extra["kvr.result_key"] = common.mod.prop("result_key")
+apply(from = rootProject.file("gradle/kvr-recipes.gradle.kts"))
+
 version = "${mod.version}+$minecraft"
 base {
     archivesName.set("${mod.id}-$loader")
@@ -49,6 +56,8 @@ dependencies {
     minecraft("com.mojang:minecraft:$minecraft")
     mappings(loom.officialMojangMappings())
     modImplementation("net.fabricmc:fabric-loader:${mod.dep("fabric_loader")}")
+    // Registry freeze relaxation for content mods lives in Fabric API, not in the loader
+    modImplementation("net.fabricmc.fabric-api:fabric-api:${common.mod.dep("fabric_api")}")
     implementation("dev.architectury:architectury-injectables:${mod.dep("architectury_injectables")}")
 
     commonBundle(project(common.path, "namedElements")) { isTransitive = false }
@@ -92,7 +101,8 @@ tasks.processResources {
         "name" to mod.name,
         "version" to project.version,
         "minecraft" to common.mod.prop("mc_dep_fabric"),
-        "loader_version" to mod.dep("fabric_loader")
+        "loader_version" to mod.dep("fabric_loader"),
+        "fabric_api_version" to common.mod.dep("fabric_api")
     )
 }
 
