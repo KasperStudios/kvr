@@ -40,6 +40,10 @@ packages all Matrix entries, and the core tests pass on every node.
       `KVRRegistrar` (items/blocks), `KVRGui` (screens), each with a provider.
 - [x] Fabric and NeoForge entrypoints installing the facades and booting `KVR.init()`.
 - [x] Tests: bootstrap seam, registry-path validation, module isolation (11 tests x 3 versions).
+- [x] Runtime verification: `kvr-fabric-0.1.0+1.21.1.jar` loads on a real Fabric 1.21.1 dedicated
+      server and logs `KVR OS core 0.1.0 booting on fabric (dedicated server)`.
+- [x] Architectury platform-side implementations (`...platform.fabric.*ProviderImpl`,
+      `...platform.neoforge.*ProviderImpl`) for the transformed facade calls.
 
 ### In progress
 - [ ] Block 2 (items, crafts, hardware tiers) — not started.
@@ -205,6 +209,10 @@ kvr/
   `net.minecraft.resources`). One Stonecutter string replacement handles it project-wide; without it
   every id call fails to compile on 1.21.11.
 - **NeoForge 21.11 / FML 10 replaced `FMLEnvironment.dist`** with `FMLEnvironment.getDist()`.
+- **Architectury really does transform `@ExpectPlatform` methods at build time** and expects the
+  implementation as `<class package>.<loader>.<Class>Impl` (e.g.
+  `com.kasperstudios.kvr.platform.fabric.KVRPlatformProviderImpl`). Missing that class compiles
+  fine and only fails when the mod loads (`NoClassDefFoundError` in the entrypoint).
 - **Never write the "wrong" branch uncommented**: the sources as written are the *active* version's
   variant; the other side must be wrapped in `/* ... *///?}`. A wrong active branch compiles against
   the wrong API and the error looks like a missing symbol.
@@ -220,6 +228,17 @@ kvr/
   - `KVR.init()` bootstrap - platform required, idempotent, reports `platformName()`.
   - Module isolation - no loader imports in `src/main/java`.
 - `./gradlew build` must produce jars for all five matrix entries before a block is called done.
+- Runtime smoke test (the only proof the mod actually loads):
+
+```bash
+# Fabric 1.21.1
+mkdir -p /tmp/kvr-srv/mods && cd /tmp/kvr-srv
+java -jar /path/fabric-installer-1.1.2.jar server -mcversion 1.21.1 -loader 0.19.2 -downloadMinecraft
+cp <repo>/fabric/versions/1.21.1/build/libs/kvr-fabric-*.jar mods/
+printf 'eula=true\n' > eula.txt
+java -Xmx1200M -jar fabric-server-launch.jar nogui
+# expect: "KVR OS core 0.1.0 booting on fabric (dedicated server)" then "Done (...)"
+```
 
 ---
 
