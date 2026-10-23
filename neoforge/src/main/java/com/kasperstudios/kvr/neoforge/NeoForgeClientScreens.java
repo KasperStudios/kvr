@@ -1,6 +1,7 @@
 package com.kasperstudios.kvr.neoforge;
 
 import com.kasperstudios.kvr.client.ChassisAssemblyScreen;
+import com.kasperstudios.kvr.client.UpgradeScreen;
 import com.kasperstudios.kvr.menu.KVRMenus;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
@@ -16,7 +17,9 @@ final class NeoForgeClientScreens {
     }
 
     static void register(IEventBus modBus) {
-        modBus.addListener((RegisterMenuScreensEvent event) ->
-                event.register(KVRMenus.chassisAssembly(), ChassisAssemblyScreen::new));
+        modBus.addListener((RegisterMenuScreensEvent event) -> {
+            event.register(KVRMenus.chassisAssembly(), ChassisAssemblyScreen::new);
+            event.register(KVRMenus.upgrade(), UpgradeScreen::new);
+        });
     }
 }

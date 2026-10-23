@@ -64,7 +64,10 @@ packages all Matrix entries, and the core tests pass on every node.
 - [x] Assembly GUI end to end: right-click a chassis opens `kvr:chassis_assembly`; client screens are
       bound through Fabric `ClientModInitializer` + `MenuScreens.register` and NeoForge
       `RegisterMenuScreensEvent`; the screen paints its own panel (`AbstractContainerScreen`, no textures).
-- [ ] Next: upgrade station menu (exact 4/16/64/256 ore deduction) and chassis painting (`dyed_color`).
+- [x] Upgrade station `kvr:upgrade_station`: part + template slots, result only when the exact ore cost is
+      available, ore deducted from the player inventory on take (4/16/64/256 via `UpgradeRules`).
+      Opened by right-clicking the tier upgrader template.
+- [ ] Next: chassis painting (`dyed_color`) and the compressed UpOre block item.
 - [ ] **Old blocker notes (resolved, kept for context)**: `MenuType`'s constructor is not publicly accessible through mojmap
       on 1.20.1/1.21.1, so menu types must be built by the loader. Verified in a spike:
       NeoForge `IMenuTypeExtension.create((windowId, inv, buf) -> menu)` compiles on 21.1/21.11;
@@ -278,6 +281,8 @@ kvr/
   (`0.1.0+<mc>`), fabric loader floor = `deps.fabric_loader`, `pack_format` = per-version
   `mod.pack_format` (1.20.1=15, 1.21.1=34, 1.21.11=75). A stale `pack_format` or version string ships
   silently and only breaks clients.
+- **`Inventory.items` / `Inventory.offhand` are private from 1.21.11**: iterate
+  `getContainerSize()` + `getItem(i)`/`setItem(i, stack)` instead of touching the arrays.
 - **`renderBackground(GuiGraphics, int, int, float)` only exists from 1.20.5**: before that the method
   takes just `GuiGraphics`. Do not override `Screen#render` to call it; let `AbstractContainerScreen`
   handle the background.

@@ -49,7 +49,8 @@ public final class KVRContent {
         ITEM_FACTORIES.put("up_ore", () -> new BlockItem(block("up_ore"), itemProperties("up_ore")));
         ITEM_FACTORIES.put("up_raw", () -> new Item(itemProperties("up_raw")));
         ITEM_FACTORIES.put("up_ingot", () -> new Item(itemProperties("up_ingot")));
-        ITEM_FACTORIES.put("tier_upgrader_template", () -> new Item(itemProperties("tier_upgrader_template")));
+        ITEM_FACTORIES.put("tier_upgrader_template",
+                () -> new TierUpgraderItem(itemProperties("tier_upgrader_template")));
         ITEM_FACTORIES.put("glasses", () -> new GlassesItem(itemProperties("glasses").stacksTo(1)));
 
         for (ComponentTier tier : ComponentTier.values()) {
