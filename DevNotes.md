@@ -61,9 +61,12 @@ packages all Matrix entries, and the core tests pass on every node.
 - [ ] **Blocker, next step first**: `MenuType`'s constructor is not publicly accessible through mojmap
       on 1.20.1/1.21.1, so menu types must be built by the loader. Verified in a spike:
       NeoForge `IMenuTypeExtension.create((windowId, inv, buf) -> menu)` compiles on 21.1/21.11;
-      Fabric `ExtendedScreenHandlerType` is generic over the payload type (`<T, D>` + `StreamCodec`),
-      and its signature differs across fabric-api versions (0.92 / 0.97 / 0.116 / 0.141), so the exact
-      ctor must be read with `javap` per fabric-api jar before writing it. Resolve that first, then add
+      Fabric `ExtendedScreenHandlerType` is generic over the payload type and its ctor changed:
+      fabric-api 0.116.17 (1.21.1) = `ExtendedScreenHandlerType(ExtendedFactory<T,D>,
+      StreamCodec<? super RegistryFriendlyByteBuf, D>)` -> `new ExtendedScreenHandlerType<T, Void>(...,
+      StreamCodec.unit(null))`; pre-1.20.5 fabric-api takes the factory alone with a PacketByteBuf.
+      Read the ctor from `META-INF/jars/fabric-screen-handler-api-v1-*.jar` inside the fabric-api
+      bundle (`javap` on the bundle itself finds nothing - the modules are nested jars). Resolve that first, then add
       `ChassisAssemblyMenu` + `AbstractContainerScreen` and the upgrade station on the same pattern.
 - [ ] Block 2c: UpOre veins in the Overworld and the Nether (worldgen: configured/placed features plus
       loader-specific biome modifiers), compressed UpOre block item.
