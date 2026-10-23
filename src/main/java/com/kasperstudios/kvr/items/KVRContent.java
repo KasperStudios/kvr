@@ -49,6 +49,7 @@ public final class KVRContent {
         ITEM_FACTORIES.put("up_raw", () -> new Item(itemProperties("up_raw")));
         ITEM_FACTORIES.put("up_ingot", () -> new Item(itemProperties("up_ingot")));
         ITEM_FACTORIES.put("tier_upgrader_template", () -> new Item(itemProperties("tier_upgrader_template")));
+        ITEM_FACTORIES.put("glasses", () -> new GlassesItem(itemProperties("glasses").stacksTo(1)));
 
         for (ComponentTier tier : ComponentTier.values()) {
             ITEM_FACTORIES.put(chassisPath(tier),
@@ -141,6 +142,10 @@ public final class KVRContent {
 
     public static Item tierUpgrader() {
         return item("tier_upgrader_template");
+    }
+
+    public static GlassesItem glasses() {
+        return (GlassesItem) item("glasses");
     }
 
     /** Every registered item path, in declaration order. */

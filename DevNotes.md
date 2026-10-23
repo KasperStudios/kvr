@@ -55,8 +55,9 @@ packages all Matrix entries, and the core tests pass on every node.
       `...platform.neoforge.*ProviderImpl`) for the transformed facade calls.
 
 ### In progress
-- [ ] Block 2b: upgrade station (consumes the exact ore cost), assembly screen, disassembly
-      (Shift+RMB), chassis painting via dyed color.
+- [ ] Block 2b (container-menu based, decided by the Creator): `ChassisAssemblyMenu` + screen,
+      upgrade station menu (exact ore deduction), chassis painting. Glasses item, its six-int stack
+      format and Shift+RMB disassembly already landed.
 - [ ] Block 2c: UpOre veins in the Overworld and the Nether (worldgen: configured/placed features plus
       loader-specific biome modifiers), compressed UpOre block item.
 
@@ -260,6 +261,13 @@ kvr/
   (`0.1.0+<mc>`), fabric loader floor = `deps.fabric_loader`, `pack_format` = per-version
   `mod.pack_format` (1.20.1=15, 1.21.1=34, 1.21.11=75). A stale `pack_format` or version string ships
   silently and only breaks clients.
+- **`Item#use` changed in 1.21.2, not 1.20.5**: before 1.21.2 it returns `InteractionResultHolder<ItemStack>`,
+  after it returns `InteractionResult`. Important version seam in 1.21.11: `Level.isClientSide` became a
+  method (`isClientSide()`) and `InteractionResult.sidedSuccess(boolean)` was replaced by the `SUCCESS`
+  constant - `GlassesItem` wraps both in tiny Stonecutter-branched helpers.
+- **`CompoundTag.getIntArray` returns `Optional<int[]>` from 1.21.11** (plain `int[]` in 1.21.1), so the
+  glasses data reader branches three ways: NBT (<1.20.5), component + plain array (1.20.5-1.21.1),
+  component + Optional (1.21.11+).
 - **Never write the "wrong" branch uncommented**: the sources as written are the *active* version's
   variant; the other side must be wrapped in `/* ... *///?}`. A wrong active branch compiles against
   the wrong API and the error looks like a missing symbol.
