@@ -1,5 +1,7 @@
 package com.kasperstudios.kvr.platform;
 
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 
@@ -8,14 +10,18 @@ import java.util.function.Supplier;
 /**
  * Loader facade for registry entries.
  *
- * <p>Fabric registers immediately, NeoForge queues into {@code DeferredRegister}; both expose the
- * same calls so the KVR core never branches on the loader.
+ * <p>Fabric registers immediately, NeoForge queues into {@code DeferredRegister}; both expose the same
+ * calls so the KVR core never branches on the loader. Ids are passed in already built by
+ * {@code KVRIds.id(path)}, so validation cannot be skipped by one loader and enforced by the other.
  */
 public interface KVRRegistrar {
 
-    /** Registers an item as {@code kvr:<path>}. */
-    void item(String path, Supplier<Item> item);
+    /** Registers an item. */
+    void item(ResourceLocation id, Supplier<Item> item);
 
-    /** Registers a block as {@code kvr:<path>}. */
-    void block(String path, Supplier<Block> block);
+    /** Registers a block. */
+    void block(ResourceLocation id, Supplier<Block> block);
+
+    /** Registers an entity type. */
+    void entityType(ResourceLocation id, Supplier<EntityType<?>> type);
 }

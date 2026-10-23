@@ -37,9 +37,11 @@ packages all Matrix entries, and the core tests pass on every node.
 - [x] Multi-module Architectury Loom project: `src/` (= `:common`), `fabric/`, `neoforge/`.
 - [x] Stonecutter matrix: 1.20.1, 1.21.1, 1.21.11 (`versions/<mc>/gradle.properties`).
 - [x] Platform facades in `com.kasperstudios.kvr.platform`: `KVRPlatform` (metadata/paths/side),
-      `KVRRegistrar` (items/blocks), `KVRGui` (screens), each with a provider.
+      `KVRRegistrar` (items/blocks/entity types, ids already validated), `KVRGui` (screens) with
+      `SimpleKVRGui` installed on the client side, each with a provider.
 - [x] Fabric and NeoForge entrypoints installing the facades and booting `KVR.init()`.
-- [x] Tests: bootstrap seam, registry-path validation, module isolation (11 tests x 3 versions).
+- [x] Tests: bootstrap seam, registry-path validation (incl. path traversal), GUI facade,
+      module isolation (16 tests x 3 versions).
 - [x] Runtime verification: `kvr-fabric-0.1.0+1.21.1.jar` loads on a real Fabric 1.21.1 dedicated
       server and logs `KVR OS core 0.1.0 booting on fabric (dedicated server)`.
 - [x] Architectury platform-side implementations (`...platform.fabric.*ProviderImpl`,
@@ -51,8 +53,9 @@ packages all Matrix entries, and the core tests pass on every node.
 ### Planned / TODO
 - [ ] Blocks 3-5 from `SPEC.md` section 7 (energy/dock plate, spatial engine, QuickJS + apps).
 - [ ] Network facade (`KVRNetwork`) — deliberately deferred to the block that ships the first packet,
-      so its API is designed against real payloads instead of guesses.
-- [ ] Client-side screen registry implementation for `KVRGui` (Block 2, `ChassisAssemblyScreen`).
+      so its API is designed against real payloads instead of guesses. Tracked as an open SPEC item,
+      not as a completed one.
+- [ ] Register the first real screens in `SimpleKVRGui` (Block 2, `ChassisAssemblyScreen`).
 
 ### Not in scope right now
 - No content registration yet: zero items/blocks are registered, so the mod currently boots and does nothing visible.
@@ -213,6 +216,14 @@ kvr/
   implementation as `<class package>.<loader>.<Class>Impl` (e.g.
   `com.kasperstudios.kvr.platform.fabric.KVRPlatformProviderImpl`). Missing that class compiles
   fine and only fails when the mod loads (`NoClassDefFoundError` in the entrypoint).
+- **Stonecutter's Gradle DSL cannot be moved into `buildSrc` or an applied `.gradle.kts` script**:
+  applied scripts are compiled without the plugin classpath (`stonecutter`/`loom` unresolved), so the
+  `stonecutter { replacements... }` block stays inline in all three build scripts. Only plain Gradle
+  helpers (e.g. `applyKvrJavaVersion`) belong in `buildSrc`.
+- **Metadata is templated from gradle.properties, never hardcoded**: mod version = project version
+  (`0.1.0+<mc>`), fabric loader floor = `deps.fabric_loader`, `pack_format` = per-version
+  `mod.pack_format` (1.20.1=15, 1.21.1=34, 1.21.11=75). A stale `pack_format` or version string ships
+  silently and only breaks clients.
 - **Never write the "wrong" branch uncommented**: the sources as written are the *active* version's
   variant; the other side must be wrapped in `/* ... *///?}`. A wrong active branch compiles against
   the wrong API and the error looks like a missing symbol.
@@ -246,7 +257,7 @@ java -Xmx1200M -jar fabric-server-launch.jar nogui
 
 | Block (SPEC section 7) | Status |
 |---|---|
-| 1. Architectural skeleton | done |
+| 1. Architectural skeleton | done (network facade intentionally open) |
 | 2. Items, crafts, hardware | not started |
 | 3. Energy, dock plate, Note 7 | not started |
 | 4. Spatial engine, 3D rendering | not started |
@@ -265,3 +276,6 @@ java -Xmx1200M -jar fabric-server-launch.jar nogui
 ## 20. Change Log of DevNotes
 
 - 2026-10-23: created after Block 1 (skeleton) landed.
+- 2026-10-23: two-axis review fixes - single namespace constant, validated ids through the registrar,
+  entity-type facade, client-side GUI registry, stronger isolation test, templated mod metadata
+  (real version / loader floor / pack_format), path-traversal rejection.

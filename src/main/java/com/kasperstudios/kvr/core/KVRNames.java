@@ -37,6 +37,16 @@ public final class KVRNames {
             throw new IllegalArgumentException("KVR resource path '" + path
                     + "' must not contain a namespace - KVR always registers in '" + NAMESPACE + "'");
         }
+        if (path.startsWith("/") || path.endsWith("/") || path.contains("//")) {
+            throw new IllegalArgumentException("KVR resource path '" + path
+                    + "' must not start, end or repeat the '/' separator");
+        }
+        for (String segment : path.split("/")) {
+            if (segment.equals(".") || segment.equals("..")) {
+                throw new IllegalArgumentException("KVR resource path '" + path
+                        + "' must not contain relative segments - traversal outside the KVR namespace is not allowed");
+            }
+        }
         if (!VALID_PATH.matcher(path).matches()) {
             throw new IllegalArgumentException("KVR resource path '" + path + "' must be lowercase and use only "
                     + "[a-z0-9_.-/] (got '" + path.toLowerCase(Locale.ROOT) + "' after folding)");

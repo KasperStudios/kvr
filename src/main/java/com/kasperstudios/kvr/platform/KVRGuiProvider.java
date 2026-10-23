@@ -28,7 +28,10 @@ public final class KVRGuiProvider {
     }
 
     public static void install(KVRGui gui) {
-        installed = gui == null ? NOOP : gui;
+        if (gui == null) {
+            throw new IllegalArgumentException("gui implementation must not be null");
+        }
+        installed = gui;
     }
 
     /** Test hook. */

@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Seam: the module boundary itself (SPEC section 1, rule 1).
- * The platform-independent core must compile and run without a single mod-loader import;
+ * The platform-independent core must compile and run without a single mod-loader reference;
  * every loader-specific behaviour belongs to the {@code fabric} / {@code neoforge} branches.
  */
 class ArchitectureIsolationTest {
@@ -23,7 +23,7 @@ class ArchitectureIsolationTest {
     );
 
     @Test
-    void commonCoreHasNoLoaderImports() throws IOException {
+    void commonCoreHasNoLoaderReferences() throws IOException {
         Path core = repositoryRoot().resolve("src").resolve("main").resolve("java");
         assertTrue(Files.isDirectory(core), "expected the common source root at " + core.toAbsolutePath());
 
@@ -32,11 +32,10 @@ class ArchitectureIsolationTest {
             for (Path file : files.filter(p -> p.toString().endsWith(".java")).toList()) {
                 List<String> lines = Files.readAllLines(file);
                 for (int i = 0; i < lines.size(); i++) {
-                    String line = lines.get(i).trim();
-                    if (!line.startsWith("import ")) continue;
+                    String code = stripComment(lines.get(i));
                     for (String forbidden : FORBIDDEN) {
-                        if (line.contains(forbidden)) {
-                            violations.add(file + ":" + (i + 1) + " -> " + line);
+                        if (code.contains(forbidden)) {
+                            violations.add(file + ":" + (i + 1) + " -> " + lines.get(i).trim());
                         }
                     }
                 }
@@ -44,7 +43,17 @@ class ArchitectureIsolationTest {
         }
 
         assertTrue(violations.isEmpty(),
-                "platform-independent core imported loader classes:\n" + String.join("\n", violations));
+                "platform-independent core referenced loader classes:\n" + String.join("\n", violations));
+    }
+
+    /** Drops line comments and block-comment bodies so javadoc prose may mention loader names. */
+    private static String stripComment(String line) {
+        String trimmed = line.trim();
+        if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) {
+            return "";
+        }
+        int lineComment = line.indexOf("//");
+        return lineComment >= 0 ? line.substring(0, lineComment) : line;
     }
 
     /**

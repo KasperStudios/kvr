@@ -1,5 +1,6 @@
 package com.kasperstudios.kvr;
 
+import com.kasperstudios.kvr.core.KVRNames;
 import com.kasperstudios.kvr.platform.KVRPlatform;
 import com.kasperstudios.kvr.platform.KVRPlatformProvider;
 import org.slf4j.Logger;
@@ -14,7 +15,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class KVR {
 
-    public static final String MOD_ID = "kvr";
+    public static final String MOD_ID = KVRNames.NAMESPACE;
     public static final String MOD_NAME = "KVR";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MOD_NAME);

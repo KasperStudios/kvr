@@ -48,6 +48,16 @@ class KVRNamesTest {
     }
 
     @Test
+    void rejectsPathTraversal() {
+        assertThrows(IllegalArgumentException.class, () -> KVRNames.validated("../../config/kvr.json"));
+        assertThrows(IllegalArgumentException.class, () -> KVRNames.validated("apps/../../secrets"));
+        assertThrows(IllegalArgumentException.class, () -> KVRNames.validated("./notes"));
+        assertThrows(IllegalArgumentException.class, () -> KVRNames.validated("/notes"));
+        assertThrows(IllegalArgumentException.class, () -> KVRNames.validated("notes/"));
+        assertThrows(IllegalArgumentException.class, () -> KVRNames.validated("apps//notes"));
+    }
+
+    @Test
     void reportsTheOffendingPathInTheMessage() {
         IllegalArgumentException ex =
                 assertThrows(IllegalArgumentException.class, () -> KVRNames.validated("CPU"));

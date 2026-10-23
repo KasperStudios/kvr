@@ -13,7 +13,7 @@ base {
 }
 
 // 1.21.11 renamed net.minecraft.resources.ResourceLocation to ...Identifier (same class, same API).
-// Instead of duplicating the id helper per version, Stonecutter rewrites the name where it applies.
+// The Stonecutter DSL cannot live in buildSrc (plugin types), so this block is repeated per module.
 stonecutter {
     replacements.string(stonecutter.eval(stonecutter.current.version, ">=1.21.11")) {
         replace("ResourceLocation", "Identifier")
@@ -48,12 +48,7 @@ loom {
     }
 }
 
-java {
-    withSourcesJar()
-    val java = if (stonecutter.eval(minecraft, ">=1.20.5")) JavaVersion.VERSION_21 else JavaVersion.VERSION_17
-    targetCompatibility = java
-    sourceCompatibility = java
-}
+applyKvrJavaVersion(stonecutter.eval(minecraft, ">=1.20.5"))
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
