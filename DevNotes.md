@@ -58,11 +58,13 @@ packages all Matrix entries, and the core tests pass on every node.
 - [ ] Block 2b (container-menu based, decided by the Creator). Landed: glasses item + stack codec +
       Shift+RMB disassembly, `AssemblyRules` (6 inputs -> build or explicit problems), and
       `KVRRegistrar.menu(...)` so the loader facade can register menu types.
-- [ ] **Blocker found, next step first**: `MenuType`'s constructor is not publicly accessible through
-      mojmap on 1.20.1/1.21.1, so a menu type must be created through loader APIs
-      (NeoForge `IMenuTypeExtension.create`, Fabric `ExtendedScreenHandlerType`). Do that inside the
-      platform registrars, then add `ChassisAssemblyMenu` + `AbstractContainerScreen` and the
-      upgrade station on the same pattern.
+- [ ] **Blocker, next step first**: `MenuType`'s constructor is not publicly accessible through mojmap
+      on 1.20.1/1.21.1, so menu types must be built by the loader. Verified in a spike:
+      NeoForge `IMenuTypeExtension.create((windowId, inv, buf) -> menu)` compiles on 21.1/21.11;
+      Fabric `ExtendedScreenHandlerType` is generic over the payload type (`<T, D>` + `StreamCodec`),
+      and its signature differs across fabric-api versions (0.92 / 0.97 / 0.116 / 0.141), so the exact
+      ctor must be read with `javap` per fabric-api jar before writing it. Resolve that first, then add
+      `ChassisAssemblyMenu` + `AbstractContainerScreen` and the upgrade station on the same pattern.
 - [ ] Block 2c: UpOre veins in the Overworld and the Nether (worldgen: configured/placed features plus
       loader-specific biome modifiers), compressed UpOre block item.
 
