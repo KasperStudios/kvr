@@ -5,6 +5,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 
@@ -26,5 +27,10 @@ final class FabricRegistrar implements KVRRegistrar {
     @Override
     public void entityType(ResourceLocation id, Supplier<EntityType<?>> type) {
         Registry.register(BuiltInRegistries.ENTITY_TYPE, id, type.get());
+    }
+
+    @Override
+    public void menu(ResourceLocation id, Supplier<MenuType<?>> menu) {
+        Registry.register(BuiltInRegistries.MENU, id, menu.get());
     }
 }

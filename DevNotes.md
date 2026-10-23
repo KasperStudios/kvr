@@ -55,9 +55,14 @@ packages all Matrix entries, and the core tests pass on every node.
       `...platform.neoforge.*ProviderImpl`) for the transformed facade calls.
 
 ### In progress
-- [ ] Block 2b (container-menu based, decided by the Creator): `ChassisAssemblyMenu` + screen,
-      upgrade station menu (exact ore deduction), chassis painting. Glasses item, its six-int stack
-      format and Shift+RMB disassembly already landed.
+- [ ] Block 2b (container-menu based, decided by the Creator). Landed: glasses item + stack codec +
+      Shift+RMB disassembly, `AssemblyRules` (6 inputs -> build or explicit problems), and
+      `KVRRegistrar.menu(...)` so the loader facade can register menu types.
+- [ ] **Blocker found, next step first**: `MenuType`'s constructor is not publicly accessible through
+      mojmap on 1.20.1/1.21.1, so a menu type must be created through loader APIs
+      (NeoForge `IMenuTypeExtension.create`, Fabric `ExtendedScreenHandlerType`). Do that inside the
+      platform registrars, then add `ChassisAssemblyMenu` + `AbstractContainerScreen` and the
+      upgrade station on the same pattern.
 - [ ] Block 2c: UpOre veins in the Overworld and the Nether (worldgen: configured/placed features plus
       loader-specific biome modifiers), compressed UpOre block item.
 
@@ -261,6 +266,9 @@ kvr/
   (`0.1.0+<mc>`), fabric loader floor = `deps.fabric_loader`, `pack_format` = per-version
   `mod.pack_format` (1.20.1=15, 1.21.1=34, 1.21.11=75). A stale `pack_format` or version string ships
   silently and only breaks clients.
+- **`new MenuType<>(...)` does not compile with mojmap**: the constructor and its `MenuSupplier` are not
+  public, so every custom menu type has to be built by the loader (NeoForge `IMenuTypeExtension`,
+  Fabric `ExtendedScreenHandlerType`). Keep menu-type creation in the platform modules.
 - **`Item#use` changed in 1.21.2, not 1.20.5**: before 1.21.2 it returns `InteractionResultHolder<ItemStack>`,
   after it returns `InteractionResult`. Important version seam in 1.21.11: `Level.isClientSide` became a
   method (`isClientSide()`) and `InteractionResult.sidedSuccess(boolean)` was replaced by the `SUCCESS`

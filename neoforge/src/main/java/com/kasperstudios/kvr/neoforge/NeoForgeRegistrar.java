@@ -5,6 +5,7 @@ import com.kasperstudios.kvr.platform.KVRRegistrar;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.neoforged.bus.api.IEventBus;
@@ -18,11 +19,13 @@ final class NeoForgeRegistrar implements KVRRegistrar {
     private final DeferredRegister.Items items = DeferredRegister.createItems(KVR.MOD_ID);
     private final DeferredRegister.Blocks blocks = DeferredRegister.createBlocks(KVR.MOD_ID);
     private final DeferredRegister<EntityType<?>> entityTypes = DeferredRegister.create(Registries.ENTITY_TYPE, KVR.MOD_ID);
+    private final DeferredRegister<MenuType<?>> menus = DeferredRegister.create(Registries.MENU, KVR.MOD_ID);
 
     NeoForgeRegistrar(IEventBus modBus) {
         items.register(modBus);
         blocks.register(modBus);
         entityTypes.register(modBus);
+        menus.register(modBus);
     }
 
     @Override
@@ -38,5 +41,10 @@ final class NeoForgeRegistrar implements KVRRegistrar {
     @Override
     public void entityType(ResourceLocation id, Supplier<EntityType<?>> type) {
         entityTypes.register(id.getPath(), type);
+    }
+
+    @Override
+    public void menu(ResourceLocation id, Supplier<MenuType<?>> menu) {
+        menus.register(id.getPath(), menu);
     }
 }
