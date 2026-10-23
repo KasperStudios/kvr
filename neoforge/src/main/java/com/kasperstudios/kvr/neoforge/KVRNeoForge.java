@@ -8,13 +8,30 @@ import com.kasperstudios.kvr.platform.KVRRegistryProvider;
 import com.kasperstudios.kvr.platform.SimpleKVRGui;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
+//? if <1.20.5 {
+/*import net.neoforged.fml.javafmlmod.FMLJavaModLoadingContext;
+*///?}
 import net.neoforged.fml.common.Mod;
 
 /** NeoForge entrypoint: installs the NeoForge platform facades and boots the KVR core. */
 @Mod(KVR.MOD_ID)
 public final class KVRNeoForge {
 
+    // NeoForge 20.5+ injects the mod bus and container into the constructor; 1.20.4 has to ask for them
+    //? if >=1.20.5 {
     public KVRNeoForge(IEventBus modBus, ModContainer container) {
+        bootstrap(modBus, container);
+    }
+    //?} else {
+    /*public KVRNeoForge() {
+        bootstrap(FMLJavaModLoadingContext.get().getModEventBus(),
+                ModList.get().getModContainerById(KVR.MOD_ID).orElseThrow(
+                        () -> new IllegalStateException("KVR mod container missing")));
+    }
+    *///?}
+
+    private static void bootstrap(IEventBus modBus, ModContainer container) {
         KVRPlatform platform = new NeoForgePlatform(container);
         KVRPlatformProvider.install(platform);
         KVRRegistryProvider.install(new NeoForgeRegistrar(modBus));

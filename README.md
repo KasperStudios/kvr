@@ -13,7 +13,8 @@ Design documents:
 ## Status
 
 Block 1 (architectural skeleton) is implemented: a Fabric + NeoForge build that compiles the same
-`common` core against Minecraft 1.20.1, 1.21.1 and 1.21.11. Gameplay content starts with Block 2.
+`common` core against Minecraft 1.20.1, 1.20.4, 1.21.1 and 1.21.11. Gameplay content starts with
+Block 2; the packet facade is deferred until the first real payload exists.
 
 ## Building
 
@@ -22,7 +23,7 @@ Requires JDK 21 (and JDK 17+ available for the 1.20.1 target).
 ```bash
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 
-./gradlew test            # tests for every Stonecutter node (33 tests)
+./gradlew test            # tests for every Stonecutter node (16 tests x 4 versions)
 ./gradlew build           # jars for every loader/version combination
 ```
 
@@ -37,9 +38,12 @@ Supported matrix:
 
 | Minecraft | Fabric | NeoForge |
 |---|---|---|
-| 1.20.1  | yes | — (NeoForge does not exist for 1.20.1) |
+| 1.20.1  | yes | — (NeoForge starts at 1.20.2) |
+| 1.20.4  | yes | yes |
 | 1.21.1  | yes | yes |
 | 1.21.11 | yes | yes |
+
+Every entry above has been booted on a real dedicated server, not just compiled.
 
 ## Layout
 

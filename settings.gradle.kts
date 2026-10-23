@@ -20,10 +20,10 @@ stonecutter {
     kotlinController = true
     create(rootProject) {
         // Root `src/` is the platform-independent KVR core (:common)
-        versions("1.20.1", "1.21.1", "1.21.11")
+        versions("1.20.1", "1.20.4", "1.21.1", "1.21.11")
         branch("fabric")
-        // NeoForge did not exist for 1.20.1
-        branch("neoforge") { versions("1.21.1", "1.21.11") }
+        // NeoForge starts at 1.20.2, so the 1.20.1 column stays Fabric-only
+        branch("neoforge") { versions("1.20.4", "1.21.1", "1.21.11") }
     }
 }
 

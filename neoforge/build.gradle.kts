@@ -91,14 +91,33 @@ tasks.shadowJar {
     exclude("fabric.mod.json", "architectury.common.json")
 }
 
+// NeoForge reads META-INF/mods.toml before 1.20.5 and META-INF/neoforge.mods.toml from 1.20.5 on,
+// so one template is emitted under the name the target version expects.
+val modsTomlName = if (stonecutter.eval(minecraft, ">=1.20.5")) "neoforge.mods.toml" else "mods.toml"
+val modsToml = mapOf(
+    "id" to mod.id.toString(),
+    "name" to mod.name,
+    "version" to project.version.toString(),
+    "minecraft" to common.mod.prop("mc_dep_forgelike").toString(),
+    "pack_format" to common.mod.prop("pack_format").toString(),
+    "loader_range" to common.mod.prop("fml_loader_range").toString(),
+    "neoforge_range" to common.mod.prop("neoforge_range").toString()
+)
+
 tasks.processResources {
-    properties(listOf("META-INF/neoforge.mods.toml", "pack.mcmeta"),
-        "id" to mod.id,
-        "name" to mod.name,
-        "version" to project.version,
-        "minecraft" to common.mod.prop("mc_dep_forgelike"),
-        "pack_format" to common.mod.prop("pack_format")
-    )
+    inputs.property("modsTomlName", modsTomlName)
+    inputs.properties(modsToml)
+
+    exclude("META-INF/neoforge.mods.toml")
+    from(rootProject.file("neoforge/src/main/resources/META-INF/neoforge.mods.toml")) {
+        into("META-INF")
+        rename { modsTomlName }
+        expand(modsToml)
+    }
+
+    filesMatching("pack.mcmeta") {
+        expand(modsToml)
+    }
 }
 
 tasks.build {

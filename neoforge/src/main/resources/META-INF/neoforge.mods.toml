@@ -1,5 +1,5 @@
 modLoader = "javafml"
-loaderVersion = "[4,)"
+loaderVersion = "${loader_range}"
 license = "All-Rights-Reserved"
 
 [[mods]]
@@ -12,7 +12,7 @@ description = "KVR - spatial OS inside Minecraft: floating 3D windows, hardware 
 [[dependencies.${id}]]
 modId = "neoforge"
 type = "required"
-versionRange = "[21,)"
+versionRange = "${neoforge_range}"
 ordering = "NONE"
 side = "BOTH"
 

@@ -35,7 +35,8 @@ packages all Matrix entries, and the core tests pass on every node.
 
 ### Implemented
 - [x] Multi-module Architectury Loom project: `src/` (= `:common`), `fabric/`, `neoforge/`.
-- [x] Stonecutter matrix: 1.20.1, 1.21.1, 1.21.11 (`versions/<mc>/gradle.properties`).
+- [x] Stonecutter matrix: 1.20.1, 1.20.4, 1.21.1, 1.21.11 (`versions/<mc>/gradle.properties`);
+      Fabric for all four, NeoForge for 1.20.4+ (NeoForge does not exist for 1.20.1).
 - [x] Platform facades in `com.kasperstudios.kvr.platform`: `KVRPlatform` (metadata/paths/side),
       `KVRRegistrar` (items/blocks/entity types, ids already validated), `KVRGui` (screens) with
       `SimpleKVRGui` installed on the client side, each with a provider.
@@ -77,7 +78,7 @@ packages all Matrix entries, and the core tests pass on every node.
 - Architectury Loom: 1.17-SNAPSHOT; Architectury Gradle plugin: 3.5-SNAPSHOT (maven.shedaniel.me)
 - Stonecutter: 0.9.8 (requires Gradle 9)
 - Fabric Loader: 0.19.2
-- NeoForge: 21.1.264 (1.21.1), 21.11.48 (1.21.11)
+- NeoForge: 20.4.237 (1.20.4), 21.1.264 (1.21.1), 21.11.48 (1.21.11)
 - JUnit: 5.10.2
 
 ### Environment notes
@@ -208,6 +209,16 @@ kvr/
 
 - **Stonecutter 0.9.8 requires Gradle 9**; Loom 1.17 requires Gradle 9 too. Gradle 8.x is not an option.
 - **Architectury Gradle plugin 3.4 crashes** with Loom 1.17 (`NoClassDefFoundError: RunConfig`) - use 3.5-SNAPSHOT.
+- **NeoForge reads a different metadata file per era**: `META-INF/mods.toml` before 1.20.5,
+  `META-INF/neoforge.mods.toml` from 1.20.5. `neoforge/build.gradle.kts` renames the single template at
+  build time; a wrong name makes FML silently report "1 invalid mod files" with no reason at INFO level.
+- **Maven version ranges with identical bounds are invalid** (`[1.20.4, 1.20.4]` -> FML 2 throws
+  `InvalidVersionSpecificationException`). Use half-open ranges: `mod.mc_dep_forgelike=[1.20.4,1.20.5)`.
+- **FML loader range differs per era**: NeoForge 20.4 uses FML 2 (`loaderVersion = "[2,)"`), 21.x uses
+  FML 4/10 (`"[4,)"`). Both are templated per version (`mod.fml_loader_range`, `mod.neoforge_range`).
+- **NeoForge < 20.5 has no `ModContainer`/`IEventBus` constructor injection**: the entrypoint needs
+  `FMLJavaModLoadingContext.get().getModEventBus()` + `ModList.get().getModContainerById(...)`, which is
+  a Stonecutter branch in `KVRNeoForge`.
 - **Mojang renamed `ResourceLocation` to `Identifier` in 1.21.11** (same class, same API, package
   `net.minecraft.resources`). One Stonecutter string replacement handles it project-wide; without it
   every id call fails to compile on 1.21.11.
@@ -242,14 +253,24 @@ kvr/
 - Runtime smoke test (the only proof the mod actually loads):
 
 ```bash
-# Fabric 1.21.1
+# Fabric
 mkdir -p /tmp/kvr-srv/mods && cd /tmp/kvr-srv
-java -jar /path/fabric-installer-1.1.2.jar server -mcversion 1.21.1 -loader 0.19.2 -downloadMinecraft
+curl -LO https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.1.2/fabric-installer-1.1.2.jar
+java -jar fabric-installer-1.1.2.jar server -mcversion 1.21.1 -loader 0.19.2 -downloadMinecraft
 cp <repo>/fabric/versions/1.21.1/build/libs/kvr-fabric-*.jar mods/
 printf 'eula=true\n' > eula.txt
 java -Xmx1200M -jar fabric-server-launch.jar nogui
-# expect: "KVR OS core 0.1.0 booting on fabric (dedicated server)" then "Done (...)"
+
+# NeoForge
+curl -LO https://maven.neoforged.net/releases/net/neoforged/neoforge/21.11.48/neoforge-21.11.48-installer.jar
+java -jar neoforge-21.11.48-installer.jar --installServer .
+cp <repo>/neoforge/versions/1.21.11/build/libs/kvr-neoforge-*.jar mods/
+env JAVA_HOME=/usr/lib/jvm/java-21-openjdk PATH=$JAVA_HOME/bin:$PATH ./run.sh nogui
+# expect: "Found mod file "kvr-neoforge-...jar"" and "KVR OS core <ver> booting on <loader> (dedicated server)" then "Done (...)"
 ```
+
+Verified 2026-10-23 on real dedicated servers: fabric 1.20.1/1.20.4/1.21.1/1.21.11,
+neoforge 1.20.4/1.21.1/1.21.11 — all boot KVR with no errors.
 
 ---
 
