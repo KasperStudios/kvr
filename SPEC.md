@@ -233,8 +233,9 @@ win.show();
 - [x] Предмет очков `kvr:glasses`: сборка сериализуется в 6 int (NBT до 1.20.5, DataComponent с 1.20.5),
   `GlassesCodec` проверяет корректность; `Shift + ПКМ` разбирает очки — шасси и все 5 деталей
   возвращаются без потерь.
-- [ ] GUI сборки `ChassisAssemblyScreen` — **Контейнер-Menu** (`AbstractContainerMenu` +
-  `AbstractContainerScreen`, решение Создателя): серверная валидация, shift-клики, хоткеи, свой рендер поверх.
+- [x] GUI сборки `ChassisAssemblyScreen` — **Контейнер-Menu** (`AbstractContainerMenu` +
+  `AbstractContainerScreen`): 6 слотов с проверкой типа, take-only результат, списание входов один раз,
+  ванильные shift-клики/хоткеи, свой стеклянный рендер без текстур. Открывается ПКМ по шасси.
 - [ ] Станция апгрейда (списание 4/16/64/256 UpOre из инвентаря) — тоже Menu.
 - [ ] Применение краски (`dyed_color`) к шасси/очкам.
 - [ ] Генерация `UpOre` в мире (жилы Overworld/Nether) — отдельный тикет worldgen.

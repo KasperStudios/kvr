@@ -61,9 +61,10 @@ packages all Matrix entries, and the core tests pass on every node.
 - [x] Menu types are built by the loader now: Fabric `ExtendedScreenHandlerType` (StreamCodec payload
       from 1.20.5, factory-only before) and NeoForge `IMenuTypeExtension`, both through
       `KVRRegistrar.menuType(...)`. `kvr:chassis_assembly` registers and the server boots with it.
-- [ ] Next step: bind `ChassisItem` use to open the menu and add the client screens
-      (`AbstractContainerScreen` + Fabric `ClientModInitializer` / NeoForge `RegisterMenuScreensEvent`),
-      then the upgrade station and painting.
+- [x] Assembly GUI end to end: right-click a chassis opens `kvr:chassis_assembly`; client screens are
+      bound through Fabric `ClientModInitializer` + `MenuScreens.register` and NeoForge
+      `RegisterMenuScreensEvent`; the screen paints its own panel (`AbstractContainerScreen`, no textures).
+- [ ] Next: upgrade station menu (exact 4/16/64/256 ore deduction) and chassis painting (`dyed_color`).
 - [ ] **Old blocker notes (resolved, kept for context)**: `MenuType`'s constructor is not publicly accessible through mojmap
       on 1.20.1/1.21.1, so menu types must be built by the loader. Verified in a spike:
       NeoForge `IMenuTypeExtension.create((windowId, inv, buf) -> menu)` compiles on 21.1/21.11;
@@ -277,6 +278,9 @@ kvr/
   (`0.1.0+<mc>`), fabric loader floor = `deps.fabric_loader`, `pack_format` = per-version
   `mod.pack_format` (1.20.1=15, 1.21.1=34, 1.21.11=75). A stale `pack_format` or version string ships
   silently and only breaks clients.
+- **`renderBackground(GuiGraphics, int, int, float)` only exists from 1.20.5**: before that the method
+  takes just `GuiGraphics`. Do not override `Screen#render` to call it; let `AbstractContainerScreen`
+  handle the background.
 - **`new MenuType<>(...)` does not compile with mojmap**: the constructor and its `MenuSupplier` are not
   public, so every custom menu type has to be built by the loader (NeoForge `IMenuTypeExtension`,
   Fabric `ExtendedScreenHandlerType`). Keep menu-type creation in the platform modules.

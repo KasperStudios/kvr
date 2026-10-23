@@ -12,6 +12,9 @@
   "entrypoints": {
     "main": [
       "com.kasperstudios.kvr.fabric.KVRFabric"
+    ],
+    "client": [
+      "com.kasperstudios.kvr.fabric.KVRFabricClient"
     ]
   },
   "depends": {

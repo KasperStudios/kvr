@@ -39,6 +39,7 @@ public final class KVRNeoForge {
         KVRContent.init();
         if (platform.isClient()) {
             KVRGuiProvider.install(new SimpleKVRGui(platform.name()));
+            NeoForgeClientScreens.register(modBus);
         }
         KVR.init();
     }
