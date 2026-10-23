@@ -47,14 +47,18 @@ packages all Matrix entries, and the core tests pass on every node.
 - [x] Block 2a content: 34 items (25 module items, 5 chassis, UpOre raw/ingot, upgrader template) and
       the `up_ore` block, registered through the loader facade; version-shaped recipes + ore loot table;
       generated 16x16 textures/models with no external assets.
+- [x] Upgrade price rules: `TierUpgrade` (4/16/64/256, template required), `UpgradeRules` (exactly what
+      is missing, chassis-room check), `CompressedOre` (64 ore per block, so 256 = 4 blocks).
 - [x] Runtime verification: `kvr-fabric-0.1.0+1.21.1.jar` loads on a real Fabric 1.21.1 dedicated
       server and logs `KVR OS core 0.1.0 booting on fabric (dedicated server)`.
 - [x] Architectury platform-side implementations (`...platform.fabric.*ProviderImpl`,
       `...platform.neoforge.*ProviderImpl`) for the transformed facade calls.
 
 ### In progress
-- [ ] Block 2b: assembly screen, disassembly, tier-upgrade screen (ore cost belongs there - a vanilla
-      smithing/crafting slot cannot consume 16 items), chassis painting, ore worldgen.
+- [ ] Block 2b: upgrade station (consumes the exact ore cost), assembly screen, disassembly
+      (Shift+RMB), chassis painting via dyed color.
+- [ ] Block 2c: UpOre veins in the Overworld and the Nether (worldgen: configured/placed features plus
+      loader-specific biome modifiers), compressed UpOre block item.
 
 ### Planned / TODO
 - [ ] Blocks 3-5 from `SPEC.md` section 7 (energy/dock plate, spatial engine, QuickJS + apps).
@@ -189,6 +193,12 @@ kvr/
 ## 8. Critical Rules
 
 > These rules are non-negotiable.
+
+0. Creator-confirmed hardware semantics: CPU = script tick rate / app responsiveness only (no invented
+   boot-time numbers), GPU = window rendering and frame drops, RAM = simultaneous `.vrapp` windows
+   (vanilla detached screens do not count), Storage = VFS capacity, Battery = capacity + safe discharge.
+   Upgrade costs are exactly 4/16/64/256 UpOre and are consumed by the KVR station, not by a vanilla
+   recipe slot.
 
 1. `src/` (the core) must never import a loader class. Platform access goes through `platform/` facades.
 2. Loader-specific code lives only in `fabric/` or `neoforge/` and must be thin (entrypoint + facades).

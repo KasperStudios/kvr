@@ -8,11 +8,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class HardwareTableTest {
 
     @Test
-    void cpuControlsBootTimeAndScriptTickRate() {
-        assertEquals(20.0, HardwareTable.of(ComponentType.CPU, ComponentTier.TIER_1_BOMZH).bootSeconds(), 1e-9);
+    void cpuControlsScriptTickRateAndResponsiveness() {
         assertEquals(10, HardwareTable.of(ComponentType.CPU, ComponentTier.TIER_1_BOMZH).scriptTickHz());
-        assertEquals(0.1, HardwareTable.of(ComponentType.CPU, ComponentTier.TIER_5_FRONTIER).bootSeconds(), 1e-9);
+        assertEquals(100, HardwareTable.of(ComponentType.CPU, ComponentTier.TIER_1_BOMZH).scriptTickMillis());
         assertEquals(200, HardwareTable.of(ComponentType.CPU, ComponentTier.TIER_5_FRONTIER).scriptTickHz());
+        assertEquals(5, HardwareTable.of(ComponentType.CPU, ComponentTier.TIER_5_FRONTIER).scriptTickMillis());
     }
 
     @Test

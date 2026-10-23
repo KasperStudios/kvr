@@ -78,8 +78,8 @@ public final class GlassesBuild {
         return spec(ComponentType.CPU).scriptTickHz();
     }
 
-    public double bootSeconds() {
-        return spec(ComponentType.CPU).bootSeconds();
+    public int scriptTickMillis() {
+        return spec(ComponentType.CPU).scriptTickMillis();
     }
 
     private HardwareSpec spec(ComponentType type) {

@@ -9,8 +9,8 @@ public final class HardwareTable {
     private static final Map<ComponentType, Map<ComponentTier, HardwareSpec>> TABLE = new EnumMap<>(ComponentType.class);
 
     static {
-        spec(ComponentType.CPU, HardwareSpec.cpu(20, 10), HardwareSpec.cpu(10, 20), HardwareSpec.cpu(4, 50),
-                HardwareSpec.cpu(1, 100), HardwareSpec.cpu(0.1, 200));
+        spec(ComponentType.CPU, HardwareSpec.cpu(10), HardwareSpec.cpu(20), HardwareSpec.cpu(50),
+                HardwareSpec.cpu(100), HardwareSpec.cpu(200));
         spec(ComponentType.GPU, HardwareSpec.gpu(15), HardwareSpec.gpu(30), HardwareSpec.gpu(60),
                 HardwareSpec.gpu(90), HardwareSpec.gpu(144));
         spec(ComponentType.RAM, HardwareSpec.ram(1), HardwareSpec.ram(2), HardwareSpec.ram(4),

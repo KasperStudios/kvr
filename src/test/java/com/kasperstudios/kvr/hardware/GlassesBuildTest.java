@@ -45,7 +45,7 @@ class GlassesBuildTest {
         assertEquals(25_000, build.batteryCapacityFe());
         assertEquals(60, build.maxDischargeFePerTick());
         assertEquals(50, build.scriptTickHz());
-        assertEquals(4.0, build.bootSeconds(), 1e-9);
+        assertEquals(20, build.scriptTickMillis());
         assertEquals(ComponentTier.TIER_4_NORMAL, build.chassisTier());
     }
 
