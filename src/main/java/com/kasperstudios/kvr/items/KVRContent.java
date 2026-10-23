@@ -3,6 +3,7 @@ package com.kasperstudios.kvr.items;
 import com.kasperstudios.kvr.KVR;
 import com.kasperstudios.kvr.core.KVRIds;
 import com.kasperstudios.kvr.hardware.ComponentTier;
+import com.kasperstudios.kvr.menu.KVRMenus;
 import com.kasperstudios.kvr.hardware.ComponentType;
 import com.kasperstudios.kvr.platform.KVRRegistrar;
 import com.kasperstudios.kvr.platform.KVRRegistryProvider;
@@ -94,6 +95,7 @@ public final class KVRContent {
         KVRRegistrar registrar = KVRRegistryProvider.get();
         BLOCK_FACTORIES.forEach((path, factory) -> registrar.block(KVRIds.id(path), memoBlock(path, factory)));
         ITEM_FACTORIES.forEach((path, factory) -> registrar.item(KVRIds.id(path), memo(path, factory)));
+        KVRMenus.init();
 
         KVR.logger().info("KVR content registered: items={} blocks={}",
                 ITEM_FACTORIES.size(), BLOCK_FACTORIES.size());

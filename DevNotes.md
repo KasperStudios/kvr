@@ -58,7 +58,13 @@ packages all Matrix entries, and the core tests pass on every node.
 - [ ] Block 2b (container-menu based, decided by the Creator). Landed: glasses item + stack codec +
       Shift+RMB disassembly, `AssemblyRules` (6 inputs -> build or explicit problems), and
       `KVRRegistrar.menu(...)` so the loader facade can register menu types.
-- [ ] **Blocker, next step first**: `MenuType`'s constructor is not publicly accessible through mojmap
+- [x] Menu types are built by the loader now: Fabric `ExtendedScreenHandlerType` (StreamCodec payload
+      from 1.20.5, factory-only before) and NeoForge `IMenuTypeExtension`, both through
+      `KVRRegistrar.menuType(...)`. `kvr:chassis_assembly` registers and the server boots with it.
+- [ ] Next step: bind `ChassisItem` use to open the menu and add the client screens
+      (`AbstractContainerScreen` + Fabric `ClientModInitializer` / NeoForge `RegisterMenuScreensEvent`),
+      then the upgrade station and painting.
+- [ ] **Old blocker notes (resolved, kept for context)**: `MenuType`'s constructor is not publicly accessible through mojmap
       on 1.20.1/1.21.1, so menu types must be built by the loader. Verified in a spike:
       NeoForge `IMenuTypeExtension.create((windowId, inv, buf) -> menu)` compiles on 21.1/21.11;
       Fabric `ExtendedScreenHandlerType` is generic over the payload type and its ctor changed:

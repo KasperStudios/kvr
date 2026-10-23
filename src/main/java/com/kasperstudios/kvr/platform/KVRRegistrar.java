@@ -2,6 +2,7 @@ package com.kasperstudios.kvr.platform;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
@@ -28,4 +29,7 @@ public interface KVRRegistrar {
 
     /** Registers a container menu type. */
     void menu(ResourceLocation id, Supplier<MenuType<?>> menu);
+
+    /** Builds a menu type through the loader API - vanilla's constructor is not public. */
+    <T extends AbstractContainerMenu> MenuType<T> menuType(MenuFactory<T> factory);
 }
