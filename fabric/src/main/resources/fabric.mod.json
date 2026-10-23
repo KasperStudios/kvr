@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "${id}",
+  "version": "${version}",
+  "name": "${name}",
+  "description": "KVR - spatial OS inside Minecraft: floating 3D windows, hardware tiers, energy and a QuickJS app runtime.",
+  "authors": [
+    "Kasperenok"
+  ],
+  "license": "All-Rights-Reserved",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.kasperstudios.kvr.fabric.KVRFabric"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16",
+    "minecraft": "${minecraft}"
+  }
+}
