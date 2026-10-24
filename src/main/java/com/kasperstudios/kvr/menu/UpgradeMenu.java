@@ -40,9 +40,10 @@ public class UpgradeMenu extends AbstractContainerMenu {
         this.inputs = inputs;
         this.resultContainer = resultContainer;
         // Without a listener the result slot is never recomputed - the screen simply stayed empty
-        // addListener lives on SimpleContainer, not on the Container interface before 1.20.5
+        // addListener lives on SimpleContainer, not on the Container interface before 1.20.5.
+        // Only the inputs are observed: the result container is written by refreshResult itself, and a
+        // listener there would recurse refreshResult -> setChanged -> slotsChanged -> StackOverflow.
         ((SimpleContainer) inputs).addListener(this::slotsChanged);
-        ((SimpleContainer) resultContainer).addListener(this::slotsChanged);
         this.owner = owner;
 
         addSlot(new Slot(inputs, PART_SLOT, 27, 47) {
@@ -118,7 +119,21 @@ public class UpgradeMenu extends AbstractContainerMenu {
         return count;
     }
 
+    private boolean refreshing;
+
     public void refreshResult() {
+        if (refreshing) {
+            return;
+        }
+        refreshing = true;
+        try {
+            doRefreshResult();
+        } finally {
+            refreshing = false;
+        }
+    }
+
+    private void doRefreshResult() {
         TierUpgrade upgrade = currentUpgrade();
         if (upgrade == null) {
             resultContainer.setItem(0, ItemStack.EMPTY);

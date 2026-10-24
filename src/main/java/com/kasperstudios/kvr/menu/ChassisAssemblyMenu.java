@@ -44,9 +44,10 @@ public class ChassisAssemblyMenu extends AbstractContainerMenu {
         this.inputs = inputs;
         this.resultContainer = resultContainer;
         // Without a listener the result slot is never recomputed - the screen simply stayed empty
-        // addListener lives on SimpleContainer, not on the Container interface before 1.20.5
+        // addListener lives on SimpleContainer, not on the Container interface before 1.20.5.
+        // Only the inputs are observed: the result container is written by refreshResult itself, and a
+        // listener there would recurse refreshResult -> setChanged -> slotsChanged -> StackOverflow.
         ((SimpleContainer) inputs).addListener(this::slotsChanged);
-        ((SimpleContainer) resultContainer).addListener(this::slotsChanged);
 
         addSlot(new Slot(inputs, 0, 27, 47) {
             @Override
@@ -112,7 +113,21 @@ public class ChassisAssemblyMenu extends AbstractContainerMenu {
     }
 
     /** Recomputes what the six items in the slots assemble into. */
+    private boolean refreshing;
+
     public void refreshResult() {
+        if (refreshing) {
+            return;
+        }
+        refreshing = true;
+        try {
+            doRefreshResult();
+        } finally {
+            refreshing = false;
+        }
+    }
+
+    private void doRefreshResult() {
         AssemblyRules.Result result = AssemblyRules.evaluate(currentChassisTier(), currentParts());
         if (!result.ok()) {
             resultContainer.setItem(0, ItemStack.EMPTY);
