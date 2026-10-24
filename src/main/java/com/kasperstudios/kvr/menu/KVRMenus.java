@@ -8,7 +8,6 @@ import net.minecraft.world.inventory.MenuType;
 public final class KVRMenus {
 
     private static MenuType<ChassisAssemblyMenu> chassisAssembly;
-    private static MenuType<UpgradeMenu> upgrade;
     private static boolean registered;
 
     private KVRMenus() {
@@ -21,9 +20,6 @@ public final class KVRMenus {
         registered = true;
         chassisAssembly = KVRRegistryProvider.get().menuType(ChassisAssemblyMenu::forPlayer);
         KVRRegistryProvider.get().menu(KVRIds.id("chassis_assembly"), () -> chassisAssembly);
-
-        upgrade = KVRRegistryProvider.get().menuType(UpgradeMenu::new);
-        KVRRegistryProvider.get().menu(KVRIds.id("upgrade_station"), () -> upgrade);
     }
 
     public static MenuType<ChassisAssemblyMenu> chassisAssembly() {
@@ -33,17 +29,9 @@ public final class KVRMenus {
         return chassisAssembly;
     }
 
-    public static MenuType<UpgradeMenu> upgrade() {
-        if (upgrade == null) {
-            throw new IllegalStateException("KVR menus are not registered yet - call KVRMenus.init() first");
-        }
-        return upgrade;
-    }
-
     /** Test/reload hook. */
     public static void reset() {
         registered = false;
         chassisAssembly = null;
-        upgrade = null;
     }
 }

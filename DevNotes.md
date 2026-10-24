@@ -64,9 +64,9 @@ packages all Matrix entries, and the core tests pass on every node.
 - [x] Assembly GUI end to end: right-click a chassis opens `kvr:chassis_assembly`; client screens are
       bound through Fabric `ClientModInitializer` + `MenuScreens.register` and NeoForge
       `RegisterMenuScreensEvent`; the screen paints its own panel (`AbstractContainerScreen`, no textures).
-- [x] Upgrade station `kvr:upgrade_station`: part + template slots, result only when the exact ore cost is
-      available, ore deducted from the player inventory on take (4/16/64/256 via `UpgradeRules`).
-      Opened by right-clicking the tier upgrader template.
+- [x] Native vanilla Smithing Table upgrades (`minecraft:smithing_transform`):
+      Template + Part/Chassis + Material (UpIngot for T1->T2, T2->T3; CompressedUpOre for T3->T4, T4->T5).
+      The hacky UpgradeMenu/Screen and template right-click behavior were completely removed.
 - [x] Paint storage in the vanilla place: `display.color` NBT before 1.20.5, the `dyed_color` component
       from 1.20.5 (1.21.2 dropped its `showInTooltip` flag - Stonecutter helper).
 - [x] Painting applied via Crafting Table special recipe (`ChassisDyeRecipe`), matching vanilla `ArmorDyeRecipe`.

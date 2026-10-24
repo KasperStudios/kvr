@@ -1,60 +1,14 @@
 package com.kasperstudios.kvr.items;
 
-import com.kasperstudios.kvr.menu.UpgradeMenu;
-//? if <1.21.2 {
-import net.minecraft.world.InteractionResultHolder;
-//?}
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import com.kasperstudios.kvr.menu.KVRMenus;
-import com.kasperstudios.kvr.platform.KVRRegistryProvider;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
 
-/** The tier upgrader template doubles as the key to the upgrade station. */
+/**
+ * The tier upgrader template: a smithing template used in the vanilla Smithing Table
+ * to upgrade components and chassis to higher tiers.
+ */
 public class TierUpgraderItem extends Item {
 
     public TierUpgraderItem(Properties properties) {
         super(properties);
-    }
-
-    //? if <1.21.2 {
-    @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        InteractionResult result = openStation(level, player);
-        return new InteractionResultHolder<>(result, player.getItemInHand(hand));
-    }
-    //?} else {
-    /*@Override
-    public InteractionResult use(Level level, Player player, InteractionHand hand) {
-        return openStation(level, player);
-    }
-    *///?}
-
-    private static InteractionResult openStation(Level level, Player player) {
-        if (!isClientSide(level)) {
-            KVRRegistryProvider.get().openMenu(player, KVRMenus.upgrade().toString(),
-                    Component.literal("Станция апгрейда KVR"), UpgradeMenu::new);
-        }
-        return success(isClientSide(level));
-    }
-
-    private static boolean isClientSide(Level level) {
-        //? if >=1.21.11 {
-        /*return level.isClientSide();
-        *///?} else {
-        return level.isClientSide;
-        //?}
-    }
-
-    private static InteractionResult success(boolean clientSide) {
-        //? if >=1.21.11 {
-        /*return InteractionResult.SUCCESS;
-        *///?} else {
-        return InteractionResult.sidedSuccess(clientSide);
-        //?}
     }
 }

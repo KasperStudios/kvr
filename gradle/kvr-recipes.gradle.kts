@@ -24,6 +24,18 @@ fun kvrResult(id: String, count: Int): String =
 
 fun kvrJson(vararg lines: String): String = lines.joinToString("\n", postfix = "\n")
 
+fun kvrSmithing(template: String, base: String, addition: String, result: String): String {
+    return kvrJson(
+        "{",
+        "  \"type\": \"minecraft:smithing_transform\",",
+        "  \"template\": ${kvrIngredient(template)},",
+        "  \"base\": ${kvrIngredient(base)},",
+        "  \"addition\": ${kvrIngredient(addition)},",
+        "  \"result\": ${kvrResult(result, 1)}",
+        "}"
+    )
+}
+
 fun kvrShaped(name: String, pattern: List<String>, key: Map<String, String>, result: String, count: Int): String {
     val keyJson = key.entries.joinToString(",\n") { (symbol, id) -> "    \"$symbol\": ${kvrIngredient(id)}" }
     return kvrJson(
@@ -98,7 +110,33 @@ val generateKvrData = tasks.register("generateKvrData") {
             )
         )
 
-        // Tier upgrader template: the reusable smithing-style pattern that gates every upgrade.
+        // Smithing upgrades for modules and chassis across all 5 tiers (1->2, 2->3, 3->4, 4->5):
+        // Tier 1 -> Tier 2: kvr:up_ingot
+        // Tier 2 -> Tier 3: kvr:up_ingot
+        // Tier 3 -> Tier 4: kvr:compressed_up_ore
+        // Tier 4 -> Tier 5: kvr:compressed_up_ore
+        val itemTypes = listOf("cpu", "gpu", "ram", "storage", "battery", "chassis")
+        val tiers = listOf(
+            Triple(1, 2, "kvr:up_ingot"),
+            Triple(2, 3, "kvr:up_ingot"),
+            Triple(3, 4, "kvr:compressed_up_ore"),
+            Triple(4, 5, "kvr:compressed_up_ore")
+        )
+        for (item in itemTypes) {
+            for ((from, to, addition) in tiers) {
+                recipes.resolve("${item}_tier${to}_smithing.json").writeText(
+                    kvrSmithing(
+                        "kvr:tier_upgrader_template",
+                        "kvr:${item}_tier$from",
+                        addition,
+                        "kvr:${item}_tier$to"
+                    )
+                )
+            }
+        }
+
+        // UpOre processing.
+        // Template crafting recipe
         recipes.resolve("tier_upgrader_template.json").writeText(
             kvrShaped(
                 "tier_upgrader_template",
@@ -109,7 +147,6 @@ val generateKvrData = tasks.register("generateKvrData") {
             )
         )
 
-        // UpOre processing.
         // UpOre block drops raw chunks.
         loot.resolve("up_ore.json").writeText(
             kvrJson(
