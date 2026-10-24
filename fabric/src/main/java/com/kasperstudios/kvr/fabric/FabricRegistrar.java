@@ -5,6 +5,7 @@ import com.kasperstudios.kvr.platform.MenuFactory;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
 //? if >=1.20.5 {
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 //?}
 import net.minecraft.core.Registry;
@@ -48,11 +49,10 @@ final class FabricRegistrar implements KVRRegistrar {
             return;
         }
         //? if >=1.20.5 {
-        serverPlayer.openMenu(new net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory<Void>() {
+        serverPlayer.openMenu(new net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory<Boolean>() {
             @Override
-            public Void getScreenOpeningData(net.minecraft.server.level.ServerPlayer ignored) {
-                // the menu type was registered with a unit payload codec
-                return null;
+            public Boolean getScreenOpeningData(net.minecraft.server.level.ServerPlayer ignored) {
+                return Boolean.TRUE;
             }
 
             @Override
@@ -95,9 +95,11 @@ final class FabricRegistrar implements KVRRegistrar {
         /*return new ExtendedScreenHandlerType<>(
                 (windowId, inventory, buffer) -> factory.create(windowId, inventory));
         *///?} else {
-        StreamCodec<RegistryFriendlyByteBuf, Void> noPayload = StreamCodec.unit(null);
-        return new ExtendedScreenHandlerType<T, Void>(
-                (windowId, inventory, payload) -> factory.create(windowId, inventory), noPayload);
+        // A unit codec cannot encode null (StreamCodec.unit(null) NPEs inside encode), which made the
+        // open_screen packet fail and dropped the client. A boolean payload keeps it trivially encodable.
+        StreamCodec<RegistryFriendlyByteBuf, Boolean> emptyPayload = ByteBufCodecs.BOOL.cast();
+        return new ExtendedScreenHandlerType<T, Boolean>(
+                (windowId, inventory, payload) -> factory.create(windowId, inventory), emptyPayload);
         //?}
     }
 }
