@@ -6,7 +6,9 @@ import com.kasperstudios.kvr.hardware.ComponentType;
 import com.kasperstudios.kvr.hardware.GlassesBuild;
 import com.kasperstudios.kvr.items.ChassisItem;
 import com.kasperstudios.kvr.items.ComponentItem;
+import com.kasperstudios.kvr.hardware.GlassesPaint;
 import com.kasperstudios.kvr.items.GlassesItem;
+import com.kasperstudios.kvr.items.KVRPaintData;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
@@ -98,7 +100,17 @@ public class ChassisAssemblyMenu extends AbstractContainerMenu {
     /** Recomputes what the six items in the slots assemble into. */
     public void refreshResult() {
         AssemblyRules.Result result = AssemblyRules.evaluate(currentChassisTier(), currentParts());
-        resultContainer.setItem(0, result.ok() ? GlassesItem.of(result.build()) : ItemStack.EMPTY);
+        if (!result.ok()) {
+            resultContainer.setItem(0, ItemStack.EMPTY);
+            return;
+        }
+        ItemStack glasses = GlassesItem.of(result.build());
+        // The paint of the shell travels with the finished glasses
+        GlassesPaint paint = KVRPaintData.paint(inputs.getItem(0));
+        if (paint != null) {
+            KVRPaintData.paint(glasses, paint);
+        }
+        resultContainer.setItem(0, glasses);
     }
 
     public GlassesBuild currentBuild() {
