@@ -151,6 +151,16 @@ public final class KVRContent {
         return (GlassesItem) item("glasses");
     }
 
+    /** Items the client tints with the stored paint: every chassis plus assembled glasses. */
+    public static java.util.List<Item> paintableItems() {
+        java.util.List<Item> items = new java.util.ArrayList<>();
+        for (ComponentTier tier : ComponentTier.values()) {
+            items.add(chassis(tier));
+        }
+        items.add(glasses());
+        return items;
+    }
+
     /** Every registered item path, in declaration order. */
     public static Map<String, Supplier<Item>> itemFactories() {
         return Collections.unmodifiableMap(ITEM_FACTORIES);
