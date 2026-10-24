@@ -144,6 +144,10 @@ public class ChassisAssemblyMenu extends AbstractContainerMenu {
                 KVRPaintData.paint(glasses, paint);
             }
             setChassisStack(glasses);
+            // burn the module slots: they are inside the glasses now
+            for (ComponentType type : ComponentType.values()) {
+                modules.setItem(type.ordinal(), ItemStack.EMPTY);
+            }
             finished = true;
             return;
         }
@@ -208,7 +212,10 @@ public class ChassisAssemblyMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return true;
+        // The screen is bound to one chassis stack: once it became the glasses (or vanished),
+        // the screen must close immediately - otherwise the player could pull modules out of a
+        // build that already turned into glasses and duplicate them.
+        return !finished && chassisStack.getItem() instanceof ChassisItem;
     }
 
     @Override
