@@ -32,4 +32,13 @@ public interface KVRRegistrar {
 
     /** Builds a menu type through the loader API - vanilla's constructor is not public. */
     <T extends AbstractContainerMenu> MenuType<T> menuType(MenuFactory<T> factory);
+
+    /**
+     * Opens a registered KVR menu for a player.
+     *
+     * <p>Loader-specific on purpose: Fabric registers extended menu types and then demands an
+     * {@code ExtendedScreenHandlerFactory}, NeoForge accepts a plain {@code SimpleMenuProvider}.
+     */
+    void openMenu(net.minecraft.world.entity.player.Player player, String menuId,
+                  net.minecraft.network.chat.Component title, MenuFactory<? extends AbstractContainerMenu> factory);
 }

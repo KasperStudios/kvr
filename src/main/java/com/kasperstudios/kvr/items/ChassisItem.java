@@ -8,7 +8,8 @@ import net.minecraft.world.InteractionResultHolder;
 //?}
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.SimpleMenuProvider;
+import com.kasperstudios.kvr.menu.KVRMenus;
+import com.kasperstudios.kvr.platform.KVRRegistryProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -44,9 +45,8 @@ public class ChassisItem extends Item {
 
     private static InteractionResult openAssembly(Level level, Player player) {
         if (!isClientSide(level)) {
-            player.openMenu(new SimpleMenuProvider(
-                    (windowId, inventory, ignored) -> new ChassisAssemblyMenu(windowId, inventory),
-                    Component.literal("Сборка KVR")));
+            KVRRegistryProvider.get().openMenu(player, KVRMenus.chassisAssembly().toString(),
+                    Component.literal("Сборка KVR"), ChassisAssemblyMenu::new);
         }
         return success(isClientSide(level));
     }

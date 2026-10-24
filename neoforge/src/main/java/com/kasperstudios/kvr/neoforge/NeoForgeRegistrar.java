@@ -52,6 +52,13 @@ final class NeoForgeRegistrar implements KVRRegistrar {
     }
 
     @Override
+    public void openMenu(net.minecraft.world.entity.player.Player player, String menuId,
+                         net.minecraft.network.chat.Component title, MenuFactory<? extends AbstractContainerMenu> factory) {
+        player.openMenu(new net.minecraft.world.SimpleMenuProvider(
+                (windowId, inventory, menuPlayer) -> factory.create(windowId, inventory), title));
+    }
+
+    @Override
     public <T extends AbstractContainerMenu> MenuType<T> menuType(MenuFactory<T> factory) {
         return IMenuTypeExtension.create((windowId, inventory, buffer) -> factory.create(windowId, inventory));
     }

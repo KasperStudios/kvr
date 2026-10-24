@@ -42,6 +42,53 @@ final class FabricRegistrar implements KVRRegistrar {
     }
 
     @Override
+    public void openMenu(net.minecraft.world.entity.player.Player player, String menuId,
+                         net.minecraft.network.chat.Component title, MenuFactory<? extends AbstractContainerMenu> factory) {
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)) {
+            return;
+        }
+        //? if >=1.20.5 {
+        serverPlayer.openMenu(new net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory<Void>() {
+            @Override
+            public Void getScreenOpeningData(net.minecraft.server.level.ServerPlayer ignored) {
+                // the menu type was registered with a unit payload codec
+                return null;
+            }
+
+            @Override
+            public net.minecraft.network.chat.Component getDisplayName() {
+                return title;
+            }
+
+            @Override
+            public AbstractContainerMenu createMenu(int windowId, net.minecraft.world.entity.player.Inventory inventory,
+                                                    net.minecraft.world.entity.player.Player menuPlayer) {
+                return factory.create(windowId, inventory);
+            }
+        });
+        //?} else {
+        /*serverPlayer.openMenu(new net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory() {
+            @Override
+            public void writeScreenOpeningData(net.minecraft.server.level.ServerPlayer ignored,
+                                               net.minecraft.network.FriendlyByteBuf buf) {
+                // the menu type was registered with an empty payload
+            }
+
+            @Override
+            public net.minecraft.network.chat.Component getDisplayName() {
+                return title;
+            }
+
+            @Override
+            public AbstractContainerMenu createMenu(int windowId, net.minecraft.world.entity.player.Inventory inventory,
+                                                    net.minecraft.world.entity.player.Player menuPlayer) {
+                return factory.create(windowId, inventory);
+            }
+        });
+        *///?}
+    }
+
+    @Override
     public <T extends AbstractContainerMenu> MenuType<T> menuType(MenuFactory<T> factory) {
         // 1.20.5 moved the extended menu type from a PacketByteBuf factory to a StreamCodec payload
         //? if <1.20.5 {
