@@ -67,7 +67,11 @@ packages all Matrix entries, and the core tests pass on every node.
 - [x] Upgrade station `kvr:upgrade_station`: part + template slots, result only when the exact ore cost is
       available, ore deducted from the player inventory on take (4/16/64/256 via `UpgradeRules`).
       Opened by right-clicking the tier upgrader template.
-- [ ] Next: chassis painting (`dyed_color`) and the compressed UpOre block item.
+- [x] Paint storage in the vanilla place: `display.color` NBT before 1.20.5, the `dyed_color` component
+      from 1.20.5 (1.21.2 dropped its `showInTooltip` flag - Stonecutter helper).
+- [ ] Next (Creator-decided): painting is applied by **combining a dye with the chassis in a crafting grid**
+      - 16 shapeless recipes per version format plus a crafting hook that writes the colour onto the
+      result, then the client colour provider so the tint is visible. Compressed UpOre block after that.
 - [ ] **Old blocker notes (resolved, kept for context)**: `MenuType`'s constructor is not publicly accessible through mojmap
       on 1.20.1/1.21.1, so menu types must be built by the loader. Verified in a spike:
       NeoForge `IMenuTypeExtension.create((windowId, inv, buf) -> menu)` compiles on 21.1/21.11;
@@ -281,6 +285,7 @@ kvr/
   (`0.1.0+<mc>`), fabric loader floor = `deps.fabric_loader`, `pack_format` = per-version
   `mod.pack_format` (1.20.1=15, 1.21.1=34, 1.21.11=75). A stale `pack_format` or version string ships
   silently and only breaks clients.
+- **`DyedItemColor` took `(int rgb, boolean showInTooltip)` until 1.21.1 and `(int rgb)` from 1.21.2.**
 - **`Inventory.items` / `Inventory.offhand` are private from 1.21.11**: iterate
   `getContainerSize()` + `getItem(i)`/`setItem(i, stack)` instead of touching the arrays.
 - **`renderBackground(GuiGraphics, int, int, float)` only exists from 1.20.5**: before that the method
