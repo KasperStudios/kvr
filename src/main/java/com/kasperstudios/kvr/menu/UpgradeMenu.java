@@ -39,9 +39,18 @@ public class UpgradeMenu extends AbstractContainerMenu {
         super(KVRMenus.upgrade(), windowId);
         this.inputs = inputs;
         this.resultContainer = resultContainer;
+        // Without a listener the result slot is never recomputed - the screen simply stayed empty
+        // addListener lives on SimpleContainer, not on the Container interface before 1.20.5
+        ((SimpleContainer) inputs).addListener(this::slotsChanged);
+        ((SimpleContainer) resultContainer).addListener(this::slotsChanged);
         this.owner = owner;
 
         addSlot(new Slot(inputs, PART_SLOT, 27, 47) {
+            @Override
+            public int getMaxStackSize() {
+                return 1;
+            }
+
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return stack.getItem() instanceof ComponentItem;
@@ -49,20 +58,26 @@ public class UpgradeMenu extends AbstractContainerMenu {
         });
         addSlot(new Slot(inputs, TEMPLATE_SLOT, 27, 20) {
             @Override
+            public int getMaxStackSize() {
+                return 1;
+            }
+
+            @Override
             public boolean mayPlace(ItemStack stack) {
                 return stack.is(KVRContent.tierUpgrader());
             }
         });
         addSlot(new Slot(resultContainer, 0, 120, 47) {
             @Override
-            public boolean mayPlace(ItemStack stack) {
-                return false;
+            public void onTake(Player player, ItemStack stack) {
+                // Taking the upgraded module must consume the part, the template and the ore once
+                consume(player);
+                super.onTake(player, stack);
             }
 
             @Override
-            public void onTake(Player player, ItemStack stack) {
-                consume(player);
-                super.onTake(player, stack);
+            public boolean mayPlace(ItemStack stack) {
+                return false;
             }
         });
 

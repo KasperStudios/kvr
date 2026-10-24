@@ -43,8 +43,17 @@ public class ChassisAssemblyMenu extends AbstractContainerMenu {
         super(KVRMenus.chassisAssembly(), windowId);
         this.inputs = inputs;
         this.resultContainer = resultContainer;
+        // Without a listener the result slot is never recomputed - the screen simply stayed empty
+        // addListener lives on SimpleContainer, not on the Container interface before 1.20.5
+        ((SimpleContainer) inputs).addListener(this::slotsChanged);
+        ((SimpleContainer) resultContainer).addListener(this::slotsChanged);
 
         addSlot(new Slot(inputs, 0, 27, 47) {
+            @Override
+            public int getMaxStackSize() {
+                return 1;
+            }
+
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return stack.getItem() instanceof ChassisItem;
@@ -55,6 +64,11 @@ public class ChassisAssemblyMenu extends AbstractContainerMenu {
         for (int i = 0; i < order.length; i++) {
             ComponentType type = order[i];
             addSlot(new Slot(inputs, i + 1, 62 + (i % 2) * 18, 20 + (i / 2) * 22) {
+                @Override
+                public int getMaxStackSize() {
+                    return 1;
+                }
+
                 @Override
                 public boolean mayPlace(ItemStack stack) {
                     return stack.getItem() instanceof ComponentItem item && item.componentType() == type;
