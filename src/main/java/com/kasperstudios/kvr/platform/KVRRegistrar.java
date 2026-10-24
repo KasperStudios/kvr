@@ -33,6 +33,9 @@ public interface KVRRegistrar {
     /** Registers a recipe serializer. */
     void recipeSerializer(ResourceLocation id, Supplier<net.minecraft.world.item.crafting.RecipeSerializer<?>> serializer);
 
+    /** Adds worldgen ore features to biomes (Overworld and Nether). */
+    void registerWorldgen();
+
     /** Builds a menu type through the loader API - vanilla's constructor is not public. */
     <T extends AbstractContainerMenu> MenuType<T> menuType(MenuFactory<T> factory);
 

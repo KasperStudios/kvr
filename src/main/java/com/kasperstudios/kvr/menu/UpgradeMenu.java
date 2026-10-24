@@ -1,6 +1,7 @@
 package com.kasperstudios.kvr.menu;
 
 import com.kasperstudios.kvr.hardware.ComponentTier;
+import com.kasperstudios.kvr.hardware.CompressedOre;
 import com.kasperstudios.kvr.hardware.TierUpgrade;
 import com.kasperstudios.kvr.hardware.UpgradeRules;
 import com.kasperstudios.kvr.items.ComponentItem;
@@ -114,6 +115,8 @@ public class UpgradeMenu extends AbstractContainerMenu {
             ItemStack stack = inventory.getItem(slot);
             if (stack.is(KVRContent.upIngot())) {
                 count += stack.getCount();
+            } else if (stack.is(KVRContent.compressedUpOre())) {
+                count += stack.getCount() * CompressedOre.ORE_PER_BLOCK;
             }
         }
         return count;
@@ -168,6 +171,18 @@ public class UpgradeMenu extends AbstractContainerMenu {
 
     private static void shrinkOre(Inventory inventory, int amount) {
         int remaining = amount;
+        // First try to deduct compressed blocks if applicable (64 each)
+        for (int slot = 0; slot < inventory.getContainerSize() && remaining >= CompressedOre.ORE_PER_BLOCK; slot++) {
+            ItemStack stack = inventory.getItem(slot);
+            if (stack.is(KVRContent.compressedUpOre())) {
+                int blocksNeeded = remaining / CompressedOre.ORE_PER_BLOCK;
+                int taken = Math.min(blocksNeeded, stack.getCount());
+                stack.shrink(taken);
+                inventory.setItem(slot, stack.isEmpty() ? ItemStack.EMPTY : stack);
+                remaining -= taken * CompressedOre.ORE_PER_BLOCK;
+            }
+        }
+        // Then deduct remaining loose ingots
         for (int slot = 0; slot < inventory.getContainerSize() && remaining > 0; slot++) {
             ItemStack stack = inventory.getItem(slot);
             if (!stack.is(KVRContent.upIngot())) {

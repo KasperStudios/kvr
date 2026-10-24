@@ -46,7 +46,13 @@ public final class KVRContent {
                 .strength(3.0F, 3.0F)
                 .requiresCorrectToolForDrops()
                 .sound(SoundType.STONE)));
+        BLOCK_FACTORIES.put("compressed_up_ore", () -> new Block(blockProperties("compressed_up_ore")
+                .mapColor(MapColor.METAL)
+                .strength(5.0F, 6.0F)
+                .requiresCorrectToolForDrops()
+                .sound(SoundType.METAL)));
         ITEM_FACTORIES.put("up_ore", () -> new BlockItem(block("up_ore"), itemProperties("up_ore")));
+        ITEM_FACTORIES.put("compressed_up_ore", () -> new BlockItem(block("compressed_up_ore"), itemProperties("compressed_up_ore")));
         ITEM_FACTORIES.put("up_raw", () -> new Item(itemProperties("up_raw")));
         ITEM_FACTORIES.put("up_ingot", () -> new Item(itemProperties("up_ingot")));
         ITEM_FACTORIES.put("tier_upgrader_template",
@@ -101,6 +107,8 @@ public final class KVRContent {
         ChassisDyeRecipe.SERIALIZER = ChassisDyeRecipe.createSerializer();
         registrar.recipeSerializer(KVRIds.id("crafting_special_chassis_dye"), () -> ChassisDyeRecipe.SERIALIZER);
 
+        registrar.registerWorldgen();
+
         KVR.logger().info("KVR content registered: items={} blocks={}",
                 ITEM_FACTORIES.size(), BLOCK_FACTORIES.size());
     }
@@ -128,6 +136,14 @@ public final class KVRContent {
 
     public static Block block(String path) {
         return BLOCKS.get(path);
+    }
+
+    public static Block compressedUpOreBlock() {
+        return block("compressed_up_ore");
+    }
+
+    public static Item compressedUpOre() {
+        return item("compressed_up_ore");
     }
 
     public static ChassisItem chassis(ComponentTier tier) {

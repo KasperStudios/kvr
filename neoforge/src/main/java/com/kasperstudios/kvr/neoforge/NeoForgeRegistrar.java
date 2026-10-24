@@ -60,6 +60,11 @@ final class NeoForgeRegistrar implements KVRRegistrar {
     }
 
     @Override
+    public void registerWorldgen() {
+        // NeoForge uses biome modifier JSONs placed in data/kvr/neoforge/biome_modifier/
+    }
+
+    @Override
     public void openMenu(net.minecraft.world.entity.player.Player player, String menuId,
                          net.minecraft.network.chat.Component title, MenuFactory<? extends AbstractContainerMenu> factory) {
         player.openMenu(new net.minecraft.world.SimpleMenuProvider(

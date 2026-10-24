@@ -48,6 +48,24 @@ final class FabricRegistrar implements KVRRegistrar {
     }
 
     @Override
+    public void registerWorldgen() {
+        net.fabricmc.fabric.api.biome.v1.BiomeModifications.addFeature(
+                net.fabricmc.fabric.api.biome.v1.BiomeSelectors.foundInOverworld(),
+                net.minecraft.world.level.levelgen.GenerationStep.Decoration.UNDERGROUND_ORES,
+                net.minecraft.resources.ResourceKey.create(
+                        net.minecraft.core.registries.Registries.PLACED_FEATURE,
+                        com.kasperstudios.kvr.core.KVRIds.id("ore_up_overworld"))
+        );
+        net.fabricmc.fabric.api.biome.v1.BiomeModifications.addFeature(
+                net.fabricmc.fabric.api.biome.v1.BiomeSelectors.foundInTheNether(),
+                net.minecraft.world.level.levelgen.GenerationStep.Decoration.UNDERGROUND_ORES,
+                net.minecraft.resources.ResourceKey.create(
+                        net.minecraft.core.registries.Registries.PLACED_FEATURE,
+                        com.kasperstudios.kvr.core.KVRIds.id("ore_up_nether"))
+        );
+    }
+
+    @Override
     public void openMenu(net.minecraft.world.entity.player.Player player, String menuId,
                          net.minecraft.network.chat.Component title, MenuFactory<? extends AbstractContainerMenu> factory) {
         if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)) {

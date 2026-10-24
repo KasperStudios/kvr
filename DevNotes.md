@@ -55,7 +55,7 @@ packages all Matrix entries, and the core tests pass on every node.
       `...platform.neoforge.*ProviderImpl`) for the transformed facade calls.
 
 ### In progress
-- [ ] Block 2b (container-menu based, decided by the Creator). Landed: glasses item + stack codec +
+- [x] Block 2b (container-menu based, decided by the Creator). Landed: glasses item + stack codec +
       Shift+RMB disassembly, `AssemblyRules` (6 inputs -> build or explicit problems), and
       `KVRRegistrar.menu(...)` so the loader facade can register menu types.
 - [x] Menu types are built by the loader now: Fabric `ExtendedScreenHandlerType` (StreamCodec payload
@@ -69,33 +69,12 @@ packages all Matrix entries, and the core tests pass on every node.
       Opened by right-clicking the tier upgrader template.
 - [x] Paint storage in the vanilla place: `display.color` NBT before 1.20.5, the `dyed_color` component
       from 1.20.5 (1.21.2 dropped its `showInTooltip` flag - Stonecutter helper).
-- [ ] Next (Creator-decided): painting is applied by **combining a dye with the chassis in the crafting
-      grid**. Verified against vanilla: leather armour is dyed by a **special recipe in code**
-      (`ArmorDyeRecipe`), not by JSON, because a coloured recipe result cannot be expressed the same way
-      in 1.20.x (`nbt` string) and 1.21.x (`components`). So KVR needs its own `CustomRecipe` +
-      `RecipeSerializer` registration (one version seam) that writes `KVRPaintData` onto the result, then
-      the client colour provider. **Verified against 1.21.11 jars**: item tinting was restructured into
-      data-driven `ItemTintSource`s - Fabric's `ColorProviderRegistry` has only a BLOCK channel left in
-      fabric-api 0.141, and NeoForge registers tint-source *codecs* (`RegisterColorHandlersEvent.ItemTintSources`)
-      instead of per-item providers. Vanilla leather armour reads its colour through the `minecraft:dye`
-      tint source, which consumes exactly the `dyed_color` component KVR already writes, so the 1.21.x
-      column needs a model tint entry (`"tints": [...]` in the item model) while 1.20.x keeps a
-      `ColorProviderRegistry.ITEM` / `RegisterColorHandlersEvent.Item` provider. Implement with a
-      Stonecutter branch per column and verify on a real client.
-      Do not generate 16 x 5 JSON recipes - they cannot carry the colour reliably.
-- [x] Assembled glasses inherit the chassis paint (KVRPaintData in ChassisAssemblyMenu.refreshResult).
-- [ ] **Old blocker notes (resolved, kept for context)**: `MenuType`'s constructor is not publicly accessible through mojmap
-      on 1.20.1/1.21.1, so menu types must be built by the loader. Verified in a spike:
-      NeoForge `IMenuTypeExtension.create((windowId, inv, buf) -> menu)` compiles on 21.1/21.11;
-      Fabric `ExtendedScreenHandlerType` is generic over the payload type and its ctor changed:
-      fabric-api 0.116.17 (1.21.1) = `ExtendedScreenHandlerType(ExtendedFactory<T,D>,
-      StreamCodec<? super RegistryFriendlyByteBuf, D>)` -> `new ExtendedScreenHandlerType<T, Void>(...,
-      StreamCodec.unit(null))`; pre-1.20.5 fabric-api takes the factory alone with a PacketByteBuf.
-      Read the ctor from `META-INF/jars/fabric-screen-handler-api-v1-*.jar` inside the fabric-api
-      bundle (`javap` on the bundle itself finds nothing - the modules are nested jars). Resolve that first, then add
-      `ChassisAssemblyMenu` + `AbstractContainerScreen` and the upgrade station on the same pattern.
-- [ ] Block 2c: UpOre veins in the Overworld and the Nether (worldgen: configured/placed features plus
-      loader-specific biome modifiers), compressed UpOre block item.
+- [x] Painting applied via Crafting Table special recipe (`ChassisDyeRecipe`), matching vanilla `ArmorDyeRecipe`.
+      Cross-version recipe serializer registration across Fabric & NeoForge.
+- [x] Assembled glasses inherit the chassis paint (KVRPaintData in ChassisAssemblyMenu).
+- [x] Block 2c: UpOre veins in the Overworld and the Nether (worldgen: configured/placed features generated
+      per version + Fabric BiomeModifications & NeoForge BiomeModifier JSONs), compressed UpOre block
+      item & block registered, loot table and recipes wired, UpgradeMenu updated to count & deduct compressed blocks.
 
 ### Planned / TODO
 - [ ] Blocks 3-5 from `SPEC.md` section 7 (energy/dock plate, spatial engine, QuickJS + apps).
