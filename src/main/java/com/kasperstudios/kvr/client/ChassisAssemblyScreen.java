@@ -27,9 +27,9 @@ public class ChassisAssemblyScreen extends AbstractContainerScreen<ChassisAssemb
     public ChassisAssemblyScreen(ChassisAssemblyMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
         this.imageWidth = 176;
-        this.imageHeight = 140;
+        this.imageHeight = 148;
         this.titleLabelY = 6;
-        this.inventoryLabelY = 41;
+        this.inventoryLabelY = 51;
     }
 
     @Override
@@ -65,8 +65,8 @@ public class ChassisAssemblyScreen extends AbstractContainerScreen<ChassisAssemb
         super.renderLabels(graphics, mouseX, mouseY);
         String[] labels = {"CPU", "GPU", "RAM", "DSK", "BAT"};
         for (int i = 0; i < labels.length; i++) {
-            // under the centred module row: 53 + i*18 - 1, slot centre +9
-            graphics.drawCenteredString(font, labels[i], 61 + i * 18, 38, LABEL);
+            // under the module slot: x = 31 + i * 24, center is x + 9 = 40 + i * 24
+            graphics.drawCenteredString(font, labels[i], 40 + i * 24, 39, LABEL);
         }
     }
 }

@@ -93,12 +93,15 @@ public class ChassisAssemblyMenu extends AbstractContainerMenu {
         // (the chassis stack is written back by persist(), which would recurse if observed)
         modules.addListener(ignored -> persist());
 
-        // one row of five module slots, centred: (5*18 - 8) / 2 = 41 + 7 = 53
+        // Five module slots with spacing (gap = 6px): 5 * 18 + 4 * 6 = 114px wide.
+        // Centered horizontally: (176 - 114) / 2 = 31px.
+        // Module Y: 20px, Labels Y: 41px.
+        // Inventory starts at Y = 62px, Inventory Label at Y = 51px.
         ComponentType[] types = ComponentType.values();
         for (int i = 0; i < types.length; i++) {
             ComponentType type = types[i];
-            int x = 53 + i * 18;
-            int y = 18;
+            int x = 31 + i * 24;
+            int y = 20;
             addSlot(new Slot(modules, type.ordinal(), x, y) {
                 @Override
                 public int getMaxStackSize() {
@@ -114,11 +117,11 @@ public class ChassisAssemblyMenu extends AbstractContainerMenu {
 
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(playerInventory, col + row * 9 + 9, 8 + col * 18, 51 + row * 18));
+                addSlot(new Slot(playerInventory, col + row * 9 + 9, 8 + col * 18, 62 + row * 18));
             }
         }
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(playerInventory, col, 8 + col * 18, 109 + col * 0));
+            addSlot(new Slot(playerInventory, col, 8 + col * 18, 120));
         }
     }
 
