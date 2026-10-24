@@ -62,6 +62,17 @@ public final class KVRChassisData {
         //?}
     }
 
+    /** Removes the partial build (all modules taken back out). */
+    public static void clear(ItemStack stack) {
+        //? if <1.20.5 {
+        /*if (stack.getTag() != null) {
+            stack.getTag().remove(TAG);
+        }
+        *///?} else {
+        stack.remove(DataComponents.CUSTOM_DATA);
+        //?}
+    }
+
     private static int[] rawData(ItemStack stack) {
         //? if <1.20.5 {
         /*return stack.getTag() == null ? null : stack.getTag().getIntArray(TAG);
