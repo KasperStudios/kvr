@@ -43,6 +43,11 @@ final class FabricRegistrar implements KVRRegistrar {
     }
 
     @Override
+    public void recipeSerializer(ResourceLocation id, Supplier<net.minecraft.world.item.crafting.RecipeSerializer<?>> serializer) {
+        Registry.register(BuiltInRegistries.RECIPE_SERIALIZER, id, serializer.get());
+    }
+
+    @Override
     public void openMenu(net.minecraft.world.entity.player.Player player, String menuId,
                          net.minecraft.network.chat.Component title, MenuFactory<? extends AbstractContainerMenu> factory) {
         if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)) {

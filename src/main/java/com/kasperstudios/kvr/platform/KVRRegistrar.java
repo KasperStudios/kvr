@@ -30,6 +30,9 @@ public interface KVRRegistrar {
     /** Registers a container menu type. */
     void menu(ResourceLocation id, Supplier<MenuType<?>> menu);
 
+    /** Registers a recipe serializer. */
+    void recipeSerializer(ResourceLocation id, Supplier<net.minecraft.world.item.crafting.RecipeSerializer<?>> serializer);
+
     /** Builds a menu type through the loader API - vanilla's constructor is not public. */
     <T extends AbstractContainerMenu> MenuType<T> menuType(MenuFactory<T> factory);
 

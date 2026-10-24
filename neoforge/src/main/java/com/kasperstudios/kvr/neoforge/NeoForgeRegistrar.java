@@ -23,12 +23,15 @@ final class NeoForgeRegistrar implements KVRRegistrar {
     private final DeferredRegister.Blocks blocks = DeferredRegister.createBlocks(KVR.MOD_ID);
     private final DeferredRegister<EntityType<?>> entityTypes = DeferredRegister.create(Registries.ENTITY_TYPE, KVR.MOD_ID);
     private final DeferredRegister<MenuType<?>> menus = DeferredRegister.create(Registries.MENU, KVR.MOD_ID);
+    private final DeferredRegister<net.minecraft.world.item.crafting.RecipeSerializer<?>> recipeSerializers =
+            DeferredRegister.create(Registries.RECIPE_SERIALIZER, KVR.MOD_ID);
 
     NeoForgeRegistrar(IEventBus modBus) {
         items.register(modBus);
         blocks.register(modBus);
         entityTypes.register(modBus);
         menus.register(modBus);
+        recipeSerializers.register(modBus);
     }
 
     @Override
@@ -49,6 +52,11 @@ final class NeoForgeRegistrar implements KVRRegistrar {
     @Override
     public void menu(ResourceLocation id, Supplier<MenuType<?>> menu) {
         menus.register(id.getPath(), menu);
+    }
+
+    @Override
+    public void recipeSerializer(ResourceLocation id, Supplier<net.minecraft.world.item.crafting.RecipeSerializer<?>> serializer) {
+        recipeSerializers.register(id.getPath(), serializer);
     }
 
     @Override

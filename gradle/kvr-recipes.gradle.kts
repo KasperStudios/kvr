@@ -130,6 +130,16 @@ val generateKvrData = tasks.register("generateKvrData") {
             )
         )
 
+        // Chassis & Glasses dyeing special recipe
+        recipes.resolve("chassis_dye.json").writeText(
+            kvrJson(
+                "{",
+                "  \"type\": \"kvr:crafting_special_chassis_dye\",",
+                "  \"category\": \"misc\"",
+                "}"
+            )
+        )
+
     }
 }
 

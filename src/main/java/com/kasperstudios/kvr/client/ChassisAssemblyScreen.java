@@ -21,7 +21,7 @@ public class ChassisAssemblyScreen extends AbstractContainerScreen<ChassisAssemb
     private static final int SLOT_HL = 0xFF37424E;   // bevel light edge (top/left)
     private static final int SLOT_SH = 0xFF10161D;   // bevel dark edge (bottom/right)
     private static final int SLOT_BG = 0xFF182129;   // slot interior
-    private static final int MODULE_HL = 0xFF27596B; // module slots tinted cyan-ish
+    private static final int MODULE_EDGE = 0xFF3AB3DA; // 4-sided neon cyan border for module sockets
     private static final int LABEL = 0xFF7FA3B8;
 
     public ChassisAssemblyScreen(ChassisAssemblyMenu menu, Inventory inventory, Component title) {
@@ -50,14 +50,21 @@ public class ChassisAssemblyScreen extends AbstractContainerScreen<ChassisAssemb
         }
     }
 
-    /** Inset slot box: interior + 1px bevel, cyan-tinted for module slots. */
+    /** Inset slot box: interior + 1px bevel, full 4-sided bright cyan frame for module slots. */
     private void drawSlot(GuiGraphics graphics, int sx, int sy, boolean module) {
-        int light = module ? MODULE_HL : SLOT_HL;
         graphics.fill(sx, sy, sx + 18, sy + 18, SLOT_BG);
-        graphics.fill(sx, sy, sx + 18, sy + 1, light);          // top
-        graphics.fill(sx, sy, sx + 1, sy + 18, light);          // left
-        graphics.fill(sx, sy + 17, sx + 18, sy + 18, SLOT_SH);  // bottom
-        graphics.fill(sx + 17, sy, sx + 18, sy + 18, SLOT_SH);  // right
+        if (module) {
+            // full 4-sided neon cyan border
+            graphics.fill(sx, sy, sx + 18, sy + 1, MODULE_EDGE);          // top
+            graphics.fill(sx, sy, sx + 1, sy + 18, MODULE_EDGE);          // left
+            graphics.fill(sx, sy + 17, sx + 18, sy + 18, MODULE_EDGE);    // bottom
+            graphics.fill(sx + 17, sy, sx + 18, sy + 18, MODULE_EDGE);    // right
+        } else {
+            graphics.fill(sx, sy, sx + 18, sy + 1, SLOT_HL);              // top
+            graphics.fill(sx, sy, sx + 1, sy + 18, SLOT_HL);              // left
+            graphics.fill(sx, sy + 17, sx + 18, sy + 18, SLOT_SH);        // bottom
+            graphics.fill(sx + 17, sy, sx + 18, sy + 18, SLOT_SH);        // right
+        }
     }
 
     @Override

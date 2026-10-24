@@ -98,6 +98,9 @@ public final class KVRContent {
         ITEM_FACTORIES.forEach((path, factory) -> registrar.item(KVRIds.id(path), memo(path, factory)));
         KVRMenus.init();
 
+        ChassisDyeRecipe.SERIALIZER = ChassisDyeRecipe.createSerializer();
+        registrar.recipeSerializer(KVRIds.id("crafting_special_chassis_dye"), () -> ChassisDyeRecipe.SERIALIZER);
+
         KVR.logger().info("KVR content registered: items={} blocks={}",
                 ITEM_FACTORIES.size(), BLOCK_FACTORIES.size());
     }
