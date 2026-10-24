@@ -74,10 +74,14 @@ packages all Matrix entries, and the core tests pass on every node.
       (`ArmorDyeRecipe`), not by JSON, because a coloured recipe result cannot be expressed the same way
       in 1.20.x (`nbt` string) and 1.21.x (`components`). So KVR needs its own `CustomRecipe` +
       `RecipeSerializer` registration (one version seam) that writes `KVRPaintData` onto the result, then
-      the client colour provider. **Both colour APIs moved in the newest versions**: Fabric's
-      `ColorProviderRegistry.ITEM` is gone in fabric-api 0.141 (1.21.11) and NeoForge's
-      `RegisterColorHandlersEvent.Item` is gone in 21.11 - read both jars with javap before writing the
-      provider, exactly like the menu-type work.
+      the client colour provider. **Verified against 1.21.11 jars**: item tinting was restructured into
+      data-driven `ItemTintSource`s - Fabric's `ColorProviderRegistry` has only a BLOCK channel left in
+      fabric-api 0.141, and NeoForge registers tint-source *codecs* (`RegisterColorHandlersEvent.ItemTintSources`)
+      instead of per-item providers. Vanilla leather armour reads its colour through the `minecraft:dye`
+      tint source, which consumes exactly the `dyed_color` component KVR already writes, so the 1.21.x
+      column needs a model tint entry (`"tints": [...]` in the item model) while 1.20.x keeps a
+      `ColorProviderRegistry.ITEM` / `RegisterColorHandlersEvent.Item` provider. Implement with a
+      Stonecutter branch per column and verify on a real client.
       Do not generate 16 x 5 JSON recipes - they cannot carry the colour reliably.
 - [x] Assembled glasses inherit the chassis paint (KVRPaintData in ChassisAssemblyMenu.refreshResult).
 - [ ] **Old blocker notes (resolved, kept for context)**: `MenuType`'s constructor is not publicly accessible through mojmap
