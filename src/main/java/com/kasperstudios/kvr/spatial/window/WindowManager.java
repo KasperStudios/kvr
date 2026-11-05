@@ -22,6 +22,8 @@ public final class WindowManager {
     private final List<SpatialWindow> windows = new ArrayList<>();
     private final IntSupplier ramWindows;
     @Nullable private SpatialWindow focused;
+    /** HUD_OFF: the OS keeps running (apps tick), but nothing is drawn or hit by the hand ray. */
+    private boolean hidden;
 
     /** @param ramWindows current RAM limit (1/2/4/8/16), read from the worn glasses build */
     public WindowManager(IntSupplier ramWindows) {
@@ -80,6 +82,7 @@ public final class WindowManager {
 
     /** Nearest window (content or grab bar) hit by the hand ray. */
     public Optional<SpatialRaycast.RayHit> pick(SpatialRaycast.Ray ray) {
+        if (hidden) return Optional.empty();
         return windows.stream()
             .filter(SpatialWindow::isVisible)
             .map(w -> SpatialRaycast.intersect(ray, w))
@@ -90,6 +93,7 @@ public final class WindowManager {
     /** Windows to draw this frame, including ones still playing the minimise animation. */
     public List<SpatialWindow> drawable() {
         List<SpatialWindow> out = new ArrayList<>();
+        if (hidden) return out;
         for (SpatialWindow w : windows) if (w.pose() != null && (w.isVisible() || (w.isMinimized() && w.scale() > 0.02f))) out.add(w);
         return out;
     }
@@ -108,5 +112,13 @@ public final class WindowManager {
 
     public void closeAll() {
         for (SpatialWindow w : List.copyOf(windows)) close(w);
+    }
+
+    public void setHidden(boolean hidden) {
+        this.hidden = hidden;
+    }
+
+    public boolean hidden() {
+        return hidden;
     }
 }

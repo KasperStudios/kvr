@@ -6,9 +6,11 @@ import com.kasperstudios.kvr.platform.KVRClientProvider;
 import com.kasperstudios.kvr.spatial.input.SpatialCursor;
 import com.kasperstudios.kvr.spatial.input.SpatialInput;
 import com.kasperstudios.kvr.spatial.render.GlassStyle;
+import com.kasperstudios.kvr.spatial.render.RenderCompat;
 import com.kasperstudios.kvr.spatial.render.SpatialRenderer;
 import com.kasperstudios.kvr.spatial.ui.DockBar;
 import com.kasperstudios.kvr.spatial.ui.GestureWheel;
+import com.kasperstudios.kvr.spatial.ui.PowerWindow;
 import com.kasperstudios.kvr.spatial.ui.ToastPanel;
 import com.kasperstudios.kvr.spatial.vanilla.SpatialScreenProxy;
 import com.kasperstudios.kvr.spatial.window.SpatialWindow;
@@ -36,16 +38,22 @@ public final class KVRSpatial {
     private static SpatialInput input;
     private static ToastPanel toasts;
     private static DockBar dock;
+    private static final com.kasperstudios.kvr.power.client.PowerKey POWER_KEY = new com.kasperstudios.kvr.power.client.PowerKey();
 
     private KVRSpatial() {}
 
     public static void initClient(SpatialConfig cfg) {
         if (config != null) return; // idempotent, like KVR.init()
+        if (!RenderCompat.SUPPORTED) {
+            KVR.logger().warn("KVR spatial UI is not available on this Minecraft version yet (render backend pending)");
+            return;
+        }
         config = cfg;
         KVRClientProvider client = KVRClient.get();
 
         cursor = new SpatialCursor();
         client.registerKeyMapping(cursor.toggleKey());
+        client.registerKeyMapping(POWER_KEY.key());
 
         windows = new WindowManager(cfg.ramWindows());
         toasts = new ToastPanel();
@@ -55,19 +63,41 @@ public final class KVRSpatial {
         client.onClientTickStart(KVRSpatial::tickStart);
         client.onWorldRender(SpatialRenderer::render);
         client.onScreenInit(SpatialScreenProxy::attachPinButton);
+        client.onHudRender(com.kasperstudios.kvr.spatial.render.AlarmOverlay::render);
         KVR.logger().info("KVR spatial UI ready");
     }
 
+    /** Dock status click, or automatically on overload. */
+    public static void openPowerWindow() {
+        if (windows.find(PowerWindow.class).isEmpty()) windows.open(new PowerWindow());
+        windows.find(PowerWindow.class).ifPresent(windows::restore);
+    }
+
     private static void tickStart() {
-        boolean worn = config.glassesWorn().getAsBoolean();
+        if (net.minecraft.client.Minecraft.getInstance().player != null) POWER_KEY.tick();
+        boolean display = config.glassesWorn().getAsBoolean();
+        boolean os = display || osRunning();
         boolean shown = windows.find(DockBar.class).isPresent();
-        if (worn && !shown) {
+        if (os && !shown) {
             windows.open(dock);
             windows.open(toasts);
-        } else if (!worn && shown) {
-            windows.closeAll(); // glasses off: every surface disappears with them
+        } else if (!os && shown) {
+            windows.closeAll(); // glasses off or powered down: every surface and app ends
+        }
+        // HUD_OFF (SPEC 2.7): display dark, OS alive — apps keep ticking, windows are just not drawn
+        windows.setHidden(os && !display);
+        // Note 7: the save button must be in front of the player at once (vignette + power key cover HUD_OFF)
+        if (shown && display && com.kasperstudios.kvr.power.client.PowerClient.overloading() && windows.find(PowerWindow.class).isEmpty()) {
+            openPowerWindow();
+            cursor.setActive(true);
         }
         input.tickStart();
+    }
+
+    /** OS running = worn glasses ON or HUD_OFF and booted (display may be dark). */
+    private static boolean osRunning() {
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        return mc.level != null && com.kasperstudios.kvr.power.GlassesPower.active(com.kasperstudios.kvr.power.client.PowerClient.worn(), mc.level.getGameTime());
     }
 
     private static void runGesture(GestureWheel.Gesture gesture) {
