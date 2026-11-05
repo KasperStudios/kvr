@@ -1,0 +1,19 @@
+{
+  "key.categories.kvr": "KVR",
+  "key.kvr.spatial_toggle": "Spatial mode",
+  "kvr.dock": "Dock",
+  "kvr.toasts": "Notifications",
+  "kvr.gesture.title": "Gestures",
+  "kvr.gesture.hint": "Alt + RMB",
+  "kvr.gesture.launcher": "Launcher",
+  "kvr.gesture.minimize_all": "Minimize all",
+  "kvr.gesture.minimize_focused": "Minimize current",
+  "kvr.gesture.virtual_space": "Virtual space",
+  "kvr.gesture.new_space": "New space",
+  "kvr.screen.pin": "3D",
+  "kvr.screen.pin.tooltip": "Pin to space",
+  "kvr.window.ram_full.title": "Out of memory",
+  "kvr.window.ram_full": "%s of %s apps open — close one first",
+  "kvr.anchor.body": "With player",
+  "kvr.anchor.world": "In world"
+}

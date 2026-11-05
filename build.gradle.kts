@@ -25,6 +25,11 @@ architectury.common(stonecutter.tree.branches.mapNotNull {
     else it.project.prop("loom.platform")
 })
 
+repositories {
+    mavenCentral()
+    maven("https://repo.spongepowered.org/repository/maven-public/")
+}
+
 dependencies {
     minecraft("com.mojang:minecraft:$minecraft")
     // Mojang mappings for every loader: NeoForge needs no yarn mapping patch,
@@ -35,6 +40,10 @@ dependencies {
     // Architectury API: the KVR core only needs the annotation contract, and a
     // version-independent artifact keeps the Stonecutter matrix free of per-version AR versions.
     compileOnly("dev.architectury:architectury-injectables:${mod.dep("architectury_injectables")}")
+
+    // SpongePowered Mixin for common client mixins (GuiMixin, MouseHandlerMixin, etc.)
+    compileOnly("org.spongepowered:mixin:0.8.7")
+    annotationProcessor("org.spongepowered:mixin:0.8.7:processor")
 
     testImplementation("org.junit.jupiter:junit-jupiter:${mod.dep("junit")}")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

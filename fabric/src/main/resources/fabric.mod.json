@@ -21,5 +21,8 @@
     "fabricloader": ">=${loader_version}",
     "fabric-api": ">=${fabric_api_version}",
     "minecraft": "${minecraft}"
-  }
+  },
+  "mixins": [
+    "kvr-spatial.mixins.json"
+  ]
 }

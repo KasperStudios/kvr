@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.kasperstudios.kvr.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "client.AbstractContainerScreenAccessor",
+    "client.GuiMixin",
+    "client.MinecraftMixin",
+    "client.MouseHandlerMixin",
+    "client.ScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

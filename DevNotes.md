@@ -53,6 +53,15 @@ packages all Matrix entries, and the core tests pass on every node.
       server and logs `KVR OS core 0.1.0 booting on fabric (dedicated server)`.
 - [x] Architectury platform-side implementations (`...platform.fabric.*ProviderImpl`,
       `...platform.neoforge.*ProviderImpl`) for the transformed facade calls.
+- [x] Block 4 Spatial UI & Engine (Task 0001 from Retool):
+      - 21 core Spatial classes: `SpatialWindow`, `WindowSurface` (offscreen FBO), `WindowManager` (RAM check),
+        `SpatialCursor` (Alt-toggle, deadzone camera turn), `SpatialRaycast`, `GrabController`, `SpatialInput`,
+        `SpatialRenderer` (in-world quads + pointer), `GlassStyle` (nine-slice glass GUI).
+      - Anchors: `WorldAnchor`, `BodyAnchor`, `LazyFollowAnchor` (Quest-style dock & toast panels).
+      - Detached vanilla screens: `SpatialScreenProxy` (3D button on any container screen).
+      - Generated 9-slice GUI sprites & mcmeta directly into `assets/kvr/textures/gui/sprites/`.
+      - SpongePowered Mixin compileOnly dependency added to `:common` build.
+      - Full compilation & test verification on 1.21.1 (Fabric & NeoForge jar assembled and verified).
 
 ### In progress
 - [x] Block 2b (container-menu based, decided by the Creator). Landed: glasses item + stack codec +
