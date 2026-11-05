@@ -40,9 +40,12 @@ public final class KVRFabric implements ModInitializer {
                 .title(net.minecraft.network.chat.Component.translatable("itemGroup.kvr.main"))
                 .icon(() -> new net.minecraft.world.item.ItemStack(KVRContent.glasses()))
                 .displayItems((params, output) -> {
-                    KVRContent.ITEMS.forEach((path, item) -> {
-                        if (!path.equals("hackglasses") && item != null) {
-                            output.accept(item);
+                    KVRContent.itemFactories().forEach((path, factory) -> {
+                        if (!path.equals("hackglasses")) {
+                            net.minecraft.world.item.Item item = KVRContent.item(path);
+                            if (item != null) {
+                                output.accept(item);
+                            }
                         }
                     });
                 })
