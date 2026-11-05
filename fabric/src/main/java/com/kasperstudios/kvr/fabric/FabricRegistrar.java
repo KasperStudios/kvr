@@ -24,12 +24,14 @@ final class FabricRegistrar implements KVRRegistrar {
 
     @Override
     public void item(ResourceLocation id, Supplier<Item> item) {
-        Registry.register(BuiltInRegistries.ITEM, id, item.get());
+        Item registeredItem = item.get();
+        Registry.register(BuiltInRegistries.ITEM, id, registeredItem);
     }
 
     @Override
     public void block(ResourceLocation id, Supplier<Block> block) {
-        Registry.register(BuiltInRegistries.BLOCK, id, block.get());
+        Block registeredBlock = block.get();
+        Registry.register(BuiltInRegistries.BLOCK, id, registeredBlock);
     }
 
     @Override

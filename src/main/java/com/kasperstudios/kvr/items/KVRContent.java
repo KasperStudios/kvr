@@ -108,8 +108,15 @@ public final class KVRContent {
         registered = true;
 
         KVRRegistrar registrar = KVRRegistryProvider.get();
-        BLOCK_FACTORIES.forEach((path, factory) -> registrar.block(KVRIds.id(path), memoBlock(path, factory)));
-        ITEM_FACTORIES.forEach((path, factory) -> registrar.item(KVRIds.id(path), memo(path, factory)));
+        // Eagerly resolve and register all blocks first, then items
+        BLOCK_FACTORIES.forEach((path, factory) -> {
+            Block b = BLOCKS.computeIfAbsent(path, ignored -> factory.get());
+            registrar.block(KVRIds.id(path), () -> b);
+        });
+        ITEM_FACTORIES.forEach((path, factory) -> {
+            Item it = ITEMS.computeIfAbsent(path, ignored -> factory.get());
+            registrar.item(KVRIds.id(path), () -> it);
+        });
         KVRMenus.init();
 
         ChassisDyeRecipe.SERIALIZER = ChassisDyeRecipe.createSerializer();
