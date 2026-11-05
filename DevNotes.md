@@ -82,6 +82,11 @@ packages all Matrix entries, and the core tests pass on every node.
       - `SpyMath`, `WindowSummary`, `SpyRelay`, `SpyClient`, `GhostRenderer`: looking at a player with KVR glasses projects their
         floating windows and battery percentage with green `hack_grid` overlay in real-time.
       - Unit tests: `SpyMathTest`, `WindowSummaryTest` (102 tests total passed, 0 failures).
+- [x] Block 5 Skeleton: Script Engine Core & Watchdog (Task 0007 from Retool):
+      - Engine-agnostic contract: `JsEngine` (eval, call with JSON args, host functions, interrupt, memory measurement).
+      - Fixed-step clock: `ScriptClock` implementing CPU tiers (10/20/50/100/200 Hz) with max 3-tick catch-up limit.
+      - Watchdog timer: `Watchdog` enforcing 25% tick budget limit, strike counter (3 slow ticks -> NOT_RESPONDING), and 4x budget instant KILL.
+      - Unit tests: `ScriptClockTest`, `WatchdogTest` (109 tests total passed, 0 failures).
 
 ### In progress
 - [x] Block 2b (container-menu based, decided by the Creator). Landed: glasses item + stack codec +
