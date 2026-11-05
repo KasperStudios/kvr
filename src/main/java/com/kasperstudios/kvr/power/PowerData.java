@@ -37,6 +37,11 @@ public final class PowerData {
         return state != PowerState.OFF && !booting(gameTime);
     }
 
+    /** Display lit: fully ON and booted. HUD_OFF keeps the OS running but shows nothing. */
+    public boolean displayOn(long gameTime) {
+        return state == PowerState.ON && !booting(gameTime);
+    }
+
     public double capacity(PowerBuild build) {
         return build.capacity() * (1.0 - wear);
     }

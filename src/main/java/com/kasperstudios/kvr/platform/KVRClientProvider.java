@@ -1,11 +1,11 @@
 package com.kasperstudios.kvr.platform;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.function.Consumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
-import org.joml.Matrix4f;
 
 /**
  * Client-side loader hooks the spatial UI needs. Implemented once per loader
@@ -27,10 +27,16 @@ public interface KVRClientProvider {
     /** After a screen's init(); {@code addWidget} adds a renderable, clickable widget to it. */
     void onScreenInit(ScreenInit callback);
 
+    /** Screen-space overlay after the vanilla GUI (used only for the overload vignette). */
+    void onHudRender(Consumer<net.minecraft.client.gui.GuiGraphics> callback);
+
     @FunctionalInterface
     interface WorldRender {
-        /** @param view camera rotation matrix (vertices are given relative to the camera position) */
-        void render(Matrix4f view, Camera camera, float partialTick);
+        /**
+         * @param poseStack the level pass pose stack exactly as the loader event gives it — the same
+         *                  one vanilla entity renderers use; vertices are relative to the camera
+         */
+        void render(PoseStack poseStack, Camera camera, float partialTick);
     }
 
     @FunctionalInterface

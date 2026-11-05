@@ -250,7 +250,7 @@ win.show();
 - [ ] Генерация `UpOre` в мире (жилы Overworld/Nether) — отдельный тикет worldgen.
 
 ### Блок 3: Энергетика, Док-Плита и Взрыв Note 7
-- [ ] Блок `DockPlateBlock` + BlockEntity с поддержкой редстоуна, FE/RF API и солнечного модуля.
+- [x] Блок `DockPlateBlock` + BlockEntity с поддержкой редстоуна, FE/RF API и солнечного модуля.
 - [x] Состояния: Standby, HUD-off, Power Off.
 - [x] Физика перегрузки батареи:
   - Стробоскоп HUD / окон.

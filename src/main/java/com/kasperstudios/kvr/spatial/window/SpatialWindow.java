@@ -5,6 +5,7 @@ import com.kasperstudios.kvr.spatial.SpatialPose;
 import com.kasperstudios.kvr.spatial.anchor.SpatialAnchor;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -109,12 +110,17 @@ public abstract class SpatialWindow {
 
     /** Render the window into its offscreen texture (called by SpatialRenderer once per frame). */
     public final void paint(int mouseX, int mouseY, float partialTick) {
-        if (surface == null) surface = new WindowSurface();
+        if (surface == null) surface = new WindowSurface(id);
         surface.render(this, mouseX, mouseY, partialTick);
     }
 
     public final int textureId() {
-        return surface == null ? 0 : surface.textureId();
+        return 0;
+    }
+
+    @Nullable
+    public final ResourceLocation texture() {
+        return surface == null ? null : surface.texture();
     }
 
     /** Ease-out scale for the open/minimise animation. */

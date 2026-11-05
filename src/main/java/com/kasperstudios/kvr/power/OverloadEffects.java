@@ -34,6 +34,23 @@ public final class OverloadEffects {
 
     private OverloadEffects() {}
 
+    /** Glasses lying on a dock plate started an overload: same broadcast as glasses on the ground. */
+    public static void startAt(ServerLevel level, net.minecraft.core.BlockPos pos) {
+        level.getServer().getPlayerList().broadcastSystemMessage(
+            Component.translatable("kvr.overload.broadcast_ground", pos.getX(), pos.getY(), pos.getZ()).withStyle(ChatFormatting.RED, ChatFormatting.BOLD), false);
+        siren(level);
+    }
+
+    /** Detonation on a dock plate: like the ground outcome, centred on the plate. */
+    public static void detonateAt(ServerLevel level, ItemStack glasses, net.minecraft.world.phys.Vec3 at) {
+        List<ItemStack> parts = GlassesPowerTicker.survivors(level, glasses);
+        glasses.setCount(0);
+        level.explode(null, at.x, at.y, at.z, PowerTable.GROUND_EXPLOSION_POWER, Level.ExplosionInteraction.MOB);
+        for (ItemStack part : parts) level.addFreshEntity(new ItemEntity(level, at.x, at.y + 0.5, at.z, part));
+        level.getServer().getPlayerList().broadcastSystemMessage(
+            Component.translatable("kvr.overload.detonated_dock", (int) at.x, (int) at.y, (int) at.z).withStyle(ChatFormatting.DARK_RED), false);
+    }
+
     static void start(ServerLevel level, Entity holder, GlassesPowerTicker.Location where) {
         Component msg = where == GlassesPowerTicker.Location.GROUND
             ? Component.translatable("kvr.overload.broadcast_ground", holder.getBlockX(), holder.getBlockY(), holder.getBlockZ())
@@ -43,7 +60,7 @@ public final class OverloadEffects {
     }
 
     /** Vanilla raid horn for every player on the server, played at their own position. */
-    static void siren(ServerLevel level) {
+    public static void siren(ServerLevel level) {
         for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
             p.connection.send(new ClientboundSoundPacket(SoundEvents.RAID_HORN, SoundSource.NEUTRAL, p.getX(), p.getY(), p.getZ(), 64f, 1f, level.random.nextLong()));
         }

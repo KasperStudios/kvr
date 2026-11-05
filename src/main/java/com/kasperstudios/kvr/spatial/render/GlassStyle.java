@@ -9,7 +9,7 @@ import net.minecraft.resources.ResourceLocation;
  * Visual language of KVR OS: glassmorphism panels from nine-slice GUI sprites
  * ({@code assets/kvr/textures/gui/sprites/*.png} + {@code .mcmeta} with {@code nine_slice} scaling),
  * so windows stay crisp at any size without custom shaders. The sprites are generated on the
- * KVR textures page (category \"GUI-спрайты\").
+ * KVR textures page (category "GUI-спрайты"). All drawing goes through {@link RenderCompat#sprite}.
  */
 public final class GlassStyle {
 
@@ -21,6 +21,9 @@ public final class GlassStyle {
     public static final ResourceLocation ANCHOR_BODY = id("anchor_body");
     public static final ResourceLocation ANCHOR_WORLD = id("anchor_world");
     public static final ResourceLocation BATTERY = id("battery");
+
+    /** Same PNG as a plain texture, for world quads (grab bar, pointer). */
+    public static final ResourceLocation GRAB_HANDLE_TEXTURE = id("textures/gui/sprites/grab_handle.png");
 
     public static final int TEXT = 0xFFF1F5F9;
     public static final int MUTED = 0xB0E2E8F0;
@@ -39,8 +42,21 @@ public final class GlassStyle {
         *///?}
     }
 
+    /** Border of the nine-slice sprites (must match their .mcmeta); 0 = stretch. Used on 1.20.1. */
+    public static int nineSliceBorder(ResourceLocation sprite) {
+        return switch (sprite.getPath()) {
+            case "panel", "panel_hover" -> 5;
+            case "grab_handle" -> 3;
+            default -> 0;
+        };
+    }
+
+    public static void sprite(GuiGraphics g, ResourceLocation sprite, int x, int y, int w, int h) {
+        RenderCompat.sprite(g, sprite, x, y, w, h);
+    }
+
     public static void panel(GuiGraphics g, int x, int y, int w, int h, boolean hovered) {
-        g.blitSprite(hovered ? PANEL_HOVER : PANEL, x, y, w, h);
+        RenderCompat.sprite(g, hovered ? PANEL_HOVER : PANEL, x, y, w, h);
     }
 
     public static void text(GuiGraphics g, Component text, int x, int y, int color) {

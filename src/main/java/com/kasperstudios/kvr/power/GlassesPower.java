@@ -71,9 +71,14 @@ public final class GlassesPower {
         return build(stack).map(b -> data(stack).percent(b)).orElse(0);
     }
 
-    /** For {@code SpatialConfig.glassesWorn}: worn, switched on and finished booting. */
+    /** OS running (ON or HUD-off, booted). */
     public static boolean active(ItemStack stack, long gameTime) {
         return build(stack).isPresent() && data(stack).active(gameTime);
+    }
+
+    /** For {@code SpatialConfig.glassesWorn}: display lit (ON and booted) — HUD_OFF hides every window. */
+    public static boolean displayOn(ItemStack stack, long gameTime) {
+        return build(stack).isPresent() && data(stack).displayOn(gameTime);
     }
 
     /** Player action; persists immediately and reports SAVED when it defuses an overload. */

@@ -7,145 +7,106 @@ import com.kasperstudios.kvr.spatial.anchor.SpatialAnchor;
 import com.kasperstudios.kvr.spatial.input.SpatialRaycast;
 import com.kasperstudios.kvr.spatial.window.SpatialWindow;
 import com.kasperstudios.kvr.spatial.window.WindowManager;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.client.Camera;
-import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Matrix4f;
-import org.joml.Matrix4fStack;
 
 /**
- * Draws every window as a textured quad in the world after translucent blocks, plus its grab bar
- * and the hand pointer where the ray touches a panel (in VR the pointer lives on the surface, not
- * in a HUD). Hooked through {@code KVRClient.onWorldRender}, so this class never sees a loader.
+ * Draws every window as a quad in the world after translucent blocks, plus its grab bar and the
+ * hand pointer where the ray touches a panel (in VR the pointer lives on the surface, not in a HUD).
+ *
+ * <p>Same convention as vanilla entity renderers: vertices relative to the camera, multiplied by the
+ * pose stack the loader event provides (on 1.20.x it carries the camera rotation, on 1.21 the
+ * rotation sits in the model-view matrix) — so this class has no version branches at all.
  */
 public final class SpatialRenderer {
 
-    private static final float POINTER = 0.012f;
+    private static final double POINTER = 0.012;
+    private static final int WHITE = 0xFFFFFFFF;
+    private static final int CYAN = 0xFF67E8F9;
+    /** Blood-red multiply for the overload strobe (approved by the Creator). */
+    private static final int ALARM_RED = 0xFFFF3B3B;
     private static long lastFrame;
 
     private SpatialRenderer() {}
 
-    /** @param view camera rotation matrix of the level pass (vertices are camera-relative) */
-    public static void render(Matrix4f view, Camera camera, float partialTick) {
+    public static void render(PoseStack pose, Camera camera, float partialTick) {
         if (!KVRSpatial.ready() || camera.getEntity() == null) return;
         long now = System.nanoTime();
         float dt = lastFrame == 0 ? 0f : Math.min(0.1f, (now - lastFrame) / 1e9f);
         lastFrame = now;
 
         WindowManager windows = KVRSpatial.windows();
-        PlayerView pv = PlayerView.capture(camera, partialTick);
-        windows.update(pv, dt);
+        windows.update(PlayerView.capture(camera, partialTick), dt);
         Optional<SpatialRaycast.RayHit> hover = KVRSpatial.input().hover();
-
         List<SpatialWindow> list = windows.drawable();
+        if (list.isEmpty() && KVRSpatial.input().ray().isEmpty()) return;
+
         // 1) offscreen: each window paints its GUI into its own texture
         for (SpatialWindow w : list) {
             boolean over = hover.isPresent() && hover.get().window() == w && hover.get().region() == SpatialRaycast.Region.CONTENT;
             w.paint(over ? (int) hover.get().px() : -1, over ? (int) hover.get().py() : -1, partialTick);
         }
 
-        // 2) world pass, far to near for correct blending of the glass
+        // 2) world pass, far to near so the glass blends correctly
         Vec3 cam = camera.getPosition();
         list.sort(Comparator.comparingDouble((SpatialWindow w) -> w.pose().center().distanceToSqr(cam)).reversed());
-
-        Matrix4fStack mv = RenderSystem.getModelViewStack();
-        mv.pushMatrix();
-        mv.identity();
-        mv.mul(view);
-        RenderSystem.applyModelViewMatrix();
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.enableDepthTest();
-        RenderSystem.disableCull();
-        try {
-            for (SpatialWindow w : list) {
-                drawWindow(w, cam);
-                if (w.hasGrabBar()) drawGrabBar(w, cam, hover);
-            }
-            drawPointer(camera, cam, hover);
-        } finally {
-            RenderSystem.enableCull();
-            RenderSystem.disableBlend();
-            mv.popMatrix();
-            RenderSystem.applyModelViewMatrix();
+        MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
+        for (SpatialWindow w : list) {
+            drawWindow(pose, buffers, w, cam);
+            if (w.hasGrabBar()) drawGrabBar(pose, buffers, w, cam, hover);
         }
+        drawPointer(pose, buffers, camera, cam, hover);
+        RenderCompat.flush(buffers);
     }
 
-    private static void drawWindow(SpatialWindow w, Vec3 cam) {
+    private static void drawWindow(PoseStack pose, MultiBufferSource buffers, SpatialWindow w, Vec3 cam) {
+        ResourceLocation tex = w.texture();
+        if (tex == null) return;
         SpatialPose p = w.pose();
         Vec3 c = p.center().subtract(cam);
         Vec3 r = p.right().scale(w.widthMeters() / 2);
         Vec3 u = p.up().scale(w.heightMeters() / 2);
-
-        RenderSystem.setShaderTexture(0, w.textureId());
-        //? if >=1.21.2 {
-        /*RenderSystem.setShader(net.minecraft.client.renderer.CoreShaders.POSITION_TEX_COLOR);
-        *///?} else {
-        RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
-        //?}
-        BufferBuilder b = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-        // FBO textures are bottom-up: v = 1 is the top row of the window
-        tex(b, c.subtract(r).add(u), 0f, 1f);
-        tex(b, c.subtract(r).subtract(u), 0f, 0f);
-        tex(b, c.add(r).subtract(u), 1f, 0f);
-        tex(b, c.add(r).add(u), 1f, 1f);
-        BufferUploader.drawWithShader(b.buildOrThrow());
+        // framebuffer textures are bottom-up: v = 1 is the top row of the window
+        int tint = com.kasperstudios.kvr.power.client.PowerClient.strobeOn() ? ALARM_RED : WHITE;
+        RenderCompat.quad(pose, buffers, tex, c.subtract(r).add(u), c.subtract(r).subtract(u), c.add(r).subtract(u), c.add(r).add(u), 0f, 1f, 1f, 0f, tint);
     }
 
-    private static void drawGrabBar(SpatialWindow w, Vec3 cam, Optional<SpatialRaycast.RayHit> hover) {
+    private static void drawGrabBar(PoseStack pose, MultiBufferSource buffers, SpatialWindow w, Vec3 cam, Optional<SpatialRaycast.RayHit> hover) {
         SpatialPose p = w.pose();
         double m = 1.0 / SpatialWindow.PX_PER_METER * w.scale();
-        Vec3 down = p.up().scale(-(w.height() / 2.0 + SpatialWindow.GRAB_GAP + SpatialWindow.GRAB_H / 2.0) * m);
-        Vec3 base = p.center().subtract(cam).add(down);
+        Vec3 base = p.center().subtract(cam).add(p.up().scale(-(w.height() / 2.0 + SpatialWindow.GRAB_GAP + SpatialWindow.GRAB_H / 2.0) * m));
 
-        boolean barHot = KVRSpatial.input().holding(w) || hover.filter(h -> h.window() == w && h.region() == SpatialRaycast.Region.GRAB_BAR).isPresent();
-        int alpha = barHot ? 235 : 150;
-        rect(base, p, SpatialWindow.GRAB_W * m * (barHot ? 1.15 : 1.0), SpatialWindow.GRAB_H * m, 255, 255, 255, alpha);
+        boolean hot = KVRSpatial.input().holding(w) || hover.filter(h -> h.window() == w && h.region() == SpatialRaycast.Region.GRAB_BAR).isPresent();
+        rect(pose, buffers, base, p, SpatialWindow.GRAB_W * m * (hot ? 1.15 : 1.0), SpatialWindow.GRAB_H * m, hot ? 0xEBFFFFFF : 0x96FFFFFF);
 
-        // anchor toggle: cyan = Body, white = World
+        // anchor toggle next to the handle: cyan = Body, white = World
         double tx = (SpatialWindow.GRAB_W / 2.0 + SpatialWindow.TOGGLE_GAP + SpatialWindow.TOGGLE_SIZE / 2.0) * m;
         boolean body = w.anchor().mode() == SpatialAnchor.Mode.BODY;
-        rect(base.add(p.right().scale(tx)), p, SpatialWindow.TOGGLE_SIZE * m * 0.6, SpatialWindow.TOGGLE_SIZE * m * 0.6, body ? 103 : 255, body ? 232 : 255, body ? 249 : 255, 210);
+        double s = SpatialWindow.TOGGLE_SIZE * m * 0.6;
+        rect(pose, buffers, base.add(p.right().scale(tx)), p, s, s, body ? CYAN : WHITE);
     }
 
-    private static void drawPointer(Camera camera, Vec3 cam, Optional<SpatialRaycast.RayHit> hover) {
+    private static void drawPointer(PoseStack pose, MultiBufferSource buffers, Camera camera, Vec3 cam, Optional<SpatialRaycast.RayHit> hover) {
         Optional<SpatialRaycast.Ray> ray = KVRSpatial.input().ray();
         if (ray.isEmpty()) return;
         double dist = hover.map(SpatialRaycast.RayHit::distance).orElse(2.0) - 0.004;
         Vec3 at = ray.get().origin().add(ray.get().dir().scale(dist)).subtract(cam);
         Vec3 left = new Vec3(camera.getLeftVector()).scale(POINTER);
         Vec3 up = new Vec3(camera.getUpVector()).scale(POINTER);
-        int a = hover.isPresent() ? 255 : 170;
-        quadColor(at.add(left).add(up), at.add(left).subtract(up), at.subtract(left).subtract(up), at.subtract(left).add(up), 255, 255, 255, a);
+        int color = hover.isPresent() ? WHITE : 0xAAFFFFFF;
+        RenderCompat.quad(pose, buffers, GlassStyle.GRAB_HANDLE_TEXTURE, at.add(left).add(up), at.add(left).subtract(up), at.subtract(left).subtract(up), at.subtract(left).add(up), 0f, 0f, 1f, 1f, color);
     }
 
-    private static void rect(Vec3 center, SpatialPose p, double w, double h, int r, int g, int b, int a) {
-        Vec3 rr = p.right().scale(w / 2);
-        Vec3 uu = p.up().scale(h / 2);
-        quadColor(center.subtract(rr).add(uu), center.subtract(rr).subtract(uu), center.add(rr).subtract(uu), center.add(rr).add(uu), r, g, b, a);
-    }
-
-    private static void quadColor(Vec3 v0, Vec3 v1, Vec3 v2, Vec3 v3, int r, int g, int b, int a) {
-        //? if >=1.21.2 {
-        /*RenderSystem.setShader(net.minecraft.client.renderer.CoreShaders.POSITION_COLOR);
-        *///?} else {
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
-        //?}
-        BufferBuilder bb = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        for (Vec3 v : new Vec3[] {v0, v1, v2, v3}) bb.addVertex((float) v.x, (float) v.y, (float) v.z).setColor(r, g, b, a);
-        BufferUploader.drawWithShader(bb.buildOrThrow());
-    }
-
-    private static void tex(BufferBuilder b, Vec3 v, float u, float vv) {
-        b.addVertex((float) v.x, (float) v.y, (float) v.z).setUv(u, vv).setColor(255, 255, 255, 255);
+    private static void rect(PoseStack pose, MultiBufferSource buffers, Vec3 center, SpatialPose p, double w, double h, int argb) {
+        Vec3 r = p.right().scale(w / 2);
+        Vec3 u = p.up().scale(h / 2);
+        RenderCompat.quad(pose, buffers, GlassStyle.GRAB_HANDLE_TEXTURE, center.subtract(r).add(u), center.subtract(r).subtract(u), center.add(r).subtract(u), center.add(r).add(u), 0f, 0f, 1f, 1f, argb);
     }
 }

@@ -68,13 +68,14 @@ packages all Matrix entries, and the core tests pass on every node.
       - Server overload physics: `OverloadEffects` (server-wide siren horn, chat warning, 4 explosion outcomes, 50% part burning `PartBurn`).
       - Mixins: `ItemEntityMixin` (ticking overload on dropped glasses item), damage type `kvr:battery_explosion`.
       - Full test suite: `PartBurnTest`, `PowerBuildTest`, `PowerDataTest`, `PowerSimulatorTest` (89 tests total passed).
-- [x] Block 3b & 3c: KVRNetwork Facade & Dock Plate Assets (Task 0004 from Retool):
+- [x] Block 3b & 3c: KVRNetwork Facade & Dock Plate Assets (Task 0004 & 0005 from Retool):
       - `KVRNetwork` facade with `sendToServer`, `sendToPlayer`, client/server packet handlers.
-      - Registered `dock_plate` block & block item + `solar_upgrade` item in `KVRContent`.
-      - Generated animated 3D block models and textures for `dock_plate`, `dock_plate_charging`, `dock_plate_solar`,
-        `dock_glasses` (tintindex 0 for chassis color), `dock_hologram` (two crossed translucent planes), and `solar_upgrade`.
-      - Multipart blockstate for `dock_plate` supporting `charging`, `solar`, `has_glasses`, and 4 rotations of `facing`.
-      - Localization entries in ru_ru.json and en_us.json.
+      - `DockLogic`, `DockPlateBlock`, `DockPlateBlockEntity`, `KVRDock`: pressure-plate block with glasses & solar module interaction,
+        4000 FE buffer, redstone/daylight generation, glasses charging 50 FE/t, overload explosion handling on plate.
+      - Client & Network: `SetPowerStatePayload` (C2S), `PowerServerHandler`, `PowerClient` snapshot & strobe,
+        physical power key `PowerKey` ('O'), floating `PowerWindow`, screen-space vignette `AlarmOverlay`, `onHudRender` hook.
+      - Full test suite: `DockLogicTest`, `PowerDataTest` additions (95 tests total passed, 0 failures).
+      - Both Fabric and NeoForge jars fully built and verified.
 
 ### In progress
 - [x] Block 2b (container-menu based, decided by the Creator). Landed: glasses item + stack codec +

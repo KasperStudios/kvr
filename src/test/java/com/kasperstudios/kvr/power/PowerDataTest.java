@@ -43,6 +43,18 @@ class PowerDataTest {
     }
 
     @Test
+    void hudOffIsActiveButDisplayDark() {
+        PowerData d = new PowerData();
+        d.state = PowerState.HUD_OFF;
+        org.junit.jupiter.api.Assertions.assertTrue(d.active(10));
+        org.junit.jupiter.api.Assertions.assertFalse(d.displayOn(10));
+        d.state = PowerState.ON;
+        d.bootUntil = 20;
+        org.junit.jupiter.api.Assertions.assertFalse(d.displayOn(10));
+        org.junit.jupiter.api.Assertions.assertTrue(d.displayOn(20));
+    }
+
+    @Test
     void temperatureRisesToDetonationPoint() {
         PowerData d = new PowerData();
         d.overloadDeadline = 600;
