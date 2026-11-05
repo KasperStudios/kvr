@@ -23,6 +23,7 @@
     "minecraft": "${minecraft}"
   },
   "mixins": [
-    "kvr-spatial.mixins.json"
+    "kvr-spatial.mixins.json",
+    "kvr-power.mixins.json"
   ]
 }

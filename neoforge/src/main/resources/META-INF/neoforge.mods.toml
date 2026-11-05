@@ -25,3 +25,6 @@ side = "BOTH"
 
 [[mixins]]
 config = "kvr-spatial.mixins.json"
+
+[[mixins]]
+config = "kvr-power.mixins.json"

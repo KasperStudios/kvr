@@ -41,9 +41,9 @@ dependencies {
     // version-independent artifact keeps the Stonecutter matrix free of per-version AR versions.
     compileOnly("dev.architectury:architectury-injectables:${mod.dep("architectury_injectables")}")
 
-    // SpongePowered Mixin for common client mixins (GuiMixin, MouseHandlerMixin, etc.)
+    // SpongePowered Mixin for common client/server mixins
     compileOnly("org.spongepowered:mixin:0.8.7")
-    annotationProcessor("org.spongepowered:mixin:0.8.7:processor")
+    compileOnly("org.ow2.asm:asm-tree:9.7")
 
     testImplementation("org.junit.jupiter:junit-jupiter:${mod.dep("junit")}")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

@@ -62,6 +62,12 @@ packages all Matrix entries, and the core tests pass on every node.
       - Generated 9-slice GUI sprites & mcmeta directly into `assets/kvr/textures/gui/sprites/`.
       - SpongePowered Mixin compileOnly dependency added to `:common` build.
       - Full compilation & test verification on 1.21.1 (Fabric & NeoForge jar assembled and verified).
+- [x] Block 3a Power Model & Overload Physics (Task 0002 from Retool):
+      - `PowerTable`, `PowerState` (ON, HUD_OFF, OFF), `PowerBuild`, `PowerData` (FE charge, wear degradation, temperature),
+        `PowerSimulator` (cold boot by CPU tier, step FE simulation, 30s overload countdown, Power Off defuse).
+      - Server overload physics: `OverloadEffects` (server-wide siren horn, chat warning, 4 explosion outcomes, 50% part burning `PartBurn`).
+      - Mixins: `ItemEntityMixin` (ticking overload on dropped glasses item), damage type `kvr:battery_explosion`.
+      - Full test suite: `PartBurnTest`, `PowerBuildTest`, `PowerDataTest`, `PowerSimulatorTest` (89 tests total passed).
 
 ### In progress
 - [x] Block 2b (container-menu based, decided by the Creator). Landed: glasses item + stack codec +
