@@ -42,5 +42,26 @@ public final class KVRNeoForge {
             NeoForgeClientScreens.register(modBus);
         }
         KVR.init();
+
+        // Register Creative Mode Tab for NeoForge
+        modBus.addListener(net.neoforged.neoforge.registries.RegisterEvent.class, event -> {
+            event.register(net.minecraft.core.registries.Registries.CREATIVE_MODE_TAB, helper -> {
+                helper.register(
+                    com.kasperstudios.kvr.core.KVRIds.id("main"),
+                    net.minecraft.world.item.CreativeModeTab.builder()
+                        .title(net.minecraft.network.chat.Component.translatable("itemGroup.kvr.main"))
+                        .icon(() -> new net.minecraft.world.item.ItemStack(KVRContent.glasses()))
+                        .displayItems((params, output) -> {
+                            KVRContent.itemFactories().forEach((path, factory) -> {
+                                if (!path.equals("hackglasses")) {
+                                    net.minecraft.world.item.Item it = factory.get();
+                                    if (it != null) output.accept(it);
+                                }
+                            });
+                        })
+                        .build()
+                );
+            });
+        });
     }
 }

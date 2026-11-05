@@ -1,6 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "kvr:item/chassis_tier3"
+    "layer0": "kvr:item/chassis_tier3",
+    "layer1": "kvr:item/chassis_tier3"
   }
 }

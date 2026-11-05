@@ -1,6 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "kvr:item/glasses"
+    "layer0": "kvr:item/glasses",
+    "layer1": "kvr:item/glasses"
   }
 }

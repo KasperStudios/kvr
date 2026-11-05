@@ -372,6 +372,27 @@ val generateKvrData = tasks.register("generateKvrData") {
             )
         )
 
+        // Dock plate crafting recipe: 3 stone slabs + 1 UpIngot + 1 redstone
+        recipes.resolve("dock_plate.json").writeText(
+            kvrShaped(
+                "dock_plate",
+                listOf(" S ", "RIR", "SSS"),
+                mapOf("S" to "minecraft:stone_slab", "I" to "kvr:up_ingot", "R" to "minecraft:redstone"),
+                "kvr:dock_plate",
+                1
+            )
+        )
+
+        // Solar upgrade crafting recipe: 3 daylight detectors + 1 UpIngot
+        recipes.resolve("solar_upgrade.json").writeText(
+            kvrShaped(
+                "solar_upgrade",
+                listOf("DDD", " I ", "   "),
+                mapOf("D" to "minecraft:daylight_detector", "I" to "kvr:up_ingot"),
+                "kvr:solar_upgrade",
+                1
+            )
+        )
     }
 }
 
