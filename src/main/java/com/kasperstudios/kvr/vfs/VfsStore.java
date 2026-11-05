@@ -17,7 +17,7 @@ import java.util.stream.Stream;
  */
 public final class VfsStore {
 
-    public static final int MAX_WRITE_BYTES = 128 * 1024;
+    public static final int MAX_WRITE_BYTES = 30_000;
     public static final int MAX_READ_BYTES = 256 * 1024;
 
     private final Path root;
@@ -36,9 +36,11 @@ public final class VfsStore {
         try (Stream<Path> s = Files.list(target)) {
             List<Entry> out = new ArrayList<>();
             for (Path p : s.toList()) {
+                String fn = p.getFileName().toString();
+                if (fn.endsWith(".tmp")) continue;
                 boolean dir = Files.isDirectory(p);
                 long sz = dir ? 0 : Files.size(p);
-                out.add(new Entry(p.getFileName().toString(), dir, sz));
+                out.add(new Entry(fn, dir, sz));
             }
             out.sort(Comparator.comparing(Entry::dir).reversed().thenComparing(Entry::name));
             return out;
@@ -103,7 +105,7 @@ public final class VfsStore {
         long[] totals = new long[2]; // bytes, files
         try (Stream<Path> s = Files.walk(root)) {
             s.forEach(p -> {
-                if (!Files.isDirectory(p)) {
+                if (!Files.isDirectory(p) && !p.getFileName().toString().endsWith(".tmp")) {
                     try {
                         totals[0] += Files.size(p);
                         totals[1]++;

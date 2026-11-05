@@ -105,6 +105,7 @@
 
   const kvr = {
     Window, Text, Button, Slider, Stack,
+    fs: null,
     toast: (o) => host('toast', o || {}),
     log: (...a) => host('log', a.map(String).join(' ')),
     on, off,
@@ -118,6 +119,35 @@
     get now() { return now; },
   };
   Object.freeze(kvr.window);
+
+  // --- kvr.fs: server VFS bound to the glasses (async; Promise + optional node-style callback) ---
+  // Paths: /home (shared user files), /tmp, /data/<this app>, /apps (read-only). Errors: err.code.
+  let fsSeq = 1;
+  const fsPending = new Map();
+  const fsCall = (op, path, text, cb) => {
+    const req = fsSeq++;
+    const p = new Promise((resolve, reject) => fsPending.set(req, { op, resolve, reject, cb }));
+    host('fs', { req, op, path: String(path), text: text === undefined ? null : String(text) });
+    if (typeof cb === 'function') p.catch(() => {}); // callback style: errors go to cb
+    return p;
+  };
+  kvr.fs = Object.freeze({
+    read: (path, cb) => fsCall('READ', path, undefined, cb),
+    write: (path, text, cb) => fsCall('WRITE', path, text, cb),
+    list: (path, cb) => fsCall('LIST', path, undefined, cb),
+    remove: (path, cb) => fsCall('DELETE', path, undefined, cb),
+    usage: (cb) => fsCall('USAGE', '/', undefined, cb),
+  });
+  const fsReply = (e) => {
+    const p = fsPending.get(e.req);
+    if (!p) return;
+    fsPending.delete(e.req);
+    let data = e.data;
+    if (e.ok && (p.op === 'LIST' || p.op === 'USAGE')) data = JSON.parse(data);
+    const err = e.ok ? null : Object.assign(new Error(e.data || e.error), { code: e.error });
+    if (typeof p.cb === 'function') p.cb(err, e.ok ? data : undefined);
+    if (err) p.reject(err); else p.resolve(data);
+  };
   global.kvr = kvr;
   global.console = { log: kvr.log, warn: kvr.log, error: kvr.log };
 
@@ -136,6 +166,7 @@
   };
 
   global.__kvr_event = (e) => {
+    if (e.type === 'fs') { fsReply(e); commit(); return; }
     const w = live.get(e.id);
     if (e.type === 'click' && w && typeof w.onClick === 'function') w.onClick(e);
     if (e.type === 'change' && w) {
