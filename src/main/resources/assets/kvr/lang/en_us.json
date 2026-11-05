@@ -17,5 +17,6 @@
   "kvr.anchor.body": "With player",
   "kvr.anchor.world": "In world",
   "block.kvr.dock_plate": "Dock Plate",
-  "item.kvr.solar_upgrade": "Solar Module"
-  }
+  "item.kvr.solar_upgrade": "Solar Module",
+  "item.kvr.hackglasses": "HackGlasses"
+}

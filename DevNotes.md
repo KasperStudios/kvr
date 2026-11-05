@@ -81,6 +81,7 @@ packages all Matrix entries, and the core tests pass on every node.
       - `KVRLoot` facade + `FabricKVRLootProvider` & `NeoForgeKVRLootProvider`: 0.5% drop in any generated chest.
       - `SpyMath`, `WindowSummary`, `SpyRelay`, `SpyClient`, `GhostRenderer`: looking at a player with KVR glasses projects their
         floating windows and battery percentage with green `hack_grid` overlay in real-time.
+      - Animated item texture (10 frames) `hackglasses.png` + `.mcmeta` + model `hackglasses.json`.
       - Unit tests: `SpyMathTest`, `WindowSummaryTest` (102 tests total passed, 0 failures).
 - [x] Block 5 Skeleton: Script Engine Core & Watchdog (Task 0007 from Retool):
       - Engine-agnostic contract: `JsEngine` (eval, call with JSON args, host functions, interrupt, memory measurement).

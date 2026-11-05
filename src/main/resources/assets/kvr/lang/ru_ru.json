@@ -17,5 +17,6 @@
   "kvr.anchor.body": "С игроком",
   "kvr.anchor.world": "В мире",
   "block.kvr.dock_plate": "Док-плита",
-  "item.kvr.solar_upgrade": "Солнечный модуль"
-  }
+  "item.kvr.solar_upgrade": "Солнечный модуль",
+  "item.kvr.hackglasses": "Хакерские очки"
+}
