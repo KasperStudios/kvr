@@ -37,11 +37,19 @@ public final class ScriptHost {
         void shake(float intensity, int durationMs);
         void resize(int width, int height);
         void sound(String id);
-        /** {@code kvr.pin(title, text)}: pinned note at the right shoulder. */
+        /** {@code kvr.pin(title, text)}: note window in front of the player (Body anchor, gear menu, ×). */
         void pin(String title, String text);
+        /** kvr.window.lock / setPublic / anchor: key = lock|public|anchor (same switches as the gear menu). */
+        void windowOption(String key, String value);
     }
 
     private static final Map<ScriptHost, Boolean> RUNNING = new ConcurrentHashMap<>();
+    /** main.js + prelude must finish evaluating within this (top-level while(true) is killed too). */
+    static final long BOOT_LIMIT_NANOS = 5_000_000_000L;
+    /** First seconds after boot: the JVM is still warming the wasm interpreter, so ticks are slow. */
+    static final long GRACE_NANOS = 3_000_000_000L;
+    /** Kill deadline during the grace period (instead of 4x budget, which is 5 ms at T5). */
+    static final long GRACE_KILL_NANOS = 250_000_000L;
     private static final ScheduledExecutorService MONITOR = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "KVR-Script-Watchdog");
         t.setDaemon(true);
@@ -63,6 +71,8 @@ public final class ScriptHost {
     private volatile State state = State.STARTING;
     private volatile String error = "";
     private volatile long tickStart;
+    private volatile long bootDeadline;
+    private volatile long graceUntil;
     private volatile boolean killed;
     private volatile boolean stopped;
     @Nullable private volatile JsEngine engine;
@@ -77,13 +87,13 @@ public final class ScriptHost {
     }
 
     public void start() {
-        JsEngine e = ScriptEngines.create();
-        if (e == null) {
+        if (!ScriptEngines.installed()) {
             state = State.NO_ENGINE;
             return;
         }
-        engine = e;
-        Thread t = new Thread(this::run, "KVR-Script-" + app.id());
+        // the engine itself is created on the script thread: a wasm instance costs ~15-20 ms;
+        // 16 MiB stack: headroom for the wasm interpreter on deep JS call chains
+        Thread t = new Thread(null, this::run, "KVR-Script-" + app.id(), 16L << 20);
         t.setDaemon(true);
         thread = t;
         RUNNING.put(this, Boolean.TRUE);
@@ -121,11 +131,29 @@ public final class ScriptHost {
     // --- script thread -------------------------------------------------------------------------
 
     private void run() {
-        JsEngine e = engine;
+        JsEngine e;
         try {
+            e = ScriptEngines.create();
+        } catch (RuntimeException | LinkageError ex) {
+            // LinkageError = Chicory jars not shipped inside the mod jar (include(...) missing)
+            crash("JS engine failed to start: " + ex);
+            RUNNING.remove(this);
+            return;
+        }
+        if (e == null) {
+            state = State.NO_ENGINE;
+            RUNNING.remove(this);
+            return;
+        }
+        engine = e;
+        try {
+            if (stopped) return; // window closed while the engine was starting
             e.expose("__kvr_host", this::host);
+            bootDeadline = System.nanoTime() + BOOT_LIMIT_NANOS;
             e.eval(prelude, "kvr:prelude.js");
             e.eval(ModuleShim.apply(app.main()), app.id() + "/main.js");
+            bootDeadline = 0;
+            graceUntil = System.nanoTime() + GRACE_NANOS;
             state = State.RUNNING;
             long t0 = System.nanoTime();
             while (!stopped) {
@@ -146,13 +174,18 @@ public final class ScriptHost {
                 }
             }
         } catch (JsEngine.JsException ex) {
-            if (!stopped) crash(killed ? "Watchdog: script exceeded " + (watchdog.killAfterNanos() / 1_000_000.0) + " ms in one tick" : ex.getMessage());
+            if (!stopped) crash(killed ? killMessage() : ex.getMessage());
         } catch (RuntimeException ex) {
             if (!stopped) crash(ex.toString());
         } finally {
             RUNNING.remove(this);
             e.close();
         }
+    }
+
+    private String killMessage() {
+        if (state == State.STARTING) return "Watchdog: app did not start within " + BOOT_LIMIT_NANOS / 1_000_000_000L + " s";
+        return "Watchdog: script exceeded " + (watchdog.killAfterNanos() / 1_000_000.0) + " ms in one tick";
     }
 
     private interface Call {
@@ -167,6 +200,7 @@ public final class ScriptHost {
         } finally {
             tickStart = 0;
         }
+        if (System.nanoTime() < graceUntil) return; // warm-up: do not judge the interpreter yet
         switch (watchdog.record(System.nanoTime() - start)) {
             case NOT_RESPONDING -> {
                 if (state != State.NOT_RESPONDING) listener.notResponding();
@@ -212,6 +246,10 @@ public final class ScriptHost {
                 String title = str(o, "title", app.name());
                 String text = str(o, "text", "");
                 listener.pin(title.length() > 40 ? title.substring(0, 40) : title, text.length() > 2000 ? text.substring(0, 2000) : text);
+            }
+            case "window.option" -> {
+                var o = JsonParser.parseString(payload).getAsJsonObject();
+                listener.windowOption(str(o, "key", ""), str(o, "value", ""));
             }
             case "sound.play" -> listener.sound(JsonParser.parseString(payload).getAsString());
             case "fs" -> fs(JsonParser.parseString(payload).getAsJsonObject());
@@ -288,8 +326,11 @@ public final class ScriptHost {
     private static void checkAll() {
         long now = System.nanoTime();
         for (ScriptHost h : RUNNING.keySet()) {
+            if (h.killed) continue;
             long start = h.tickStart;
-            if (start != 0 && now - start > h.watchdog.killAfterNanos() && !h.killed) {
+            long boot = h.bootDeadline;
+            long limit = now < h.graceUntil ? Math.max(h.watchdog.killAfterNanos(), GRACE_KILL_NANOS) : h.watchdog.killAfterNanos();
+            if ((start != 0 && now - start > limit) || (boot != 0 && now > boot)) {
                 h.killed = true;
                 JsEngine e = h.engine;
                 if (e != null) e.interrupt();

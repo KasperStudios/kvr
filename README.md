@@ -1,60 +1,59 @@
-# KVR — Kasper Virtual Reality (Spatial OS for Minecraft)
+# KVR Spatial UI — пример реализации на Java
 
-Minecraft mod that turns the game into a spatial operating system: floating 3D windows, a hardware
-tier ladder for the glasses you wear, battery physics with thermal runaway, and a QuickJS app runtime.
+Интерфейс KVR OS без HUD. Всё, что видит игрок, — окна в мире, как в Quest / visionOS:
+приложения, док, уведомления, колесо жестов, откреплённые ванильные экраны.
 
-Design documents:
+Написано под архитектуру из DevNotes: ядро в `src/` (`:common`) без импортов загрузчиков,
+загрузчики дают тонкий фасад, mojmap. Активная ветка Stonecutter — **1.21.1**. Места,
+которые меняются в 1.21.2+, помечены `//? if`.
 
-- [`CONCEPT.md`](CONCEPT.md) — product concept and OS behaviour
-- [`SPEC.md`](SPEC.md) — technical specification and implementation roadmap
-- [`docs/adr/`](docs/adr) — accepted architecture decisions (controls, spatial windows, hardware)
-- [`DevNotes.md`](DevNotes.md) — operational contract: status, rules, how to build
+## Слои
 
-## Status
+| Пакет | Что делает |
+|---|---|
+| `spatial` | `SpatialPose` (где окно и куда смотрит), `PlayerView` (снимок головы/тела), `SpatialConfig` (точки интеграции), `KVRSpatial` (загрузка) |
+| `spatial.anchor` | `WorldAnchor` — висит в мире. `BodyAnchor` — идёт с игроком, не следует за головой. `LazyFollowAnchor` — системные панели в стиле Quest: стоят на месте и подтягиваются, когда игрок отвернулся |
+| `spatial.window` | `SpatialWindow` — база окна (рисует себя через обычный `GuiGraphics`). `WindowSurface` — offscreen FBO 2×. `WindowManager` — лимит RAM по тиру (ванильные экраны и системные панели не считаются) |
+| `spatial.input` | `SpatialCursor` — Alt-тумблер, deadzone и доворот камеры у края. `SpatialRaycast` — луч руки против плоскости окна. `GrabController` — окно «в руке» за планку. `SpatialInput` — маршрутизация кликов за тик |
+| `spatial.render` | `SpatialRenderer` — квады окон, планки захвата и указатель на поверхности (без версионных веток). `RenderCompat` — единственное место с версионным рендер-API. `GlassStyle` — стекло из nine-slice спрайтов |
+| `spatial.ui` | `DockBar` (низко перед игроком), `ToastPanel` (чуть выше линии взгляда), `GestureWheel` (появляется у руки) |
+| `spatial.vanilla` | `SpatialScreenProxy` — кнопка «3D» на любом контейнере, экран становится парящим окном, меню не закрывается |
+| `platform` | `KVRClient` + `KVRClientProvider` — 4 хука: клавиша, начало тика, рендер мира, init экрана |
+| `mixin.client` | мышь, колесо, скрытие центрального прицела, «не копать сквозь панель», фон откреплённого экрана |
 
-Block 1 (architectural skeleton) is implemented: a Fabric + NeoForge build that compiles the same
-`common` core against Minecraft 1.20.1, 1.20.4, 1.21.1 and 1.21.11. Gameplay content starts with
-Block 2; the packet facade is deferred until the first real payload exists.
+## Подключение
 
-## Building
+1. Скопировать `src/`, `fabric/`, `neoforge/` поверх репозитория.
+2. Добавить `kvr-spatial.mixins.json` в `fabric.mod.json` (`"mixins"`) и в `[[mixins]]` у
+   `neoforge.mods.toml`.
+3. Слить lang-ключи в существующие `ru_ru.json` / `en_us.json`.
+4. GUI-спрайты (`textures/gui/sprites/*.png` + `.mcmeta`) скачать со страницы текстур KVR,
+   категория «GUI-спрайты».
+5. В клиентском entrypoint каждого загрузчика:
 
-Requires JDK 21. The Fabric jar needs **Fabric API** at runtime (registry freeze relaxation for
-content mods); NeoForge needs nothing extra.
-
-```bash
-export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
-
-./gradlew test            # tests for every Stonecutter node (16 tests x 4 versions)
-./gradlew build           # jars for every loader/version combination
+```java
+KVRClient.install(new FabricKVRClientProvider());          // или new NeoForgeKVRClientProvider(modBus)
+KVRSpatial.initClient(new SpatialConfig(ramWindows, glassesWorn, batteryPercent, appHost));
 ```
 
-Output jars:
+`SpatialConfig` специально принимает лямбды: UI не угадывает, как хранится сборка очков, —
+её отдаёт код из Блока 2 (`GlassesCodec` / `HardwareTable`), а приложения — рантайм QuickJS (Блок 5).
 
-```
-fabric/versions/<mc>/build/libs/kvr-fabric-<version>+<mc>.jar
-neoforge/versions/<mc>/build/libs/kvr-neoforge-<version>+<mc>.jar
-```
+## Как это работает за кадр
 
-Supported matrix:
+1. `ClientTick START` → `SpatialInput`: Alt, луч, клики по окнам съедаются до ванильного `handleKeybinds`.
+2. `AFTER_TRANSLUCENT` → `SpatialRenderer`: якоря считают позы, каждое окно рисует GUI в свой FBO,
+   затем квады рисуются в мире от дальнего к ближнему, сверху планки и указатель.
 
-| Minecraft | Fabric | NeoForge |
-|---|---|---|
-| 1.20.1  | yes | — (NeoForge starts at 1.20.2) |
-| 1.20.4  | yes | yes |
-| 1.21.1  | yes | yes |
-| 1.21.11 | yes | yes |
+## Стыки версий (Stonecutter)
 
-Every entry above has been booted on a real dedicated server, not just compiled.
+Весь версионный рендер собран в `spatial/render/RenderCompat.java`, остальные классы от версии
+не зависят. Исключения: `SpatialCursor` (категория клавиш 1.21.9+), `SpatialScreenProxy`
+(`MouseButtonEvent` 1.21.9+), `GlassStyle.id` (`ResourceLocation`) и провайдеры загрузчиков.
+На 1.21.5+ (нода 1.21.11) пространственный UI пока выключен (`RenderCompat.SUPPORTED = false`).
+Подробности — `CHANGELOG.md`, запись 0002.
 
-## Layout
+## Тесты
 
-```
-src/            # platform-independent core (:common) — no loader imports allowed
-fabric/         # Fabric branch: entrypoint + platform facades
-neoforge/       # NeoForge branch: entrypoint + platform facades
-versions/<mc>/  # per-version properties consumed by Stonecutter
-```
-
-## License
-
-All rights reserved.
+`SpatialRaycastTest`, `LazyFollowAnchorTest` — чистая математика на `Vec3`, без клиента.
+Запускаются обычным `./gradlew test` на всех нодах.

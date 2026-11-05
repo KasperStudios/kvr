@@ -71,6 +71,32 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
         return host;
     }
 
+    // --- keyboard (Alt mode, config.json "keyboard": true) --------------------------------------
+
+    @Override
+    public boolean wantsKeyboard() {
+        return host.app().keyboard() && host.state() != ScriptHost.State.CRASHED;
+    }
+
+    @Override
+    public void keyboardFocus(boolean focused) {
+        host.post("{\"type\":\"keyboard\",\"focused\":" + focused + "}");
+    }
+
+    @Override
+    public void keyEvent(int key, int scancode, int action, int mods) {
+        String a = action == 0 ? "up" : action == 2 ? "repeat" : "down";
+        host.post("{\"type\":\"key\",\"key\":" + key + ",\"scancode\":" + scancode + ",\"action\":\"" + a + "\",\"mods\":" + mods + "}");
+    }
+
+    @Override
+    public void charTyped(int codepoint, int mods) {
+        JsonObject o = new JsonObject();
+        o.addProperty("type", "char");
+        o.addProperty("ch", new String(Character.toChars(codepoint)));
+        host.post(o.toString());
+    }
+
     @Override
     public Component title() {
         UiNode ui = host.ui();
@@ -120,7 +146,9 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
             GlassStyle.text(g, title().copy().withStyle(ChatFormatting.BOLD), PAD, 9, GlassStyle.TEXT);
             g.fill(PAD, TITLE_H - 2, width - PAD, TITLE_H - 1, 0x30FFFFFF);
             switch (host.state()) {
-                case NO_ENGINE -> message(g, Component.translatable("kvr.app.no_engine"), GlassStyle.MUTED);
+                case NO_ENGINE -> message(g, com.kasperstudios.kvr.script.ScriptEngines.problem().isEmpty()
+                    ? Component.translatable("kvr.app.no_engine")
+                    : Component.translatable("kvr.app.engine_failed", com.kasperstudios.kvr.script.ScriptEngines.problem()), GlassStyle.MUTED);
                 case CRASHED -> message(g, Component.translatable("kvr.app.crashed").append(": " + host.error()), GlassStyle.DANGER);
                 case STARTING -> message(g, Component.translatable("kvr.app.starting"), GlassStyle.MUTED);
                 default -> {
@@ -370,6 +398,20 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
         if (loc == null) return;
         Minecraft.getInstance().execute(() ->
             Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvent.createVariableRangeEvent(loc), 1f)));
+    }
+
+    /** kvr.window.lock / setPublic / anchor: the same switches as the gear menu. */
+    @Override
+    public void windowOption(String key, String value) {
+        Minecraft.getInstance().execute(() -> {
+            var view = com.kasperstudios.kvr.spatial.PlayerView.capture(Minecraft.getInstance().gameRenderer.getMainCamera(), 1f);
+            switch (key) {
+                case "lock" -> setLocked(Boolean.parseBoolean(value));
+                case "public" -> setPublic(Boolean.parseBoolean(value));
+                case "anchor" -> switchAnchor("body".equals(value) ? SpatialAnchor.Mode.BODY : SpatialAnchor.Mode.WORLD, view);
+                default -> {}
+            }
+        });
     }
 
     @Override

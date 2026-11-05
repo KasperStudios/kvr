@@ -62,6 +62,16 @@ dependencies {
     "neoForge"("net.neoforged:neoforge:${common.mod.dep("neoforge_loader")}")
     implementation("dev.architectury:architectury-injectables:${mod.dep("architectury_injectables")}")
 
+    // Chicory runtime bundle
+    implementation("com.dylibso.chicory:runtime:1.4.0")
+    implementation("com.dylibso.chicory:wasi:1.4.0")
+    implementation("com.dylibso.chicory:wasm:1.4.0")
+    implementation("com.dylibso.chicory:log:1.4.0")
+    include("com.dylibso.chicory:runtime:1.4.0")
+    include("com.dylibso.chicory:wasi:1.4.0")
+    include("com.dylibso.chicory:wasm:1.4.0")
+    include("com.dylibso.chicory:log:1.4.0")
+
     commonBundle(project(common.path, "namedElements")) { isTransitive = false }
     shadowBundle(project(common.path, "transformProductionNeoForge")) { isTransitive = false }
 }

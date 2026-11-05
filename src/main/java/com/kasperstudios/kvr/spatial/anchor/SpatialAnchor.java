@@ -25,11 +25,14 @@ public sealed interface SpatialAnchor permits WorldAnchor, BodyAnchor, LazyFollo
 
     Mode mode();
 
-    /** Switch anchor type without moving the window (grab-bar toggle). */
+    /**
+     * Switch anchor type from the gear menu (or {@code kvr.window.anchor}). World freezes the window
+     * where it is; Body keeps its direction from the player but pulls it within arm's reach.
+     */
     static SpatialAnchor of(Mode mode, SpatialPose current, PlayerView view) {
         return switch (mode) {
             case WORLD -> new WorldAnchor(current);
-            case BODY -> BodyAnchor.at(current, view);
+            case BODY -> BodyAnchor.carry(current, view);
             case FOLLOW -> LazyFollowAnchor.at(current, view);
         };
     }

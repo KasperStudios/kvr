@@ -145,6 +145,124 @@ public final class RenderCompat {
     //?}
 
     /**
+     * A texture fed from outside the game (desktop app frames). Uploads straight from a direct
+     * {@link java.nio.ByteBuffer} (the mapped shared-memory slot) with {@code glTexSubImage2D} — one copy,
+     * CPU → GPU, only the damaged rectangles, BGRA accepted as is. Always linear-filtered.
+     */
+    public static final class StreamTexture implements AutoCloseable {
+
+        private final ResourceLocation id;
+        private int width;
+        private int height;
+        //? if <1.21.5 {
+        private int glId = -1;
+        //?}
+
+        public StreamTexture(ResourceLocation id) {
+            this.id = id;
+        }
+
+        public ResourceLocation texture() { return id; }
+        public int width() { return width; }
+        public int height() { return height; }
+        public boolean ready() { return width > 0; }
+
+        /**
+         * @param px     pixels of the frame, row {@code stride} bytes, position 0 = top-left
+         * @param rects  damaged rectangles as {x, y, w, h}; ignored when {@code full}
+         */
+        public void upload(java.nio.ByteBuffer px, int w, int h, int stride, boolean bgra, java.util.List<int[]> rects, boolean full) {
+            //? if <1.21.5 {
+            com.mojang.blaze3d.systems.RenderSystem.assertOnRenderThread();
+            if (glId == -1) {
+                glId = com.mojang.blaze3d.platform.TextureUtil.generateTextureId();
+                Minecraft.getInstance().getTextureManager().register(id, new IdTexture(this));
+            }
+            if (w != width || h != height) {
+                com.mojang.blaze3d.platform.TextureUtil.prepareImage(glId, w, h);
+                width = w;
+                height = h;
+                full = true;
+            }
+            com.mojang.blaze3d.platform.GlStateManager._bindTexture(glId);
+            org.lwjgl.opengl.GL11.glTexParameteri(org.lwjgl.opengl.GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL11.GL_TEXTURE_MIN_FILTER, org.lwjgl.opengl.GL11.GL_LINEAR);
+            org.lwjgl.opengl.GL11.glTexParameteri(org.lwjgl.opengl.GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL11.GL_TEXTURE_MAG_FILTER, org.lwjgl.opengl.GL11.GL_LINEAR);
+            int format = bgra ? org.lwjgl.opengl.GL12.GL_BGRA : org.lwjgl.opengl.GL11.GL_RGBA;
+            org.lwjgl.opengl.GL11.glPixelStorei(org.lwjgl.opengl.GL11.GL_UNPACK_ALIGNMENT, 4);
+            org.lwjgl.opengl.GL11.glPixelStorei(org.lwjgl.opengl.GL11.GL_UNPACK_ROW_LENGTH, stride / 4);
+            try {
+                if (full || rects.isEmpty()) {
+                    sub(px, 0, 0, w, h, format);
+                } else {
+                    for (int[] r : rects) {
+                        int x = Math.max(0, r[0]);
+                        int y = Math.max(0, r[1]);
+                        int rw = Math.min(w - x, r[2]);
+                        int rh = Math.min(h - y, r[3]);
+                        if (rw > 0 && rh > 0) sub(px, x, y, rw, rh, format);
+                    }
+                }
+            } finally {
+                org.lwjgl.opengl.GL11.glPixelStorei(org.lwjgl.opengl.GL11.GL_UNPACK_ROW_LENGTH, 0);
+                org.lwjgl.opengl.GL11.glPixelStorei(org.lwjgl.opengl.GL11.GL_UNPACK_SKIP_PIXELS, 0);
+                org.lwjgl.opengl.GL11.glPixelStorei(org.lwjgl.opengl.GL11.GL_UNPACK_SKIP_ROWS, 0);
+            }
+            //?}
+        }
+
+        //? if <1.21.5 {
+        private static void sub(java.nio.ByteBuffer px, int x, int y, int w, int h, int format) {
+            org.lwjgl.opengl.GL11.glPixelStorei(org.lwjgl.opengl.GL11.GL_UNPACK_SKIP_PIXELS, x);
+            org.lwjgl.opengl.GL11.glPixelStorei(org.lwjgl.opengl.GL11.GL_UNPACK_SKIP_ROWS, y);
+            org.lwjgl.opengl.GL11.glTexSubImage2D(org.lwjgl.opengl.GL11.GL_TEXTURE_2D, 0, x, y, w, h, format, org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE, px);
+        }
+        //?}
+
+        @Override
+        public void close() {
+            //? if <1.21.5 {
+            if (glId == -1) return;
+            Minecraft.getInstance().getTextureManager().release(id);
+            com.mojang.blaze3d.platform.TextureUtil.releaseTextureId(glId);
+            glId = -1;
+            width = 0;
+            height = 0;
+            //?}
+        }
+    }
+
+    //? if <1.21.5 {
+    /** GL id owned by a {@link StreamTexture}; vanilla must not touch filtering or delete it. */
+    private static final class IdTexture extends net.minecraft.client.renderer.texture.AbstractTexture {
+        private final StreamTexture owner;
+
+        IdTexture(StreamTexture owner) {
+            this.owner = owner;
+        }
+
+        @Override
+        public int getId() {
+            return owner.glId == -1 ? 0 : owner.glId;
+        }
+
+        @Override
+        public void setFilter(boolean blur, boolean mipmap) {
+            // keep GL_LINEAR: entity render types ask for nearest, desktop text would turn to mush at an angle
+        }
+
+        @Override
+        public void load(net.minecraft.server.packs.resources.ResourceManager manager) {
+            // pixels come from kvr-desktopd
+        }
+
+        @Override
+        public void releaseId() {
+            // StreamTexture.close() deletes the id
+        }
+    }
+    //?}
+
+    /**
      * One full-bright, translucent, double-sided quad in the world. Corners are camera-relative,
      * given top-left → bottom-left → bottom-right → top-right.
      */
@@ -184,6 +302,21 @@ public final class RenderCompat {
     /** Flush what the world pass queued (call once after all quads). */
     public static void flush(MultiBufferSource.BufferSource buffers) {
         buffers.endBatch();
+    }
+
+    /**
+     * Text in the world (like sign text): {@code matrix} maps GUI pixels (x right, y down) onto a plane.
+     * Full-bright, depth-tested.
+     */
+    public static void text(MultiBufferSource buffers, org.joml.Matrix4f matrix, String text, float x, float y, int argb) {
+        //? if <1.21.5 {
+        Minecraft.getInstance().font.drawInBatch(text, x, y, argb, false, matrix, buffers,
+            net.minecraft.client.gui.Font.DisplayMode.NORMAL, 0, FULL_BRIGHT);
+        //?}
+    }
+
+    public static int textWidth(String text) {
+        return Minecraft.getInstance().font.width(text);
     }
 
     /** GUI sprite from the gui atlas ({@code kvr:panel} → textures/gui/sprites/panel.png). */

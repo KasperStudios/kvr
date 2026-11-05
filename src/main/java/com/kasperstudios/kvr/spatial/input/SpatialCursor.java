@@ -21,7 +21,13 @@ public final class SpatialCursor {
     /** Entity#turn multiplies by 0.15; vanilla mouse code feeds it degrees / 0.15. */
     private static final double TURN_SCALE = 0.15;
 
+    //? if >=1.21.9 {
+    /*// VERIFY on 1.21.11: categories became KeyMapping.Category objects (lang key key.category.kvr.main)
+    private final KeyMapping toggleKey = new KeyMapping("key.kvr.spatial_toggle", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT,
+        KeyMapping.Category.register(com.kasperstudios.kvr.spatial.render.GlassStyle.id("main")));
+    *///?} else {
     private final KeyMapping toggleKey = new KeyMapping("key.kvr.spatial_toggle", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, "key.categories.kvr");
+    //?}
     private boolean active;
     private float yawOffset;
     private float pitchOffset;

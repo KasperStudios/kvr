@@ -4,32 +4,21 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * C2S: the player switches the power state of their glasses from the "Питание" window or the
- * overload panel. This is the only Block 3 packet: the overload itself reaches the client through
- * the synced glasses stack (power data is written every second), so no S2C alarm is needed.
+ * C2S: the player switches the power state of their glasses (Power window, power key, overload
+ * panel). The only Block 3 packet — the overload reaches the client through the synced stack.
+ * Written for the project's channel-based {@code KVRNetwork}:
  *
- * <p>Register with your {@code KVRNetwork} (server receiver) and wire the client sender:
  * <pre>{@code
- * KVRNetwork.registerServerbound(SetPowerStatePayload.TYPE, SetPowerStatePayload.CODEC, PowerServerHandler::handle);
- * PowerClient.installSender(state -> KVRNetwork.sendToServer(new SetPowerStatePayload(state)));
+ * KVRNetwork.registerServerReceiver(SetPowerStatePayload.CHANNEL, (player, buf) -> {
+ *     SetPowerStatePayload p = SetPowerStatePayload.read(buf);
+ *     player.getServer().execute(() -> PowerServerHandler.handle(player, p));
+ * });
+ * PowerClient.installSender(state -> KVRNetwork.sendToServer(SetPowerStatePayload.CHANNEL, new SetPowerStatePayload(state)::write));
  * }</pre>
  */
-//? if >=1.20.5 {
-public record SetPowerStatePayload(PowerState state) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+public record SetPowerStatePayload(PowerState state) {
 
-    public static final Type<SetPowerStatePayload> TYPE = new Type<>(id("set_power_state"));
-
-    public static final net.minecraft.network.codec.StreamCodec<FriendlyByteBuf, SetPowerStatePayload> CODEC =
-        net.minecraft.network.codec.StreamCodec.of((buf, p) -> buf.writeEnum(p.state()), buf -> new SetPowerStatePayload(buf.readEnum(PowerState.class)));
-
-    @Override
-    public Type<? extends net.minecraft.network.protocol.common.custom.CustomPacketPayload> type() {
-        return TYPE;
-    }
-//?} else {
-/*public record SetPowerStatePayload(PowerState state) {
-
-    public static final ResourceLocation ID = id("set_power_state");
+    public static final ResourceLocation CHANNEL = id("set_power_state");
 
     public void write(FriendlyByteBuf buf) {
         buf.writeEnum(state);
@@ -38,7 +27,6 @@ public record SetPowerStatePayload(PowerState state) implements net.minecraft.ne
     public static SetPowerStatePayload read(FriendlyByteBuf buf) {
         return new SetPowerStatePayload(buf.readEnum(PowerState.class));
     }
-*///?}
 
     private static ResourceLocation id(String path) {
         //? if >=1.21 {

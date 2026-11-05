@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Raw mouse for the Alt pointer and the grab depth. Neither loader has a portable event for
- * \"mouse moved while no screen is open\", so this lives in a common mixin (no loader imports).
+ * "mouse moved while no screen is open", so this lives in a common mixin (no loader imports).
  * Handlers take only {@link CallbackInfo}, which also skips the 1.21 {@code turnPlayer(double)}
  * signature seam.
  */

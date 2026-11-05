@@ -139,7 +139,7 @@ function removeNote() {
     return;
   }
   kvr.fs.remove(DIR + '/' + current)
-    .then(() => { kvr.toast({ title: T.title, text: T.deleted + ': ' + current }); showList(); } )
+    .then(() => { kvr.toast({ title: T.title, text: T.deleted + ': ' + current }); showList(); })
     .catch(fail);
 }
 

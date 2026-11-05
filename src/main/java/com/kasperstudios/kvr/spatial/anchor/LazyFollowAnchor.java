@@ -5,7 +5,7 @@ import com.kasperstudios.kvr.spatial.SpatialPose;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Quest-style \"lazy follow\" for system panels (dock, notifications): the panel stays where it is
+ * Quest-style "lazy follow" for system panels (dock, notifications): the panel stays where it is
  * while it is comfortably in view, and only when the player turns away by more than
  * {@code maxAngleDeg} (or walks off) does it glide back in front at the configured distance/height.
  * This is what makes the dock feel like part of the room instead of a HUD glued to the face.

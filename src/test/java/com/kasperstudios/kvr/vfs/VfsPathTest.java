@@ -10,35 +10,28 @@ import org.junit.jupiter.api.Test;
 class VfsPathTest {
 
     @Test
-    void normalisesAndStripsDuplicateSlashes() throws Exception {
+    void normalizesSlashes() throws Exception {
+        assertEquals("/home/notes/coords.txt", VfsPath.normalize("/home//notes/coords.txt/"));
         assertEquals("/", VfsPath.normalize("/"));
-        assertEquals("/home/notes.txt", VfsPath.normalize("/home//notes.txt"));
-        assertEquals("/tmp/scratch", VfsPath.normalize("/tmp/scratch/"));
     }
 
     @Test
-    void rejectsDotsAndEscapes() {
-        assertThrows(VfsException.class, () -> VfsPath.normalize("/home/../etc/passwd"));
-        assertThrows(VfsException.class, () -> VfsPath.normalize("/home/./a"));
-        assertThrows(VfsException.class, () -> VfsPath.normalize("relative/path"));
-        assertThrows(VfsException.class, () -> VfsPath.normalize(""));
-        assertThrows(VfsException.class, () -> VfsPath.normalize("/bad:char"));
+    void rejectsTraversalAndJunk() {
+        for (String bad : new String[] {"home/a", "/home/../system/x", "/home/./a", "/home/a b", "/home/\u0444\u0430\u0439\u043b", "", "/" + "a/".repeat(10)}) {
+            assertThrows(VfsException.class, () -> VfsPath.normalize(bad), bad);
+        }
     }
 
     @Test
-    void sandboxPermissions() {
-        // Shared home/tmp
-        assertTrue(VfsPath.canAccess("/home/todo.txt", "notes", true));
-        assertTrue(VfsPath.canAccess("/home/todo.txt", "messenger", false));
-        assertTrue(VfsPath.canAccess("/tmp/scratch", "notes", true));
-
-        // Private /data/<app>
-        assertTrue(VfsPath.canAccess("/data/notes/db.json", "notes", true));
-        assertFalse(VfsPath.canAccess("/data/notes/db.json", "kav", false));
-
-        // System is locked
-        assertFalse(VfsPath.canAccess("/system/root.key", "notes", false));
-        assertFalse(VfsPath.canAccess("/apps/kav.vrapp", "notes", true));
-        assertTrue(VfsPath.canAccess("/apps/kav.vrapp", "notes", false));
+    void sandboxRules() {
+        assertTrue(VfsPath.canAccess("/home/coords.txt", "notes", true));
+        assertTrue(VfsPath.canAccess("/tmp/x", "notes", true));
+        assertTrue(VfsPath.canAccess("/data/notes/state.json", "notes", true));
+        assertFalse(VfsPath.canAccess("/data/messenger/chat.json", "notes", false));
+        assertFalse(VfsPath.canAccess("/system/boot.cfg", "notes", false));
+        assertTrue(VfsPath.canAccess("/apps/kav/main.js", "notes", false));
+        assertFalse(VfsPath.canAccess("/apps/kav/main.js", "notes", true));
+        assertTrue(VfsPath.canAccess("/", "notes", false));
+        assertFalse(VfsPath.canAccess("/", "notes", true));
     }
 }

@@ -23,7 +23,10 @@ final class WindowSurface implements AutoCloseable {
     }
 
     void render(SpatialWindow window, int mouseX, int mouseY, float partialTick) {
-        surface.paint(window.width(), window.height(), SUPERSAMPLE, g -> window.renderContent(g, mouseX, mouseY, partialTick));
+        surface.paint(window.width(), window.height(), SUPERSAMPLE, g -> {
+            window.renderContent(g, mouseX, mouseY, partialTick);
+            window.renderChrome(g, mouseX, mouseY);
+        });
     }
 
     ResourceLocation texture() {

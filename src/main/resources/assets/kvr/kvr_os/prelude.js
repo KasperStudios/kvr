@@ -132,9 +132,13 @@
       shake: (o) => host('window.shake', o || {}),
       resize: (o) => host('window.resize', o || {}),
       setTitle: (t) => root && root.setTitle(t),
+      // same switches as the gear menu (the user can always change them back there)
+      lock: (on = true) => host('window.option', { key: 'lock', value: String(!!on) }),
+      setPublic: (on = true) => host('window.option', { key: 'public', value: String(!!on) }),
+      anchor: (mode) => host('window.option', { key: 'anchor', value: mode === 'body' ? 'body' : 'world' }),
     },
     sound: { play: (id) => host('sound.play', String(id)) },
-    // "Закрепить у плеча": read-only note at the right shoulder that follows the player
+    // note window (coords etc.): opens in front of the player, Body anchor; gear menu + × like any window
     pin: (title, text) => host('window.pin', { title: String(title), text: String(text === undefined ? '' : text) }),
     player: Object.freeze({
       coords: () => host('player.coords'), // {x, y, z, dimension}
@@ -222,6 +226,9 @@
     if (e.type === 'fs') { fsReply(e); commit(); return; }
     if (e.type === 'msg_ack') { msgAck(e); commit(); return; }
     if (e.type === 'msg') { emitLocal('msg', e); commit(); return; }
+    // Alt-mode keyboard (config.json "keyboard": true): kvr.on('key', e => e.key/scancode/action/mods),
+    // kvr.on('char', e => e.ch), kvr.on('keyboard', e => e.focused)
+    if (e.type === 'key' || e.type === 'char' || e.type === 'keyboard') { emitLocal(e.type, e); commit(); return; }
     const w = live.get(e.id);
     if (e.type === 'click' && w && typeof w.onClick === 'function') w.onClick(e);
     if (e.type === 'change' && w) {

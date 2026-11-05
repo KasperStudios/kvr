@@ -1,5 +1,6 @@
 package com.kasperstudios.kvr.spatial.window;
 
+import com.kasperstudios.kvr.config.KvrConfig;
 import com.kasperstudios.kvr.spatial.PlayerView;
 import com.kasperstudios.kvr.spatial.input.SpatialRaycast;
 import java.util.ArrayList;
@@ -7,6 +8,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.IntSupplier;
 import org.jetbrains.annotations.Nullable;
 
@@ -14,6 +16,10 @@ import org.jetbrains.annotations.Nullable;
  * Owns every open window. Enforces the RAM rule from SPEC 2.5: the number of simultaneously open
  * {@link SpatialWindow.Kind#APP} windows is capped by the RAM tier; detached vanilla screens and
  * system panels never count.
+ *
+ * <p>Window settings from the gear menu: the × is honoured on the next {@link #tick()}, locked
+ * windows ignore the minimise gestures, new windows without an explicit Public/Private choice get
+ * {@code default_window_public} from {@code kvr-client.toml}.
  */
 public final class WindowManager {
 
@@ -21,18 +27,26 @@ public final class WindowManager {
 
     private final List<SpatialWindow> windows = new ArrayList<>();
     private final IntSupplier ramWindows;
+    private final BooleanSupplier defaultPublic;
     @Nullable private SpatialWindow focused;
     /** HUD_OFF: the OS keeps running (apps tick), but nothing is drawn or hit by the hand ray. */
     private boolean hidden;
 
     /** @param ramWindows current RAM limit (1/2/4/8/16), read from the worn glasses build */
     public WindowManager(IntSupplier ramWindows) {
+        this(ramWindows, () -> KvrConfig.client().defaultWindowPublic());
+    }
+
+    /** Test / tooling constructor: explicit default visibility, no config file. */
+    public WindowManager(IntSupplier ramWindows, BooleanSupplier defaultPublic) {
         this.ramWindows = ramWindows;
+        this.defaultPublic = defaultPublic;
     }
 
     public OpenResult open(SpatialWindow window) {
         if (windows.stream().anyMatch(w -> w.id().equals(window.id()))) return OpenResult.ALREADY_OPEN;
         if (window.kind() == SpatialWindow.Kind.APP && appsOpen() >= ramWindows.getAsInt()) return OpenResult.RAM_FULL;
+        if (window.hasSettings() && !window.hasPublicChoice()) window.setPublic(defaultPublic.getAsBoolean());
         windows.add(window);
         focused = window;
         return OpenResult.OPENED;
@@ -51,14 +65,19 @@ public final class WindowManager {
         return ramWindows.getAsInt();
     }
 
-    /** Gesture 2: hide every app/vanilla window into the dock. */
+    /** Gesture 2: hide every app/vanilla window into the dock (locked windows stay). */
     public void minimizeAll() {
-        windows.stream().filter(w -> w.kind() != SpatialWindow.Kind.SYSTEM).forEach(w -> w.setMinimized(true));
+        windows.stream().filter(w -> w.kind() != SpatialWindow.Kind.SYSTEM && !w.isLocked()).forEach(w -> w.setMinimized(true));
     }
 
-    /** Gesture 3: the window in focus (last clicked or under the hand ray). */
+    /** Gesture 3: the window in focus (last clicked or under the hand ray), unless it is locked. */
     public void minimizeFocused() {
-        if (focused != null && focused.kind() != SpatialWindow.Kind.SYSTEM) focused.setMinimized(true);
+        if (focused != null && focused.kind() != SpatialWindow.Kind.SYSTEM && !focused.isLocked()) focused.setMinimized(true);
+    }
+
+    /** Windows set to Public in the gear menu: materialised for other players, readable by HackGlasses. */
+    public List<SpatialWindow> publicWindows() {
+        return windows.stream().filter(SpatialWindow::isPublic).toList();
     }
 
     public void restore(SpatialWindow window) {
@@ -75,8 +94,14 @@ public final class WindowManager {
         for (SpatialWindow w : windows) w.update(view, dt);
     }
 
-    /** Client tick. Copy first: a window may close itself (e.g. its container menu went away). */
+    /**
+     * Client tick. Windows whose × was clicked are closed first; then every window ticks.
+     * Copy first: a window may close itself (e.g. its container menu went away).
+     */
     public void tick() {
+        for (SpatialWindow w : List.copyOf(windows)) {
+            if (w.closeRequested()) close(w);
+        }
         for (SpatialWindow w : List.copyOf(windows)) w.tick();
     }
 

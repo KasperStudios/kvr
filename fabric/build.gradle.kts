@@ -52,13 +52,28 @@ configurations {
     get("developmentFabric").extendsFrom(commonBundle)
 }
 
+repositories {
+    maven("https://maven.terraformersmc.com/releases/")
+}
+
 dependencies {
     minecraft("com.mojang:minecraft:$minecraft")
     mappings(loom.officialMojangMappings())
     modImplementation("net.fabricmc:fabric-loader:${mod.dep("fabric_loader")}")
     // Registry freeze relaxation for content mods lives in Fabric API, not in the loader
     modImplementation("net.fabricmc.fabric-api:fabric-api:${common.mod.dep("fabric_api")}")
+    modCompileOnly("com.terraformersmc:modmenu:11.0.3")
     implementation("dev.architectury:architectury-injectables:${mod.dep("architectury_injectables")}")
+
+    // Chicory runtime bundle
+    implementation("com.dylibso.chicory:runtime:1.4.0")
+    implementation("com.dylibso.chicory:wasi:1.4.0")
+    implementation("com.dylibso.chicory:wasm:1.4.0")
+    implementation("com.dylibso.chicory:log:1.4.0")
+    include("com.dylibso.chicory:runtime:1.4.0")
+    include("com.dylibso.chicory:wasi:1.4.0")
+    include("com.dylibso.chicory:wasm:1.4.0")
+    include("com.dylibso.chicory:log:1.4.0")
 
     commonBundle(project(common.path, "namedElements")) { isTransitive = false }
     shadowBundle(project(common.path, "transformProductionFabric")) { isTransitive = false }

@@ -24,11 +24,7 @@ class SpatialRaycastTest {
 
     @Test
     void viewersRightIsPositiveLocalX() {
-        // facing +Z (south), +X is east (the viewer's left hand), -X is west (viewer's right hand).
-        // forward = (0, 0, 1), WORLD_UP = (0, 1, 0).
-        // forward x up = (0*0 - 1*1, 1*0 - 0*0, 0*1 - 0*0) = (-1, 0, 0).
-        // So right() vector is (-1, 0, 0).
-        // Ray towards -X: d = (-0.2, 0, 0). d.dot(right()) = (-0.2)*(-1) = +0.2.
+        // facing +Z, the viewer's right hand is -X
         SpatialRaycast.PlaneHit hit = SpatialRaycast.intersectPlane(new SpatialRaycast.Ray(Vec3.ZERO, new Vec3(-0.2, 0, 2).normalize()), WINDOW);
         assertNotNull(hit);
         assertEquals(0.2, hit.localX(), 1e-4);

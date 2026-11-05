@@ -1,108 +1,17 @@
 {
   "multipart": [
-    {
-      "when": {
-        "charging": "false",
-        "solar": "false"
-      },
-      "apply": {
-        "model": "kvr:block/dock_plate"
-      }
-    },
-    {
-      "when": {
-        "charging": "false",
-        "solar": "true"
-      },
-      "apply": {
-        "model": "kvr:block/dock_plate_solar"
-      }
-    },
-    {
-      "when": {
-        "charging": "true"
-      },
-      "apply": {
-        "model": "kvr:block/dock_plate_charging"
-      }
-    },
-    {
-      "when": {
-        "has_glasses": "true",
-        "facing": "north"
-      },
-      "apply": {
-        "model": "kvr:block/dock_glasses"
-      }
-    },
-    {
-      "when": {
-        "has_glasses": "true",
-        "facing": "east"
-      },
-      "apply": {
-        "model": "kvr:block/dock_glasses",
-        "y": 90
-      }
-    },
-    {
-      "when": {
-        "has_glasses": "true",
-        "facing": "south"
-      },
-      "apply": {
-        "model": "kvr:block/dock_glasses",
-        "y": 180
-      }
-    },
-    {
-      "when": {
-        "has_glasses": "true",
-        "facing": "west"
-      },
-      "apply": {
-        "model": "kvr:block/dock_glasses",
-        "y": 270
-      }
-    },
-    {
-      "when": {
-        "charging": "true",
-        "facing": "north"
-      },
-      "apply": {
-        "model": "kvr:block/dock_hologram"
-      }
-    },
-    {
-      "when": {
-        "charging": "true",
-        "facing": "east"
-      },
-      "apply": {
-        "model": "kvr:block/dock_hologram",
-        "y": 90
-      }
-    },
-    {
-      "when": {
-        "charging": "true",
-        "facing": "south"
-      },
-      "apply": {
-        "model": "kvr:block/dock_hologram",
-        "y": 180
-      }
-    },
-    {
-      "when": {
-        "charging": "true",
-        "facing": "west"
-      },
-      "apply": {
-        "model": "kvr:block/dock_hologram",
-        "y": 270
-      }
-    }
+    { "when": { "charging": "false", "solar": "false" }, "apply": { "model": "kvr:block/dock_plate" } },
+    { "when": { "charging": "false", "solar": "true" }, "apply": { "model": "kvr:block/dock_plate_solar" } },
+    { "when": { "charging": "true" }, "apply": { "model": "kvr:block/dock_plate_charging" } },
+
+    { "when": { "has_glasses": "true", "facing": "north" }, "apply": { "model": "kvr:block/dock_glasses" } },
+    { "when": { "has_glasses": "true", "facing": "east" }, "apply": { "model": "kvr:block/dock_glasses", "y": 90 } },
+    { "when": { "has_glasses": "true", "facing": "south" }, "apply": { "model": "kvr:block/dock_glasses", "y": 180 } },
+    { "when": { "has_glasses": "true", "facing": "west" }, "apply": { "model": "kvr:block/dock_glasses", "y": 270 } },
+
+    { "when": { "charging": "true", "facing": "north" }, "apply": { "model": "kvr:block/dock_hologram" } },
+    { "when": { "charging": "true", "facing": "east" }, "apply": { "model": "kvr:block/dock_hologram", "y": 90 } },
+    { "when": { "charging": "true", "facing": "south" }, "apply": { "model": "kvr:block/dock_hologram", "y": 180 } },
+    { "when": { "charging": "true", "facing": "west" }, "apply": { "model": "kvr:block/dock_hologram", "y": 270 } }
   ]
 }

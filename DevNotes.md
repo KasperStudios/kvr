@@ -88,6 +88,13 @@ packages all Matrix entries, and the core tests pass on every node.
       - Fixed-step clock: `ScriptClock` implementing CPU tiers (10/20/50/100/200 Hz) with max 3-tick catch-up limit.
       - Watchdog timer: `Watchdog` enforcing 25% tick budget limit, strike counter (3 slow ticks -> NOT_RESPONDING), and 4x budget instant KILL.
       - Unit tests: `ScriptClockTest`, `WatchdogTest` (109 tests total passed, 0 failures).
+- [x] Block 5a & D1: Headless Desktop Daemon & Settings Chrome (Tasks 0012, 0013, 0014):
+      - `kvr-desktopd`: native Rust headless Wayland compositor built with Smithay 0.6. No windows in WM/niri.
+      - Zero-copy shared memory bridge (`FileChannel.map` + triple buffering) with damage regions for <1 ms per frame.
+      - Security consent screen (`DesktopConsentScreen`) storing SHA-256 hash before launch.
+      - `WindowChrome` gear menu on all windows: Anchor toggle (Body/World), Visibility toggle (Public/Private), Lock toggle (misclick protection in PvP/mining).
+      - Cross `×` button in top right for instant window close.
+      - `ChicoryJsEngine` + QuickJS-ng WASM runtime bundled (165/165 tests passed, 0 failures).
 - [x] Block 5e System Apps & TextInput (Task 0011 from Retool):
       - Text input system: `TextInput` widget, `TextInputScreen` capturing keyboard focus for floating 3D windows with single/multiline support, Enter, Ctrl+Enter, and Ctrl+V clipboard pasting.
       - Shoulder pin: `PinnedNote` floating at right shoulder via `LazyFollowAnchor` without consuming RAM slots.

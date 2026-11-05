@@ -30,9 +30,12 @@ import net.minecraft.world.phys.Vec3;
  * {@code assets/kvr/apps/<id>/} (config.json + main.js), shown in the dock and launched as
  * {@link ScriptWindow}s in front of the player. 5b/5d replace the source with the glasses' VFS.
  *
- * <pre>{@code new SpatialConfig(ramWindows, glassesWorn, batteryPercent, new BuiltinApps(List.of("hello", "kav", "notes", "calc", "messenger")))}</pre>
+ * <pre>{@code new SpatialConfig(ramWindows, glassesWorn, batteryPercent, new BuiltinApps(BuiltinApps.SYSTEM_APPS))}</pre>
  */
 public final class BuiltinApps implements SpatialConfig.AppHost {
+
+    /** The apps shipped in the jar; ChicoryJsEngineTest boots exactly these on the real prelude. */
+    public static final List<String> SYSTEM_APPS = List.of("hello", "kav", "notes", "calc", "messenger");
 
     private static final double SPAWN_DISTANCE = 0.9;
 
@@ -41,13 +44,20 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
     private String prelude;
 
     public BuiltinApps(List<String> ids) {
-        this.ids = List.copyOf(ids);
+        List<String> all = new ArrayList<>(ids);
+        if (com.kasperstudios.kvr.desktop.client.HostDesktopClient.enabledLocally()) all.add(com.kasperstudios.kvr.desktop.client.HostDesktopClient.DOCK_ID);
+        this.ids = List.copyOf(all);
     }
 
     @Override
     public List<SpatialConfig.DockItem> dockItems() {
         List<SpatialConfig.DockItem> out = new ArrayList<>();
         for (String id : ids) {
+            if (id.equals(com.kasperstudios.kvr.desktop.client.HostDesktopClient.DOCK_ID)) {
+                boolean on = KVRSpatial.windows().all().stream().anyMatch(w -> w instanceof com.kasperstudios.kvr.desktop.client.HostDesktopWindow);
+                out.add(new SpatialConfig.DockItem(id, GlassStyle.id("gesture/launcher"), Component.translatable("kvr.desktop.title"), on));
+                continue;
+            }
             boolean running = KVRSpatial.windows().all().stream().anyMatch(w -> w.id().equals("app:" + id));
             out.add(new SpatialConfig.DockItem(id, GlassStyle.id("gesture/launcher"), Component.literal(app(id).map(VrApp::name).orElse(id)), running));
         }
@@ -56,6 +66,10 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
 
     @Override
     public void launch(String appId) {
+        if (appId.equals(com.kasperstudios.kvr.desktop.client.HostDesktopClient.DOCK_ID)) {
+            com.kasperstudios.kvr.desktop.client.HostDesktopClient.open();
+            return;
+        }
         var open = KVRSpatial.windows().all().stream().filter(w -> w.id().equals("app:" + appId)).findFirst();
         if (open.isPresent()) {
             KVRSpatial.windows().restore(open.get());

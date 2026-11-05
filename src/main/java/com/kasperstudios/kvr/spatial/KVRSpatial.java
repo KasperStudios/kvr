@@ -75,6 +75,7 @@ public final class KVRSpatial {
 
     private static void tickStart() {
         if (net.minecraft.client.Minecraft.getInstance().player != null) POWER_KEY.tick();
+        com.kasperstudios.kvr.script.ClientInfo.tick(); // snapshot for kvr.player / kvr.players (script threads)
         boolean display = config.glassesWorn().getAsBoolean();
         boolean os = display || osRunning();
         boolean shown = windows.find(DockBar.class).isPresent();

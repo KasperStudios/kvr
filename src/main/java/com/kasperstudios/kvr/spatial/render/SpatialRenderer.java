@@ -29,7 +29,6 @@ public final class SpatialRenderer {
 
     private static final double POINTER = 0.012;
     private static final int WHITE = 0xFFFFFFFF;
-    private static final int CYAN = 0xFF67E8F9;
     /** Blood-red multiply for the overload strobe (approved by the Creator). */
     private static final int ALARM_RED = 0xFFFF3B3B;
     private static long lastFrame;
@@ -84,13 +83,13 @@ public final class SpatialRenderer {
         Vec3 base = p.center().subtract(cam).add(p.up().scale(-(w.height() / 2.0 + SpatialWindow.GRAB_GAP + SpatialWindow.GRAB_H / 2.0) * m));
 
         boolean hot = KVRSpatial.input().holding(w) || hover.filter(h -> h.window() == w && h.region() == SpatialRaycast.Region.GRAB_BAR).isPresent();
-        rect(pose, buffers, base, p, SpatialWindow.GRAB_W * m * (hot ? 1.15 : 1.0), SpatialWindow.GRAB_H * m, hot ? 0xEBFFFFFF : 0x96FFFFFF);
-
-        // anchor toggle next to the handle: cyan = Body, white = World
-        double tx = (SpatialWindow.GRAB_W / 2.0 + SpatialWindow.TOGGLE_GAP + SpatialWindow.TOGGLE_SIZE / 2.0) * m;
-        boolean body = w.anchor().mode() == SpatialAnchor.Mode.BODY;
-        double s = SpatialWindow.TOGGLE_SIZE * m * 0.6;
-        rect(pose, buffers, base.add(p.right().scale(tx)), p, s, s, body ? CYAN : WHITE);
+        // the handle itself tells the state: red = locked (cannot be grabbed), cyan = Body, white = World/Follow
+        int color;
+        if (w.isLocked()) color = 0xB4F43F5E;
+        else if (w.anchor().mode() == SpatialAnchor.Mode.BODY) color = hot ? 0xEB67E8F9 : 0xA067E8F9;
+        else color = hot ? 0xEBFFFFFF : 0x96FFFFFF;
+        boolean grow = hot && !w.isLocked();
+        rect(pose, buffers, base, p, SpatialWindow.GRAB_W * m * (grow ? 1.15 : 1.0), SpatialWindow.GRAB_H * m, color);
     }
 
     private static void drawPointer(PoseStack pose, MultiBufferSource buffers, Camera camera, Vec3 cam, Optional<SpatialRaycast.RayHit> hover) {

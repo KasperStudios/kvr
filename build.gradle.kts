@@ -45,6 +45,10 @@ dependencies {
     compileOnly("org.spongepowered:mixin:0.8.7")
     compileOnly("org.ow2.asm:asm-tree:9.7")
 
+    // Chicory WebAssembly runtime for QuickJS
+    implementation("com.dylibso.chicory:runtime:1.4.0")
+    implementation("com.dylibso.chicory:wasi:1.4.0")
+
     testImplementation("org.junit.jupiter:junit-jupiter:${mod.dep("junit")}")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

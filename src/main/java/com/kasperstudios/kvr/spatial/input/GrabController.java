@@ -8,7 +8,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * \"Holding the window in the hand\" (ADR-002): LMB on the grab bar attaches the window to the ray at
+ * "Holding the window in the hand" (ADR-002): LMB on the grab bar attaches the window to the ray at
  * the distance where it was grabbed; the mouse moves it in X/Y, the wheel pushes it away or pulls
  * it closer; releasing LMB drops it and re-bases its anchor at that spot.
  */

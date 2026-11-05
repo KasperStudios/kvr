@@ -59,7 +59,7 @@ public final class DockBar extends SpatialWindow {
         for (SpatialConfig.DockItem item : config.apps().dockItems()) {
             boolean hot = GlassStyle.inside(mx, my, x, y, ICON, ICON);
             GlassStyle.panel(g, x, y, ICON, ICON, hot);
-            g.blitSprite(item.icon(), x + 6, y + 6, 16, 16);
+            GlassStyle.sprite(g, item.icon(), x + 6, y + 6, 16, 16);
             if (item.running()) g.fill(x + ICON / 2 - 1, y + ICON + 2, x + ICON / 2 + 1, y + ICON + 4, GlassStyle.TEXT);
             x += ICON + GAP;
         }
@@ -74,7 +74,7 @@ public final class DockBar extends SpatialWindow {
         int sx = width - STATUS_W - GlassStyle.PADDING + 4;
         g.fill(sx - 6, 10, sx - 5, height - 10, 0x40FFFFFF);
         int pct = config.batteryPercent().getAsInt();
-        g.blitSprite(GlassStyle.BATTERY, sx, height / 2 - 8, 16, 16);
+        GlassStyle.sprite(g, GlassStyle.BATTERY, sx, height / 2 - 8, 16, 16);
         int fill = Math.round(10 * pct / 100f);
         g.fill(sx + 2, height / 2 - 3, sx + 2 + fill, height / 2 + 3, pct <= 20 ? GlassStyle.DANGER : GlassStyle.OK);
         GlassStyle.text(g, Component.literal(pct + "%"), sx + 20, height / 2 - 8, GlassStyle.TEXT);
@@ -83,6 +83,10 @@ public final class DockBar extends SpatialWindow {
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
+        if (mx >= width - STATUS_W - GlassStyle.PADDING) {
+            com.kasperstudios.kvr.spatial.KVRSpatial.openPowerWindow();
+            return true;
+        }
         int i = (int) ((mx - GlassStyle.PADDING) / (ICON + GAP));
         if (mx < GlassStyle.PADDING || i < 0) return false;
         List<SpatialConfig.DockItem> items = config.apps().dockItems();

@@ -103,7 +103,7 @@ public final class GestureWheel extends SpatialWindow {
             int by = (int) Math.round(c + Math.sin(angle) * RADIUS) - BUTTON / 2;
             boolean hot = all[i] == hovered;
             GlassStyle.panel(g, bx, by, BUTTON, BUTTON, hot);
-            g.blitSprite(all[i].icon(), bx + (BUTTON - 16) / 2, by + (BUTTON - 16) / 2, 16, 16);
+            GlassStyle.sprite(g, all[i].icon(), bx + (BUTTON - 16) / 2, by + (BUTTON - 16) / 2, 16, 16);
         }
         Component center = hovered != null ? hovered.label() : Component.translatable("kvr.gesture.hint");
         GlassStyle.centered(g, center, c, c - 4, hovered != null ? GlassStyle.TEXT : GlassStyle.MUTED);

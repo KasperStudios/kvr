@@ -59,6 +59,13 @@ public final class ToastPanel extends SpatialWindow {
     }
 
     @Override
+    public String spyText() {
+        StringBuilder sb = new StringBuilder();
+        for (Shown s : shown) sb.append(s.toast().title().getString()).append(": ").append(s.toast().text().getString()).append('\n');
+        return sb.toString();
+    }
+
+    @Override
     public void tick() {
         long now = Util.getMillis();
         shown.removeIf(s -> now - s.since() > s.toast().durationMs());
@@ -75,7 +82,7 @@ public final class ToastPanel extends SpatialWindow {
             int x = slide;
             GlassStyle.panel(g, x, y + 2, W - slide, ROW - 4, false);
             g.fill(x + 6, y + 8, x + 30, y + ROW - 8, (s.toast().accent() & 0x00FFFFFF) | 0x40000000);
-            g.blitSprite(s.toast().icon(), x + 10, y + 12, 16, 16);
+            GlassStyle.sprite(g, s.toast().icon(), x + 10, y + 12, 16, 16);
             int tx = x + 38;
             int maxW = W - slide - 44;
             g.drawString(font, s.toast().title().copy().withStyle(ChatFormatting.BOLD), tx, y + 9, GlassStyle.TEXT, false);

@@ -19,7 +19,8 @@ public final class SpatialRaycast {
     /** Hit on an infinite window plane; local metres from the centre, +x right, +y down. */
     public record PlaneHit(double distance, double localX, double localY) {}
 
-    public enum Region { CONTENT, GRAB_BAR, ANCHOR_TOGGLE }
+    /** The Body/World toggle next to the grab bar is gone (0013): anchoring lives in the gear menu. */
+    public enum Region { CONTENT, GRAB_BAR }
 
     /** {@code px/py} are window GUI pixels (may lie outside the content for the grab bar). */
     public record RayHit(SpatialWindow window, Region region, double distance, double px, double py, double localX, double localY) {}
@@ -57,8 +58,6 @@ public final class SpatialRaycast {
         double cx = w.width() / 2.0;
         double half = SpatialWindow.GRAB_W / 2.0;
         if (px >= cx - half - SpatialWindow.GRAB_HIT_PAD && px <= cx + half + SpatialWindow.GRAB_HIT_PAD) return Region.GRAB_BAR;
-        double tx = cx + half + SpatialWindow.TOGGLE_GAP;
-        if (px >= tx - 2 && px <= tx + SpatialWindow.TOGGLE_SIZE + 2) return Region.ANCHOR_TOGGLE;
         return null;
     }
 }

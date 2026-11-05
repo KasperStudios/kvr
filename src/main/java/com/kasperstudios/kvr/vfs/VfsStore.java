@@ -2,123 +2,127 @@ package com.kasperstudios.kvr.vfs;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * On-disk storage for one glasses UUID: {@code <root>/home/...}, {@code <root>/tmp/...}, etc.
- * Enforces per-file size caps (128 KB write / 256 KB read, to keep the network sane), quota check
- * before atomic writes, directory creation and recursive deletion.
+ * One glasses' file system on the server disk ({@code <world>/kvr/vfs/<glasses-uuid>/}). Text files
+ * for now (UTF-8). Enforces the byte and file-count quota on every write. Plain NIO, no Minecraft
+ * classes — unit-tested with a temp directory.
  */
 public final class VfsStore {
 
+    /** One C2S custom payload is capped at 32767 bytes by vanilla; keep a margin for the header. */
     public static final int MAX_WRITE_BYTES = 30_000;
     public static final int MAX_READ_BYTES = 256 * 1024;
 
-    private final Path root;
-
     public record Entry(String name, boolean dir, long size) {}
+
     public record Usage(long bytes, int files) {}
+
+    private final Path root;
 
     public VfsStore(Path root) {
         this.root = root.toAbsolutePath().normalize();
     }
 
-    public List<Entry> list(String normalizedPath) throws VfsException {
-        Path target = resolve(normalizedPath);
-        if (!Files.exists(target)) return Collections.emptyList();
-        if (!Files.isDirectory(target)) throw new VfsException(VfsException.Code.NOT_FOUND, normalizedPath + " is not a directory");
-        try (Stream<Path> s = Files.list(target)) {
-            List<Entry> out = new ArrayList<>();
-            for (Path p : s.toList()) {
-                String fn = p.getFileName().toString();
-                if (fn.endsWith(".tmp")) continue;
-                boolean dir = Files.isDirectory(p);
-                long sz = dir ? 0 : Files.size(p);
-                out.add(new Entry(fn, dir, sz));
-            }
-            out.sort(Comparator.comparing(Entry::dir).reversed().thenComparing(Entry::name));
-            return out;
+    public List<Entry> list(String path) throws VfsException {
+        Path dir = resolve(path);
+        if (path.equals("/")) ensureSkeleton();
+        if (!Files.isDirectory(dir)) throw new VfsException(VfsException.Code.NOT_FOUND, path);
+        List<Entry> out = new ArrayList<>();
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir)) {
+            for (Path p : ds) out.add(new Entry(p.getFileName().toString(), Files.isDirectory(p), Files.isDirectory(p) ? 0 : Files.size(p)));
+        } catch (IOException e) {
+            throw new VfsException(VfsException.Code.IO, e.getMessage());
+        }
+        out.sort((a, b) -> a.dir() != b.dir() ? (a.dir() ? -1 : 1) : a.name().compareTo(b.name()));
+        return out;
+    }
+
+    public String read(String path) throws VfsException {
+        Path f = resolve(path);
+        if (Files.isDirectory(f)) throw new VfsException(VfsException.Code.IS_DIRECTORY, path);
+        if (!Files.isRegularFile(f)) throw new VfsException(VfsException.Code.NOT_FOUND, path);
+        try {
+            if (Files.size(f) > MAX_READ_BYTES) throw new VfsException(VfsException.Code.TOO_LARGE, path);
+            return Files.readString(f, StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new VfsException(VfsException.Code.IO, e.getMessage());
         }
     }
 
-    public String read(String normalizedPath) throws VfsException {
-        Path p = resolve(normalizedPath);
-        if (!Files.exists(p)) throw new VfsException(VfsException.Code.NOT_FOUND, normalizedPath);
-        if (Files.isDirectory(p)) throw new VfsException(VfsException.Code.IS_DIRECTORY, normalizedPath);
+    public void write(String path, String text, VfsQuota quota) throws VfsException {
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > MAX_WRITE_BYTES) throw new VfsException(VfsException.Code.TOO_LARGE, bytes.length + " bytes");
+        if (path.equals("/")) throw new VfsException(VfsException.Code.IS_DIRECTORY, path);
+        Path f = resolve(path);
+        if (Files.isDirectory(f)) throw new VfsException(VfsException.Code.IS_DIRECTORY, path);
         try {
-            long sz = Files.size(p);
-            if (sz > MAX_READ_BYTES) throw new VfsException(VfsException.Code.TOO_LARGE, sz + " > " + MAX_READ_BYTES);
-            return Files.readString(p, StandardCharsets.UTF_8);
+            boolean exists = Files.isRegularFile(f);
+            long old = exists ? Files.size(f) : 0;
+            Usage u = usage();
+            if (!exists && u.files() + 1 > quota.files()) throw new VfsException(VfsException.Code.QUOTA_FILES, u.files() + "/" + quota.files());
+            if (u.bytes() - old + bytes.length > quota.bytes()) throw new VfsException(VfsException.Code.QUOTA_BYTES, (u.bytes() - old + bytes.length) + "/" + quota.bytes());
+            Files.createDirectories(f.getParent());
+            Files.write(f, bytes);
         } catch (IOException e) {
             throw new VfsException(VfsException.Code.IO, e.getMessage());
         }
     }
 
-    public void write(String normalizedPath, String text, VfsQuota quota) throws VfsException {
-        byte[] bytes = (text == null ? "" : text).getBytes(StandardCharsets.UTF_8);
-        if (bytes.length > MAX_WRITE_BYTES) throw new VfsException(VfsException.Code.TOO_LARGE, bytes.length + " > " + MAX_WRITE_BYTES);
-        Path p = resolve(normalizedPath);
+    /** Deletes a file or an empty directory. */
+    public void delete(String path) throws VfsException {
+        if (path.equals("/")) throw new VfsException(VfsException.Code.DENIED, path);
+        Path f = resolve(path);
+        if (!Files.exists(f)) throw new VfsException(VfsException.Code.NOT_FOUND, path);
         try {
-            boolean exists = Files.exists(p);
-            if (exists && Files.isDirectory(p)) throw new VfsException(VfsException.Code.IS_DIRECTORY, normalizedPath);
-            Usage cur = usage();
-            long oldSize = exists ? Files.size(p) : 0;
-            long nextBytes = cur.bytes() - oldSize + bytes.length;
-            int nextFiles = cur.files() + (exists ? 0 : 1);
-            if (nextBytes > quota.bytes()) throw new VfsException(VfsException.Code.QUOTA_BYTES, nextBytes + " > " + quota.bytes());
-            if (nextFiles > quota.files()) throw new VfsException(VfsException.Code.QUOTA_FILES, nextFiles + " > " + quota.files());
-            Files.createDirectories(p.getParent());
-            Path tmp = p.resolveSibling(p.getFileName().toString() + ".tmp");
-            Files.write(tmp, bytes);
-            Files.move(tmp, p, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException e) {
-            throw new VfsException(VfsException.Code.IO, e.getMessage());
-        }
-    }
-
-    public void delete(String normalizedPath) throws VfsException {
-        Path p = resolve(normalizedPath);
-        if (!Files.exists(p)) return;
-        try {
-            if (Files.isDirectory(p)) {
-                try (Stream<Path> s = Files.walk(p)) {
-                    for (Path sub : s.sorted(Comparator.reverseOrder()).toList()) Files.delete(sub);
+            if (Files.isDirectory(f)) {
+                try (Stream<Path> s = Files.list(f)) {
+                    if (s.findAny().isPresent()) throw new VfsException(VfsException.Code.NOT_EMPTY, path);
                 }
-            } else {
-                Files.delete(p);
             }
+            Files.delete(f);
         } catch (IOException e) {
             throw new VfsException(VfsException.Code.IO, e.getMessage());
         }
     }
 
-    public Usage usage() {
-        if (!Files.exists(root)) return new Usage(0, 0);
-        long[] totals = new long[2]; // bytes, files
+    public Usage usage() throws VfsException {
+        if (!Files.isDirectory(root)) return new Usage(0, 0);
         try (Stream<Path> s = Files.walk(root)) {
-            s.forEach(p -> {
-                if (!Files.isDirectory(p) && !p.getFileName().toString().endsWith(".tmp")) {
-                    try {
-                        totals[0] += Files.size(p);
-                        totals[1]++;
-                    } catch (IOException ignored) {}
+            long[] acc = {0, 0};
+            s.filter(Files::isRegularFile).forEach(p -> {
+                acc[1]++;
+                try {
+                    acc[0] += Files.size(p);
+                } catch (IOException ignored) {
+                    // file vanished between walk and size: count it as 0
                 }
             });
-        } catch (IOException ignored) {}
-        return new Usage(totals[0], (int) totals[1]);
+            return new Usage(acc[0], (int) acc[1]);
+        } catch (IOException e) {
+            throw new VfsException(VfsException.Code.IO, e.getMessage());
+        }
     }
 
-    private Path resolve(String normalizedPath) throws VfsException {
-        Path p = root.resolve(normalizedPath.substring(1)).normalize();
-        if (!p.startsWith(root)) throw new VfsException(VfsException.Code.DENIED, "escape attempt: " + normalizedPath);
+    /** /home /tmp /data /apps exist from the first listing. */
+    private void ensureSkeleton() throws VfsException {
+        try {
+            for (String d : new String[] {"home", "tmp", "data", "apps"}) Files.createDirectories(root.resolve(d));
+        } catch (IOException e) {
+            throw new VfsException(VfsException.Code.IO, e.getMessage());
+        }
+    }
+
+    /** {@code path} must already be normalized by {@link VfsPath#normalize}; this is the last line of defence. */
+    private Path resolve(String path) throws VfsException {
+        Path p = path.equals("/") ? root : root.resolve(path.substring(1)).normalize();
+        if (!p.startsWith(root)) throw new VfsException(VfsException.Code.INVALID_PATH, path);
         return p;
     }
 }

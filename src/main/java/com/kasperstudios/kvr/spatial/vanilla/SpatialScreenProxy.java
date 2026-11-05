@@ -6,6 +6,7 @@ import com.kasperstudios.kvr.spatial.PlayerView;
 import com.kasperstudios.kvr.spatial.SpatialPose;
 import com.kasperstudios.kvr.spatial.anchor.WorldAnchor;
 import com.kasperstudios.kvr.spatial.render.GlassStyle;
+import com.kasperstudios.kvr.spatial.render.RenderCompat;
 import com.kasperstudios.kvr.spatial.window.SpatialWindow;
 import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
@@ -91,6 +92,19 @@ public final class SpatialScreenProxy extends SpatialWindow {
         return title;
     }
 
+    /** Item names in the container: exactly what a hacker wants to see in someone's chest. */
+    @Override
+    public String spyText() {
+        StringBuilder sb = new StringBuilder();
+        for (var slot : menu.slots) {
+            if (!slot.hasItem()) continue;
+            var stack = slot.getItem();
+            sb.append(stack.getCount()).append('x').append(stack.getHoverName().getString()).append(", ");
+            if (sb.length() > 240) break;
+        }
+        return sb.toString();
+    }
+
     @Override
     public void tick() {
         Minecraft mc = Minecraft.getInstance();
@@ -107,27 +121,39 @@ public final class SpatialScreenProxy extends SpatialWindow {
         AbstractContainerScreenAccessor a = (AbstractContainerScreenAccessor) screen;
         int ox = a.kvr$leftPos() - PAD;
         int oy = a.kvr$topPos() - PAD;
-        g.pose().pushPose();
-        g.pose().translate(-ox, -oy, 0);
+        RenderCompat.pushTranslate(g, -ox, -oy);
         painting = screen;
         try {
             screen.render(g, mx < 0 ? -1 : mx + ox, my < 0 ? -1 : my + oy, partialTick);
         } finally {
             painting = null;
-            g.pose().popPose();
+            RenderCompat.pop(g);
         }
     }
 
     @Override
     public boolean mouseClicked(double x, double y, int button) {
-        AbstractContainerScreenAccessor a = (AbstractContainerScreenAccessor) screen;
-        return screen.mouseClicked(x + a.kvr$leftPos() - PAD, y + a.kvr$topPos() - PAD, button);
+        return forward(x, y, button, false);
     }
 
     @Override
     public boolean mouseReleased(double x, double y, int button) {
+        return forward(x, y, button, true);
+    }
+
+    /** Window pixels → the screen's own coordinates, then into vanilla's input API. */
+    private boolean forward(double x, double y, int button, boolean release) {
         AbstractContainerScreenAccessor a = (AbstractContainerScreenAccessor) screen;
-        return screen.mouseReleased(x + a.kvr$leftPos() - PAD, y + a.kvr$topPos() - PAD, button);
+        double sx = x + a.kvr$leftPos() - PAD;
+        double sy = y + a.kvr$topPos() - PAD;
+        //? if >=1.21.9 {
+        /*// VERIFY on 1.21.11: GuiEventListener takes MouseButtonEvent since 1.21.9
+        net.minecraft.client.input.MouseButtonEvent e =
+            new net.minecraft.client.input.MouseButtonEvent(sx, sy, new net.minecraft.client.input.MouseButtonInfo(button, 0));
+        return release ? screen.mouseReleased(e) : screen.mouseClicked(e, false);
+        *///?} else {
+        return release ? screen.mouseReleased(sx, sy, button) : screen.mouseClicked(sx, sy, button);
+        //?}
     }
 
     @Override
