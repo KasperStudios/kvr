@@ -1,0 +1,316 @@
+{
+  "ambientocclusion": false,
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "glasses": "kvr:block/dock_glasses",
+    "particle": "kvr:block/dock_glasses"
+  },
+  "elements": [
+    {
+      "name": "shell",
+      "from": [
+        3.5,
+        1,
+        6.5
+      ],
+      "to": [
+        12.5,
+        2,
+        9.5
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            0,
+            0,
+            9,
+            3
+          ],
+          "texture": "#glasses",
+          "tintindex": 0
+        },
+        "down": {
+          "uv": [
+            0,
+            6,
+            9,
+            9
+          ],
+          "texture": "#glasses",
+          "tintindex": 0
+        },
+        "north": {
+          "uv": [
+            0,
+            4,
+            9,
+            5
+          ],
+          "texture": "#glasses",
+          "tintindex": 0
+        },
+        "south": {
+          "uv": [
+            0,
+            4,
+            9,
+            5
+          ],
+          "texture": "#glasses",
+          "tintindex": 0
+        },
+        "east": {
+          "uv": [
+            10,
+            4,
+            13,
+            5
+          ],
+          "texture": "#glasses",
+          "tintindex": 0
+        },
+        "west": {
+          "uv": [
+            10,
+            4,
+            13,
+            5
+          ],
+          "texture": "#glasses",
+          "tintindex": 0
+        }
+      }
+    },
+    {
+      "name": "glass",
+      "from": [
+        4.5,
+        1.98,
+        7.5
+      ],
+      "to": [
+        11.5,
+        1.98,
+        8.5
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            0,
+            10,
+            7,
+            11
+          ],
+          "texture": "#glasses"
+        }
+      }
+    },
+    {
+      "name": "strap_left",
+      "from": [
+        3.5,
+        1,
+        9.5
+      ],
+      "to": [
+        4.5,
+        1.5,
+        13.5
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "down": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "north": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "south": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "east": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "west": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        }
+      }
+    },
+    {
+      "name": "strap_right",
+      "from": [
+        11.5,
+        1,
+        9.5
+      ],
+      "to": [
+        12.5,
+        1.5,
+        13.5
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "down": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "north": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "south": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "east": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "west": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        }
+      }
+    },
+    {
+      "name": "strap_back",
+      "from": [
+        4.5,
+        1,
+        12.5
+      ],
+      "to": [
+        11.5,
+        1.5,
+        13.5
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "down": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "north": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "south": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "east": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        },
+        "west": {
+          "uv": [
+            0,
+            12,
+            4,
+            14
+          ],
+          "texture": "#glasses"
+        }
+      }
+    }
+  ]
+}

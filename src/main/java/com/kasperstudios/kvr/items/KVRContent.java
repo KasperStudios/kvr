@@ -51,8 +51,15 @@ public final class KVRContent {
                 .strength(5.0F, 6.0F)
                 .requiresCorrectToolForDrops()
                 .sound(SoundType.METAL)));
+        BLOCK_FACTORIES.put("dock_plate", () -> new Block(blockProperties("dock_plate")
+                .mapColor(MapColor.METAL)
+                .strength(2.0F, 3.0F)
+                .requiresCorrectToolForDrops()
+                .sound(SoundType.METAL)));
         ITEM_FACTORIES.put("up_ore", () -> new BlockItem(block("up_ore"), itemProperties("up_ore")));
         ITEM_FACTORIES.put("compressed_up_ore", () -> new BlockItem(block("compressed_up_ore"), itemProperties("compressed_up_ore")));
+        ITEM_FACTORIES.put("dock_plate", () -> new BlockItem(block("dock_plate"), itemProperties("dock_plate")));
+        ITEM_FACTORIES.put("solar_upgrade", () -> new Item(itemProperties("solar_upgrade")));
         ITEM_FACTORIES.put("up_raw", () -> new Item(itemProperties("up_raw")));
         ITEM_FACTORIES.put("up_ingot", () -> new Item(itemProperties("up_ingot")));
         ITEM_FACTORIES.put("tier_upgrader_template",

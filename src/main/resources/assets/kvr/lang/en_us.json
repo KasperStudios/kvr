@@ -15,5 +15,7 @@
   "kvr.window.ram_full.title": "Out of memory",
   "kvr.window.ram_full": "%s of %s apps open — close one first",
   "kvr.anchor.body": "With player",
-  "kvr.anchor.world": "In world"
-}
+  "kvr.anchor.world": "In world",
+  "block.kvr.dock_plate": "Dock Plate",
+  "item.kvr.solar_upgrade": "Solar Module"
+  }

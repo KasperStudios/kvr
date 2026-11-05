@@ -1,0 +1,78 @@
+{
+  "ambientocclusion": false,
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "holo": "kvr:block/dock_hologram",
+    "particle": "kvr:block/dock_hologram"
+  },
+  "elements": [
+    {
+      "name": "holo_ns",
+      "from": [
+        5,
+        4,
+        8
+      ],
+      "to": [
+        11,
+        12,
+        8
+      ],
+      "shade": false,
+      "faces": {
+        "north": {
+          "uv": [
+            5,
+            4,
+            11,
+            12
+          ],
+          "texture": "#holo"
+        },
+        "south": {
+          "uv": [
+            5,
+            4,
+            11,
+            12
+          ],
+          "texture": "#holo"
+        }
+      }
+    },
+    {
+      "name": "holo_ew",
+      "from": [
+        8,
+        4,
+        5
+      ],
+      "to": [
+        8,
+        12,
+        11
+      ],
+      "shade": false,
+      "faces": {
+        "east": {
+          "uv": [
+            5,
+            4,
+            11,
+            12
+          ],
+          "texture": "#holo"
+        },
+        "west": {
+          "uv": [
+            5,
+            4,
+            11,
+            12
+          ],
+          "texture": "#holo"
+        }
+      }
+    }
+  ]
+}

@@ -15,5 +15,7 @@
   "kvr.window.ram_full.title": "Не хватает памяти",
   "kvr.window.ram_full": "Открыто %s из %s приложений — закройте одно",
   "kvr.anchor.body": "С игроком",
-  "kvr.anchor.world": "В мире"
-}
+  "kvr.anchor.world": "В мире",
+  "block.kvr.dock_plate": "Док-плита",
+  "item.kvr.solar_upgrade": "Солнечный модуль"
+  }
