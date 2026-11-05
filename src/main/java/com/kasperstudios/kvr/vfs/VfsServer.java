@@ -47,6 +47,16 @@ public final class VfsServer {
         KVRNetwork.sendToPlayer(player, VfsProtocol.REPLY, r::write);
     }
 
+    /** Store + quota of the glasses this player wears with a running OS (used by the messenger). */
+    public record Context(VfsStore store, VfsQuota quota) {}
+
+    public static Optional<Context> context(ServerPlayer player) {
+        ItemStack glasses = player.getItemBySlot(EquipmentSlot.HEAD);
+        Optional<PowerBuild> build = GlassesPower.build(glasses);
+        if (build.isEmpty() || !GlassesPower.active(glasses, player.level().getGameTime())) return Optional.empty();
+        return Optional.of(new Context(new VfsStore(root(player.getServer(), glasses)), VfsQuota.forStorageTier(build.get().storage())));
+    }
+
     static VfsProtocol.Reply handle(ServerPlayer player, VfsProtocol.Request req) {
         try {
             rateLimit(player);

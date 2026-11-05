@@ -48,5 +48,7 @@
   "kvr.os.soon": "Coming in the next Block 5 tasks",
   "block.kvr.dock_plate": "Dock Plate",
   "item.kvr.solar_upgrade": "Solar Module",
-  "item.kvr.hackglasses": "HackGlasses"
+  "item.kvr.hackglasses": "HackGlasses",
+  "kvr.input.hint": "Typing into the window. Enter or Esc to finish, Ctrl+V to paste",
+  "kvr.input.hint_multi": "Typing into the window. Enter = new line, Ctrl+Enter or Esc to finish, Ctrl+V to paste"
 }

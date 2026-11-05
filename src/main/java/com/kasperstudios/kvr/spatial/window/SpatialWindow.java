@@ -73,6 +73,11 @@ public abstract class SpatialWindow {
         return true;
     }
 
+    /** Short plain text a HackGlasses wearer may read off this window (<= 256 chars). */
+    public String spyText() {
+        return "";
+    }
+
     public boolean isVisible() {
         return !minimized;
     }

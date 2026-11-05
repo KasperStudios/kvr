@@ -30,7 +30,7 @@ import net.minecraft.world.phys.Vec3;
  * {@code assets/kvr/apps/<id>/} (config.json + main.js), shown in the dock and launched as
  * {@link ScriptWindow}s in front of the player. 5b/5d replace the source with the glasses' VFS.
  *
- * <pre>{@code new SpatialConfig(ramWindows, glassesWorn, batteryPercent, new BuiltinApps(List.of("hello", "kav")))}</pre>
+ * <pre>{@code new SpatialConfig(ramWindows, glassesWorn, batteryPercent, new BuiltinApps(List.of("hello", "kav", "notes", "calc", "messenger")))}</pre>
  */
 public final class BuiltinApps implements SpatialConfig.AppHost {
 

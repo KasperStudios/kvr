@@ -1,15 +1,19 @@
 package com.kasperstudios.kvr.script.ui;
 
+import com.google.gson.JsonObject;
 import com.kasperstudios.kvr.script.ScriptHost;
 import com.kasperstudios.kvr.script.VrApp;
 import com.kasperstudios.kvr.spatial.KVRSpatial;
 import com.kasperstudios.kvr.spatial.anchor.SpatialAnchor;
 import com.kasperstudios.kvr.spatial.render.GlassStyle;
 import com.kasperstudios.kvr.spatial.render.RenderCompat;
+import com.kasperstudios.kvr.spatial.ui.PinnedNote;
 import com.kasperstudios.kvr.spatial.ui.ToastPanel;
 import com.kasperstudios.kvr.spatial.window.SpatialWindow;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -25,6 +29,10 @@ import net.minecraft.util.FormattedCharSequence;
  * A running .vrapp as a spatial window (Kind APP — takes a RAM slot). Paints the latest widget tree
  * committed by the script: column layout, rows via {@code Stack({dir:'row'})}, glass or gradient
  * background, shake. Clicks become UI events in the script's inbox. Closing the window stops the app.
+ *
+ * <p>Text fields ({@code kvr.TextInput}): a click opens {@link TextInputScreen} which captures the
+ * keyboard; the typed value is shown immediately from {@link #localValues} (the script's tree lags a
+ * tick behind) and every change is posted as {@code {type:'input'}}, Enter/Esc as {@code {type:'submit'}}.
  */
 public final class ScriptWindow extends SpatialWindow implements ScriptHost.Listener {
 
@@ -32,11 +40,15 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
     private static final int TITLE_H = 24;
     private static final int BTN_H = 20;
     private static final int SLIDER_H = 8;
+    private static final int LINE = 10;
 
     private record Hit(int id, String type, int x, int y, int w, int h, double min, double max, boolean readOnly) {}
 
     private final ScriptHost host;
     private final List<Hit> hits = new ArrayList<>();
+    private final Map<Integer, UiNode> inputs = new HashMap<>();
+    private final Map<Integer, String> localValues = new HashMap<>();
+    private int focused = -1;
     private boolean started;
     private long shakeUntil;
     private float shakeIntensity;
@@ -71,6 +83,7 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
         super.onClosed();
     }
 
+    @Override
     public String spyText() {
         UiNode ui = host.ui();
         if (ui == null) return "";
@@ -83,6 +96,7 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
         if (sb.length() > 240) return;
         if ("text".equals(n.type())) sb.append(n.str("text", "")).append('\n');
         if ("button".equals(n.type())) sb.append('[').append(n.str("label", "")).append("] ");
+        if ("input".equals(n.type())) sb.append(n.str("value", "")).append('\n'); // HackGlasses see what you type
         for (UiNode c : n.children()) collectText(c, sb);
     }
 
@@ -91,6 +105,7 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
     @Override
     protected void renderContent(GuiGraphics g, int mx, int my, float partialTick) {
         hits.clear();
+        inputs.clear();
         int ox = 0;
         int oy = 0;
         if (System.currentTimeMillis() < shakeUntil) {
@@ -171,6 +186,9 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
                 hits.add(new Hit(n.id(), "slider", x, y, w, SLIDER_H + 2, min, max, n.bool("readOnly")));
                 return y + SLIDER_H + 2;
             }
+            case "input" -> {
+                return input(g, font, n, x, y, w, mx, my);
+            }
             case "stack" -> {
                 if (!"row".equals(n.str("dir", "column"))) return column(g, n.children(), x, y, w, mx, my) - 4;
                 int count = Math.max(1, n.children().size());
@@ -183,6 +201,44 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
                 return y;
             }
         }
+    }
+
+    private int input(GuiGraphics g, Font font, UiNode n, int x, int y, int w, int mx, int my) {
+        boolean multi = n.bool("multiline");
+        int rows = multi ? (int) Math.max(2, Math.min(16, n.num("rows", 5))) : 1;
+        int h = rows * LINE + 8;
+        boolean focus = focused == n.id();
+        boolean hot = GlassStyle.inside(mx, my, x, y, w, h);
+        String value = localValues.getOrDefault(n.id(), n.str("value", ""));
+
+        g.fill(x, y, x + w, y + h, focus ? 0x60000000 : hot ? 0x48000000 : 0x38000000);
+        int edge = focus ? GlassStyle.ACCENT : 0x40FFFFFF;
+        g.fill(x, y, x + w, y + 1, edge);
+        g.fill(x, y + h - 1, x + w, y + h, edge);
+        g.fill(x, y, x + 1, y + h, edge);
+        g.fill(x + w - 1, y, x + w, y + h, edge);
+
+        int tx = x + 4;
+        int ty = y + 5;
+        int tw = w - 8;
+        boolean caret = focus && (System.currentTimeMillis() / 500) % 2 == 0;
+        if (value.isEmpty() && !focus) {
+            g.drawString(font, font.plainSubstrByWidth(n.str("placeholder", ""), tw), tx, ty, GlassStyle.MUTED, false);
+        } else if (!multi) {
+            String shown = font.plainSubstrByWidth(value, tw - 6, true); // tail: the caret end stays visible
+            g.drawString(font, shown, tx, ty, GlassStyle.TEXT, false);
+            if (caret) g.drawString(font, "_", tx + font.width(shown), ty, GlassStyle.ACCENT, false);
+        } else {
+            List<FormattedCharSequence> lines = new ArrayList<>(font.split(Component.literal(value), tw - 6));
+            if (lines.isEmpty() || value.endsWith("\n")) lines.add(FormattedCharSequence.EMPTY);
+            int from = Math.max(0, lines.size() - rows); // follow the end while typing
+            int ly = ty;
+            for (int i = from; i < lines.size(); i++, ly += LINE) g.drawString(font, lines.get(i), tx, ly, GlassStyle.TEXT, false);
+            if (caret) g.drawString(font, "_", tx + font.width(lines.get(lines.size() - 1)), ly - LINE, GlassStyle.ACCENT, false);
+        }
+        inputs.put(n.id(), n);
+        hits.add(new Hit(n.id(), "input", x, y, w, h, 0, 0, n.bool("readOnly")));
+        return y + h;
     }
 
     private void message(GuiGraphics g, Component text, int color) {
@@ -219,11 +275,62 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
                     double v = h.min() + (h.max() - h.min()) * Math.max(0, Math.min(1, (mx - h.x()) / h.w()));
                     host.post("{\"type\":\"change\",\"id\":" + h.id() + ",\"value\":" + v + "}");
                 }
+                case "input" -> {
+                    UiNode n = inputs.get(h.id());
+                    if (h.readOnly() || n == null) return false;
+                    focus(n);
+                }
                 default -> {}
             }
             return true;
         }
         return false;
+    }
+
+    /** Keyboard to this field until Enter/Esc. */
+    private void focus(UiNode n) {
+        int id = n.id();
+        boolean multi = n.bool("multiline");
+        int maxLen = (int) Math.max(1, Math.min(8000, n.num("maxLength", multi ? 4000 : 256)));
+        focused = id;
+        localValues.putIfAbsent(id, n.str("value", ""));
+        Minecraft.getInstance().setScreen(new TextInputScreen(new TextInputScreen.Target() {
+            @Override
+            public String value() {
+                return localValues.getOrDefault(id, "");
+            }
+
+            @Override
+            public void set(String value) {
+                localValues.put(id, value);
+                host.post(valueEvent("input", id, value));
+            }
+
+            @Override
+            public void submit() {
+                host.post(valueEvent("submit", id, localValues.getOrDefault(id, "")));
+                localValues.remove(id); // the script's tree is authoritative again (it may clear the field)
+                if (focused == id) focused = -1;
+            }
+
+            @Override
+            public int maxLength() {
+                return maxLen;
+            }
+
+            @Override
+            public boolean multiline() {
+                return multi;
+            }
+        }));
+    }
+
+    private static String valueEvent(String type, int id, String value) {
+        JsonObject e = new JsonObject();
+        e.addProperty("type", type);
+        e.addProperty("id", id);
+        e.addProperty("value", value);
+        return e.toString();
     }
 
     // --- ScriptHost.Listener (called on the script thread -> hop to the client thread) ----------
@@ -263,6 +370,11 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
         if (loc == null) return;
         Minecraft.getInstance().execute(() ->
             Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvent.createVariableRangeEvent(loc), 1f)));
+    }
+
+    @Override
+    public void pin(String title, String text) {
+        Minecraft.getInstance().execute(() -> PinnedNote.pin(title, text));
     }
 
     private static int argb(String hex, int alpha) {

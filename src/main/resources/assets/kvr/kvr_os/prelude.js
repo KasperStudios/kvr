@@ -1,5 +1,6 @@
 // KVR OS prelude — evaluated before every app (QuickJS, ES2020).
-// Host bridge: __kvr_host(op, payload) -> result (values are passed as JSON by the engine adapter).
+// Host bridge: __kvr_host(op, payload) -> result. The engine adapter passes payload as JSON and
+// JSON.parse()s the host's JSON return value, so getters below receive plain JS values.
 // Entry points called by Java: __kvr_tick(ms), __kvr_event(event).
 (function (global) {
   'use strict';
@@ -75,6 +76,23 @@
     setValue(v) { return this.set({ value: Number(v) }); }
     get value() { return this.props.value; }
   }
+  // Text field: click focuses it (keyboard captured until Enter/Esc; multiline: Ctrl+Enter).
+  // props: value, placeholder, multiline, rows, maxLength, readOnly, onInput(v), onSubmit(v)
+  class TextInput extends Widget {
+    constructor(props = {}) {
+      const p = Object.assign({ value: '', placeholder: '', multiline: false }, props);
+      const onInput = p.onInput || null;
+      const onSubmit = p.onSubmit || null;
+      delete p.onInput;
+      delete p.onSubmit;
+      p.value = String(p.value);
+      super('input', p);
+      this.onInput = onInput;
+      this.onSubmit = onSubmit;
+    }
+    setValue(v) { return this.set({ value: String(v) }); }
+    get value() { return this.props.value; }
+  }
   class Stack extends Widget {
     constructor(props) { super('stack', Object.assign({ dir: 'column' }, props)); this.children = []; }
     add(...ws) { this.children.push(...ws); markDirty(); return this; }
@@ -104,7 +122,7 @@
   };
 
   const kvr = {
-    Window, Text, Button, Slider, Stack,
+    Window, Text, Button, Slider, Stack, TextInput,
     fs: null,
     toast: (o) => host('toast', o || {}),
     log: (...a) => host('log', a.map(String).join(' ')),
@@ -116,6 +134,17 @@
       setTitle: (t) => root && root.setTitle(t),
     },
     sound: { play: (id) => host('sound.play', String(id)) },
+    // "Закрепить у плеча": read-only note at the right shoulder that follows the player
+    pin: (title, text) => host('window.pin', { title: String(title), text: String(text === undefined ? '' : text) }),
+    player: Object.freeze({
+      coords: () => host('player.coords'), // {x, y, z, dimension}
+      name: () => host('player.name'),
+    }),
+    players: Object.freeze({
+      online: () => host('players.online') || [], // other players on the server, sorted
+    }),
+    msg: null,
+    get lang() { return host('client.lang') || 'en_us'; }, // e.g. 'ru_ru'
     get now() { return now; },
   };
   Object.freeze(kvr.window);
@@ -149,6 +178,30 @@
     if (err) p.reject(err); else p.resolve(data);
   };
   global.kvr = kvr;
+
+  // --- kvr.msg: KVR Messenger (server relay, glasses required on both ends) ---------------------
+  // send(to, text, {attach:'/home/x.txt'}) -> Promise; errors: OFFLINE, NO_GLASSES,
+  // RECIPIENT_GLASSES_OFF, RECIPIENT_FULL, RATE_LIMIT, or a VFS code for the attachment (NOT_FOUND,
+  // DENIED, ...). Incoming: kvr.msg.on(m => m.from/text/file).
+  let msgSeq = 1;
+  const msgPending = new Map();
+  kvr.msg = Object.freeze({
+    send: (to, text, opts = {}) => {
+      const req = msgSeq++;
+      const p = new Promise((resolve, reject) => msgPending.set(req, { resolve, reject }));
+      host('msg.send', { req, to: String(to), text: String(text === undefined ? '' : text), attach: opts.attach ? String(opts.attach) : '' });
+      return p;
+    },
+    pending: () => host('msg.pending') || [], // messages that arrived while the app was closed
+    on: (fn) => on('msg', fn),
+  });
+  const msgAck = (e) => {
+    const p = msgPending.get(e.req);
+    if (!p) return;
+    msgPending.delete(e.req);
+    if (e.ok) p.resolve(true);
+    else p.reject(Object.assign(new Error(e.error), { code: e.error }));
+  };
   global.console = { log: kvr.log, warn: kvr.log, error: kvr.log };
 
   global.__kvr_tick = (ms) => {
@@ -167,12 +220,20 @@
 
   global.__kvr_event = (e) => {
     if (e.type === 'fs') { fsReply(e); commit(); return; }
+    if (e.type === 'msg_ack') { msgAck(e); commit(); return; }
+    if (e.type === 'msg') { emitLocal('msg', e); commit(); return; }
     const w = live.get(e.id);
     if (e.type === 'click' && w && typeof w.onClick === 'function') w.onClick(e);
     if (e.type === 'change' && w) {
       w.props.value = e.value;
       markDirty();
       if (typeof w.onChange === 'function') w.onChange(e.value);
+    }
+    if ((e.type === 'input' || e.type === 'submit') && w) {
+      w.props.value = String(e.value);
+      markDirty();
+      if (e.type === 'input' && typeof w.onInput === 'function') w.onInput(w.props.value);
+      if (e.type === 'submit' && typeof w.onSubmit === 'function') w.onSubmit(w.props.value);
     }
     emitLocal('ui:' + e.type, e);
     commit();

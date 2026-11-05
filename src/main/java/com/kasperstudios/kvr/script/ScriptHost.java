@@ -1,9 +1,13 @@
 package com.kasperstudios.kvr.script;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import com.kasperstudios.kvr.KVR;
 import com.kasperstudios.kvr.script.ui.UiNode;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -33,6 +37,8 @@ public final class ScriptHost {
         void shake(float intensity, int durationMs);
         void resize(int width, int height);
         void sound(String id);
+        /** {@code kvr.pin(title, text)}: pinned note at the right shoulder. */
+        void pin(String title, String text);
     }
 
     private static final Map<ScriptHost, Boolean> RUNNING = new ConcurrentHashMap<>();
@@ -96,10 +102,18 @@ public final class ScriptHost {
 
     /** UI event from the window (client thread): {@code {"type":"click","id":4}}. */
     public void post(String eventJson) {
-        if (inbox.size() < 64) inbox.add(eventJson);
+        if (inbox.size() < 128) inbox.add(eventJson);
     }
 
     public State state() { return state; }
+
+    /** The live host of an app (Messenger delivery etc.), if it is running. */
+    public static Optional<ScriptHost> running(String appId) {
+        for (ScriptHost h : RUNNING.keySet()) {
+            if (h.app.id().equals(appId) && !h.stopped) return Optional.of(h);
+        }
+        return Optional.empty();
+    }
     public String error() { return error; }
     @Nullable public UiNode ui() { return ui.get(); }
     public VrApp app() { return app; }
@@ -171,7 +185,10 @@ public final class ScriptHost {
         KVR.logger().warn("KVR app {} crashed: {}", app.id(), error);
     }
 
-    /** Host bridge, called on the script thread: args[0] = op (JSON string), args[1] = payload (JSON). */
+    /**
+     * Host bridge, called on the script thread: args[0] = op (JSON string), args[1] = payload (JSON).
+     * Returns a JSON value; most ops return {@code null}, getters return data.
+     */
     private String host(String[] args) {
         String op = args.length > 0 ? JsonParser.parseString(args[0]).getAsString() : "";
         String payload = args.length > 1 ? args[1] : "null";
@@ -190,10 +207,80 @@ public final class ScriptHost {
                 var o = JsonParser.parseString(payload).getAsJsonObject();
                 listener.resize(o.has("width") ? o.get("width").getAsInt() : 0, o.has("height") ? o.get("height").getAsInt() : 0);
             }
+            case "window.pin" -> {
+                var o = JsonParser.parseString(payload).getAsJsonObject();
+                String title = str(o, "title", app.name());
+                String text = str(o, "text", "");
+                listener.pin(title.length() > 40 ? title.substring(0, 40) : title, text.length() > 2000 ? text.substring(0, 2000) : text);
+            }
             case "sound.play" -> listener.sound(JsonParser.parseString(payload).getAsString());
+            case "fs" -> fs(JsonParser.parseString(payload).getAsJsonObject());
+            case "player.coords" -> {
+                ClientInfo.Snapshot s = ClientInfo.get();
+                JsonObject o = new JsonObject();
+                o.addProperty("x", s.x());
+                o.addProperty("y", s.y());
+                o.addProperty("z", s.z());
+                o.addProperty("dimension", s.dimension());
+                return o.toString();
+            }
+            case "player.name" -> {
+                return new JsonPrimitive(ClientInfo.get().name()).toString();
+            }
+            case "client.lang" -> {
+                return new JsonPrimitive(ClientInfo.get().language()).toString();
+            }
+            case "players.online" -> {
+                JsonArray arr = new JsonArray();
+                ClientInfo.get().online().forEach(arr::add);
+                return arr.toString();
+            }
+            case "msg.send" -> msgSend(JsonParser.parseString(payload).getAsJsonObject());
+            case "msg.pending" -> {
+                return com.kasperstudios.kvr.messenger.client.MessengerClient.drainPending();
+            }
             default -> KVR.logger().debug("[{}] unknown host op {}", app.id(), op);
         }
         return "null";
+    }
+
+    private static String str(JsonObject o, String key, String def) {
+        return o.has(key) && o.get(key).isJsonPrimitive() ? o.get(key).getAsString() : def;
+    }
+
+    /** kvr.msg.send: relayed by the server; the result comes back as a {@code {type:'msg_ack'}} event. */
+    private void msgSend(JsonObject o) {
+        int req = o.get("req").getAsInt();
+        com.kasperstudios.kvr.messenger.client.MessengerClient.send(str(o, "to", ""), str(o, "text", ""), str(o, "attach", ""), ack -> {
+            JsonObject e = new JsonObject();
+            e.addProperty("type", "msg_ack");
+            e.addProperty("req", req);
+            e.addProperty("ok", ack.ok());
+            e.addProperty("error", ack.error());
+            post(e.toString());
+        });
+    }
+
+    /** kvr.fs: async round trip to the server VFS; the reply comes back as a {@code {type:'fs'}} event. */
+    private void fs(JsonObject o) {
+        int req = o.get("req").getAsInt();
+        com.kasperstudios.kvr.vfs.VfsProtocol.Op op;
+        try {
+            op = com.kasperstudios.kvr.vfs.VfsProtocol.Op.valueOf(o.get("op").getAsString());
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        String path = o.has("path") ? o.get("path").getAsString() : "/";
+        String text = o.has("text") && !o.get("text").isJsonNull() ? o.get("text").getAsString() : "";
+        com.kasperstudios.kvr.vfs.client.VfsClient.request(op, app.id(), path, text, r -> {
+            JsonObject e = new JsonObject();
+            e.addProperty("type", "fs");
+            e.addProperty("req", req);
+            e.addProperty("ok", r.ok());
+            e.addProperty("error", r.error());
+            e.addProperty("data", r.data());
+            post(e.toString());
+        });
     }
 
     // --- watchdog monitor ----------------------------------------------------------------------

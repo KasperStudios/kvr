@@ -48,5 +48,7 @@
   "kvr.os.soon": "Будет в следующих заданиях Блока 5",
   "block.kvr.dock_plate": "Док-плита",
   "item.kvr.solar_upgrade": "Солнечный модуль",
-  "item.kvr.hackglasses": "Хакерские очки"
+  "item.kvr.hackglasses": "Хакерские очки",
+  "kvr.input.hint": "Ввод в окно. Enter или Esc — готово, Ctrl+V — вставить",
+  "kvr.input.hint_multi": "Ввод в окно. Enter — новая строка, Ctrl+Enter или Esc — готово, Ctrl+V — вставить"
 }

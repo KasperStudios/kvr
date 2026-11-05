@@ -88,6 +88,13 @@ packages all Matrix entries, and the core tests pass on every node.
       - Fixed-step clock: `ScriptClock` implementing CPU tiers (10/20/50/100/200 Hz) with max 3-tick catch-up limit.
       - Watchdog timer: `Watchdog` enforcing 25% tick budget limit, strike counter (3 slow ticks -> NOT_RESPONDING), and 4x budget instant KILL.
       - Unit tests: `ScriptClockTest`, `WatchdogTest` (109 tests total passed, 0 failures).
+- [x] Block 5e System Apps & TextInput (Task 0011 from Retool):
+      - Text input system: `TextInput` widget, `TextInputScreen` capturing keyboard focus for floating 3D windows with single/multiline support, Enter, Ctrl+Enter, and Ctrl+V clipboard pasting.
+      - Shoulder pin: `PinnedNote` floating at right shoulder via `LazyFollowAnchor` without consuming RAM slots.
+      - Messenger protocol: `MessengerProtocol`, `MessengerServer` (rate limiting 5 msg / 5s, server file forwarding between `/home/` and `/home/inbox/`), `MessengerClient` (toasts + pending offline message queue).
+      - `prelude.js` expanded: `kvr.TextInput`, `kvr.pin()`, `kvr.player.coords()/name()`, `kvr.players.online()`, `kvr.lang`, `kvr.msg.send/pending/on()`.
+      - Builtin apps: Notes (notes manager, VFS integration, pinning), Calc (math parser, stack & shulker converter), Messenger (contacts, chat, coordinate sharing, file attachments).
+      - Unit tests: `MessengerProtocolTest` (124 tests total passed, 0 failures).
 - [x] Block 5b Virtual File System (Task 0010 from Retool):
       - Server-side VFS bound to glasses stack UUID: files stored in `<world>/kvr/vfs/<uuid>/` (steal glasses = steal files).
       - Strict sandbox enforcement in `VfsPath`: `/home/` & `/tmp/` shared, `/data/<app>/` private to app, `/apps/` read-only, `/system/` denied.

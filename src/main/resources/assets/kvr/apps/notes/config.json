@@ -1,0 +1,8 @@
+{
+  "id": "notes",
+  "name": "Notes",
+  "version": "1.0.0",
+  "author": "Kasper Studios",
+  "window_opts": { "width": 300, "height": 270 },
+  "permissions": ["fs.home", "player.coords"]
+}
