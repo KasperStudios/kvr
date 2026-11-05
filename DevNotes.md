@@ -88,6 +88,14 @@ packages all Matrix entries, and the core tests pass on every node.
       - Fixed-step clock: `ScriptClock` implementing CPU tiers (10/20/50/100/200 Hz) with max 3-tick catch-up limit.
       - Watchdog timer: `Watchdog` enforcing 25% tick budget limit, strike counter (3 slow ticks -> NOT_RESPONDING), and 4x budget instant KILL.
       - Unit tests: `ScriptClockTest`, `WatchdogTest` (109 tests total passed, 0 failures).
+- [x] Block 5a UI Harness & App Runtime (Task 0008 from Retool):
+      - `ScriptHost`: per-app background thread daemon with watchdog monitor thread and UI event queue.
+      - `prelude.js`: full declarative JS API (`kvr.Window`, `Text`, `Button`, `Slider`, `Stack`, `setTimeout`/`setInterval`, `kvr.toast`, `window.shake`, `sound.play`).
+      - `ModuleShim`: transforms `import { ... } from 'kvr'` into global destructuring for modern JS support.
+      - `UiNode`: AST parser for JS widget tree committed across threads with 512 max node protection.
+      - `ScriptWindow`: floating app window occupying RAM slots, rendering dynamic UI nodes, buttons, sliders, gradients and shake.
+      - Bundled apps: `Hello KVR` (counter, clock, toasts) and `KAV — PonoScan 3000` (full scam scan, red alert, explosion, reboot).
+      - Unit tests: `ModuleShimTest`, `UiNodeTest` (115 tests total passed, 0 failures).
 
 ### In progress
 - [x] Block 2b (container-menu based, decided by the Creator). Landed: glasses item + stack codec +

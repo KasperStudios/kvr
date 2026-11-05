@@ -1,0 +1,8 @@
+{
+  "id": "hello",
+  "name": "Hello KVR",
+  "version": "1.0.0",
+  "author": "Kasper Studios",
+  "window_opts": { "width": 240, "height": 150 },
+  "permissions": []
+}
