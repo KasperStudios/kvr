@@ -24,11 +24,11 @@ public interface KVRClientProvider {
     /** Level render, after translucent blocks. */
     void onWorldRender(WorldRender callback);
 
-    /** After a screen's init(); {@code addWidget} adds a renderable, clickable widget to it. */
-    void onScreenInit(ScreenInit callback);
-
     /** Screen-space overlay after the vanilla GUI (used only for the overload vignette). */
     void onHudRender(Consumer<net.minecraft.client.gui.GuiGraphics> callback);
+
+    /** After a screen's init(); {@code addWidget} adds a renderable, clickable widget to it. */
+    void onScreenInit(ScreenInit callback);
 
     @FunctionalInterface
     interface WorldRender {

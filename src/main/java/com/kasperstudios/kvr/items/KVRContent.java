@@ -65,6 +65,7 @@ public final class KVRContent {
         ITEM_FACTORIES.put("tier_upgrader_template",
                 () -> new TierUpgraderItem(itemProperties("tier_upgrader_template")));
         ITEM_FACTORIES.put("glasses", () -> new GlassesItem(itemProperties("glasses").stacksTo(1)));
+        ITEM_FACTORIES.put("hackglasses", () -> new GlassesItem(itemProperties("hackglasses").stacksTo(1)));
 
         for (ComponentTier tier : ComponentTier.values()) {
             ITEM_FACTORIES.put(chassisPath(tier),

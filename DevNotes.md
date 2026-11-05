@@ -76,6 +76,12 @@ packages all Matrix entries, and the core tests pass on every node.
         physical power key `PowerKey` ('O'), floating `PowerWindow`, screen-space vignette `AlarmOverlay`, `onHudRender` hook.
       - Full test suite: `DockLogicTest`, `PowerDataTest` additions (95 tests total passed, 0 failures).
       - Both Fabric and NeoForge jars fully built and verified.
+- [x] Block 4 Artifact: HackGlasses & MITM Projection (Task 0006 from Retool):
+      - Registered `kvr:hackglasses` as standalone secret artifact without crafting, creative tabs or battery requirements.
+      - `KVRLoot` facade + `FabricKVRLootProvider` & `NeoForgeKVRLootProvider`: 0.5% drop in any generated chest.
+      - `SpyMath`, `WindowSummary`, `SpyRelay`, `SpyClient`, `GhostRenderer`: looking at a player with KVR glasses projects their
+        floating windows and battery percentage with green `hack_grid` overlay in real-time.
+      - Unit tests: `SpyMathTest`, `WindowSummaryTest` (102 tests total passed, 0 failures).
 
 ### In progress
 - [x] Block 2b (container-menu based, decided by the Creator). Landed: glasses item + stack codec +

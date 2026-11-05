@@ -12,6 +12,7 @@ public final class KVRServer {
 
     public interface Provider {
         void onRegisterCommands(Consumer<CommandDispatcher<CommandSourceStack>> callback);
+        default void onServerTick(Consumer<net.minecraft.server.MinecraftServer> callback) {}
     }
 
     private static Provider provider;
@@ -26,5 +27,9 @@ public final class KVRServer {
     public static Provider get() {
         if (provider == null) throw new IllegalStateException("KVRServer is not installed: call KVRServer.install(...) from the loader entrypoint before KVRPower.init()");
         return provider;
+    }
+
+    public static void onServerTick(Consumer<net.minecraft.server.MinecraftServer> callback) {
+        get().onServerTick(callback);
     }
 }
