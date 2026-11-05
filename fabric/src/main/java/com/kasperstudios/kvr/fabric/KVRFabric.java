@@ -24,16 +24,6 @@ public final class KVRFabric implements ModInitializer {
         KVR.init();
 
         // Register Creative Mode Tab for Fabric
-        net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents.modifyEntriesEvent(
-            net.minecraft.world.item.CreativeModeTabs.TOOLS_AND_UTILITIES
-        ).register(entries -> {
-            KVRContent.itemFactories().forEach((path, factory) -> {
-                if (!path.equals("hackglasses")) {
-                    net.minecraft.world.item.Item it = factory.get();
-                    if (it != null) entries.accept(it);
-                }
-            });
-        });
         registerKvrTab();
     }
 
@@ -50,10 +40,9 @@ public final class KVRFabric implements ModInitializer {
                 .title(net.minecraft.network.chat.Component.translatable("itemGroup.kvr.main"))
                 .icon(() -> new net.minecraft.world.item.ItemStack(KVRContent.glasses()))
                 .displayItems((params, output) -> {
-                    KVRContent.itemFactories().forEach((path, factory) -> {
-                        if (!path.equals("hackglasses")) {
-                            net.minecraft.world.item.Item it = factory.get();
-                            if (it != null) output.accept(it);
+                    KVRContent.ITEMS.forEach((path, item) -> {
+                        if (!path.equals("hackglasses") && item != null) {
+                            output.accept(item);
                         }
                     });
                 })

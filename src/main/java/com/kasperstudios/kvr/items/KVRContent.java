@@ -35,8 +35,8 @@ public final class KVRContent {
 
     private static final Map<String, Supplier<Item>> ITEM_FACTORIES = new LinkedHashMap<>();
     private static final Map<String, Supplier<Block>> BLOCK_FACTORIES = new LinkedHashMap<>();
-    private static final Map<String, Item> ITEMS = new ConcurrentHashMap<>();
-    private static final Map<String, Block> BLOCKS = new ConcurrentHashMap<>();
+    public static final Map<String, Item> ITEMS = new ConcurrentHashMap<>();
+    public static final Map<String, Block> BLOCKS = new ConcurrentHashMap<>();
 
     private static boolean registered;
 
@@ -51,7 +51,7 @@ public final class KVRContent {
                 .strength(5.0F, 6.0F)
                 .requiresCorrectToolForDrops()
                 .sound(SoundType.METAL)));
-        BLOCK_FACTORIES.put("dock_plate", () -> new Block(blockProperties("dock_plate")
+        BLOCK_FACTORIES.put("dock_plate", () -> new com.kasperstudios.kvr.dock.DockPlateBlock(blockProperties("dock_plate")
                 .mapColor(MapColor.METAL)
                 .strength(2.0F, 3.0F)
                 .requiresCorrectToolForDrops()
