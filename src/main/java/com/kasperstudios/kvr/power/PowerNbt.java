@@ -9,28 +9,37 @@ import net.minecraft.world.item.ItemStack;
  * Optional / {@code ...Or(key, default)}. Using {@code custom_data} avoids registering a new
  * DataComponentType just for this.
  */
-final class PowerNbt {
+public final class PowerNbt {
 
     static final String KEY = "kvr_power";
 
     private PowerNbt() {}
 
-    static CompoundTag read(ItemStack stack) {
+    /** Any KVR compound stored on a stack (power, VFS id, ...). */
+    public static CompoundTag readKey(ItemStack stack, String key) {
         //? if >=1.20.5 {
         net.minecraft.world.item.component.CustomData data = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA);
-        return data == null ? new CompoundTag() : getCompound(data.copyTag(), KEY);
+        return data == null ? new CompoundTag() : getCompound(data.copyTag(), key);
         //?} else {
         /*CompoundTag tag = stack.getTag();
-        return tag == null ? new CompoundTag() : getCompound(tag, KEY);
+        return tag == null ? new CompoundTag() : getCompound(tag, key);
         *///?}
     }
 
-    static void write(ItemStack stack, CompoundTag power) {
+    public static void writeKey(ItemStack stack, String key, CompoundTag value) {
         //? if >=1.20.5 {
-        net.minecraft.world.item.component.CustomData.update(net.minecraft.core.component.DataComponents.CUSTOM_DATA, stack, all -> all.put(KEY, power));
+        net.minecraft.world.item.component.CustomData.update(net.minecraft.core.component.DataComponents.CUSTOM_DATA, stack, all -> all.put(key, value));
         //?} else {
-        /*stack.getOrCreateTag().put(KEY, power);
+        /*stack.getOrCreateTag().put(key, value);
         *///?}
+    }
+
+    static CompoundTag read(ItemStack stack) {
+        return readKey(stack, KEY);
+    }
+
+    static void write(ItemStack stack, CompoundTag power) {
+        writeKey(stack, KEY, power);
     }
 
     static CompoundTag getCompound(CompoundTag t, String k) {
@@ -57,7 +66,7 @@ final class PowerNbt {
         //?}
     }
 
-    static String getString(CompoundTag t, String k, String def) {
+    public static String getString(CompoundTag t, String k, String def) {
         //? if >=1.21.5 {
         /*return t.getStringOr(k, def);
         *///?} else {

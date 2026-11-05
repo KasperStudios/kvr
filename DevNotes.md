@@ -88,7 +88,15 @@ packages all Matrix entries, and the core tests pass on every node.
       - Fixed-step clock: `ScriptClock` implementing CPU tiers (10/20/50/100/200 Hz) with max 3-tick catch-up limit.
       - Watchdog timer: `Watchdog` enforcing 25% tick budget limit, strike counter (3 slow ticks -> NOT_RESPONDING), and 4x budget instant KILL.
       - Unit tests: `ScriptClockTest`, `WatchdogTest` (109 tests total passed, 0 failures).
-- [x] Block 5a UI Harness & App Runtime (Task 0008 & 0009 from Retool):
+- [x] Block 5b Virtual File System (Task 0010 from Retool):
+      - Server-side VFS bound to glasses stack UUID: files stored in `<world>/kvr/vfs/<uuid>/` (steal glasses = steal files).
+      - Strict sandbox enforcement in `VfsPath`: `/home/` & `/tmp/` shared, `/data/<app>/` private to app, `/apps/` read-only, `/system/` denied.
+      - Path normalization: dot rejection, path traversal protection, max length 128, max depth 6.
+      - Storage quotas from hardware tier: T1 256KB (2 files), T2 1MB (5 files), T3 8MB, T4 64MB, T5 512MB.
+      - Atomic writes (`.tmp` move), recursive directory cleanup, 128KB write / 256KB read caps per network call.
+      - `VfsProtocol` and `VfsServer` with per-player rate limiting (40 req/s flood guard).
+      - `VfsClient` with async callback dispatch to client thread and 256 max pending request limiter.
+      - Unit tests: `VfsPathTest`, `VfsProtocolTest`, `VfsStoreTest` (122 tests total passed, 0 failures).
       - `ScriptHost`: per-app background thread daemon with watchdog monitor thread and UI event queue.
       - `prelude.js`: full declarative JS API (`kvr.Window`, `Text`, `Button`, `Slider`, `Stack`, `setTimeout`/`setInterval`, `kvr.toast`, `window.shake`, `sound.play`).
       - `ModuleShim`: transforms `import { ... } from 'kvr'` into global destructuring for modern JS support.
