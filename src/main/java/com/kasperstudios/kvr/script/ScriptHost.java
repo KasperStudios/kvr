@@ -21,8 +21,20 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Runs one app: its own daemon thread (never the render thread, DevNotes 7), the CPU-tier
  * {@link ScriptClock}, the {@link Watchdog}, an inbox of UI events, and the latest committed
- * {@link UiNode} tree. A shared monitor thread interrupts any tick that runs past the kill
- * deadline, so {@code while(true){}} cannot hang the game.
+ * {@link UiNode} tree. A shared monitor thread interrupts any call that runs away, so
+ * {@code while(true){}} cannot hang the game.
+ *
+ * <p>0022 — "every app crashes after a while with the same error": the watchdog measured WALL-CLOCK time,
+ * so a garbage-collector pause, a world autosave or the OS giving the core to the render thread during a
+ * script tick counted as script time, and one such stall killed the app for good ("script exceeded 50 ms").
+ * Now everything is measured in the script thread's own CPU time ({@link java.lang.management.ThreadMXBean}),
+ * which stands still during GC pauses and while the thread is not scheduled:
+ * <ul>
+ *   <li>soft (SPEC budget, {@link Watchdog}): slow ticks in a row → "not responding" overlay, recovers by itself;
+ *       ticks under {@link #SOFT_FLOOR_NANOS} of CPU are never judged (the wasm interpreter needs a few ms);</li>
+ *   <li>hard: only a call that burns {@link #HARD_KILL_CPU_NANOS} of CPU (a real endless loop) is killed,
+ *       or one stuck for {@link #HARD_KILL_WALL_NANOS} of wall time.</li>
+ * </ul>
  *
  * <p>Side effects the app asks for (toast, shake, resize, sound) are handed to {@link Listener},
  * which the window runs on the client thread.
@@ -48,8 +60,15 @@ public final class ScriptHost {
     static final long BOOT_LIMIT_NANOS = 5_000_000_000L;
     /** First seconds after boot: the JVM is still warming the wasm interpreter, so ticks are slow. */
     static final long GRACE_NANOS = 3_000_000_000L;
-    /** Kill deadline during the grace period (instead of 4x budget, which is 5 ms at T5). */
-    static final long GRACE_KILL_NANOS = 250_000_000L;
+    /** One call (tick or UI event) may burn this much CPU before it is treated as an endless loop. */
+    static final long HARD_KILL_CPU_NANOS = 1_000_000_000L;
+    /** … or hang this long in wall time (a deadlock, or no per-thread CPU clock on this JVM). */
+    static final long HARD_KILL_WALL_NANOS = 15_000_000_000L;
+    static final long NO_CPU_CLOCK_KILL_NANOS = 3_000_000_000L;
+    /** Ticks cheaper than this (CPU) are never judged by the soft watchdog. */
+    static final long SOFT_FLOOR_NANOS = 20_000_000L;
+    private static final java.lang.management.ThreadMXBean THREADS = java.lang.management.ManagementFactory.getThreadMXBean();
+    private static final boolean CPU_CLOCK = cpuClockAvailable();
     private static final ScheduledExecutorService MONITOR = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "KVR-Script-Watchdog");
         t.setDaemon(true);
@@ -57,7 +76,17 @@ public final class ScriptHost {
     });
 
     static {
-        MONITOR.scheduleAtFixedRate(ScriptHost::checkAll, 1, 1, TimeUnit.MILLISECONDS);
+        MONITOR.scheduleAtFixedRate(ScriptHost::checkAll, 5, 5, TimeUnit.MILLISECONDS);
+    }
+
+    private static boolean cpuClockAvailable() {
+        try {
+            if (!THREADS.isThreadCpuTimeSupported()) return false;
+            if (!THREADS.isThreadCpuTimeEnabled()) THREADS.setThreadCpuTimeEnabled(true);
+            return THREADS.getCurrentThreadCpuTime() >= 0;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     private final VrApp app;
@@ -71,6 +100,9 @@ public final class ScriptHost {
     private volatile State state = State.STARTING;
     private volatile String error = "";
     private volatile long tickStart;
+    /** Script thread CPU time when the current call started (valid while {@link #tickStart} != 0). */
+    private volatile long tickCpuStart;
+    private volatile long threadId;
     private volatile long bootDeadline;
     private volatile long graceUntil;
     private volatile boolean killed;
@@ -131,6 +163,7 @@ public final class ScriptHost {
     // --- script thread -------------------------------------------------------------------------
 
     private void run() {
+        threadId = Thread.currentThread().getId();
         JsEngine e;
         try {
             e = ScriptEngines.create();
@@ -185,7 +218,11 @@ public final class ScriptHost {
 
     private String killMessage() {
         if (state == State.STARTING) return "Watchdog: app did not start within " + BOOT_LIMIT_NANOS / 1_000_000_000L + " s";
-        return "Watchdog: script exceeded " + (watchdog.killAfterNanos() / 1_000_000.0) + " ms in one tick";
+        return "Watchdog: one call used more than " + HARD_KILL_CPU_NANOS / 1_000_000L + " ms of CPU (endless loop?)";
+    }
+
+    private static long cpuNow() {
+        return CPU_CLOCK ? THREADS.getCurrentThreadCpuTime() : System.nanoTime();
     }
 
     private interface Call {
@@ -193,15 +230,18 @@ public final class ScriptHost {
     }
 
     private void timed(Call call) throws JsEngine.JsException {
-        long start = System.nanoTime();
-        tickStart = start;
+        long cpu0 = cpuNow();
+        tickCpuStart = cpu0; // before tickStart: the monitor reads them in the opposite order
+        tickStart = System.nanoTime();
         try {
             call.run();
         } finally {
             tickStart = 0;
         }
         if (System.nanoTime() < graceUntil) return; // warm-up: do not judge the interpreter yet
-        switch (watchdog.record(System.nanoTime() - start)) {
+        long cpu = cpuNow() - cpu0;
+        // KILL from the soft watchdog only means "one heavy tick": the call finished, nothing to kill
+        switch (watchdog.record(cpu < SOFT_FLOOR_NANOS ? 0 : cpu)) {
             case NOT_RESPONDING -> {
                 if (state != State.NOT_RESPONDING) listener.notResponding();
                 state = State.NOT_RESPONDING;
@@ -329,8 +369,17 @@ public final class ScriptHost {
             if (h.killed) continue;
             long start = h.tickStart;
             long boot = h.bootDeadline;
-            long limit = now < h.graceUntil ? Math.max(h.watchdog.killAfterNanos(), GRACE_KILL_NANOS) : h.watchdog.killAfterNanos();
-            if ((start != 0 && now - start > limit) || (boot != 0 && now > boot)) {
+            boolean runaway = false;
+            if (start != 0) {
+                long wall = now - start;
+                if (CPU_CLOCK && h.threadId != 0) {
+                    long cpu = THREADS.getThreadCpuTime(h.threadId); // -1 if the thread is gone
+                    runaway = (cpu >= 0 && cpu - h.tickCpuStart > HARD_KILL_CPU_NANOS) || wall > HARD_KILL_WALL_NANOS;
+                } else {
+                    runaway = wall > NO_CPU_CLOCK_KILL_NANOS;
+                }
+            }
+            if (runaway || (boot != 0 && now > boot)) {
                 h.killed = true;
                 JsEngine e = h.engine;
                 if (e != null) e.interrupt();
