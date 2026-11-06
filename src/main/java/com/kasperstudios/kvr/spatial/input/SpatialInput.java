@@ -80,7 +80,8 @@ public final class SpatialInput {
         }
 
         handleAttack(mc, view, ray);
-        if (glassesWorn.getAsBoolean()) handleUse(mc, view, ray);
+        // Alt + RMB opens the gesture wheel or uses windows whenever Alt mode is active
+        handleUse(mc, view, ray);
     }
 
     /** Who gets the keyboard this tick (see class doc). */

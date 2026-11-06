@@ -25,6 +25,7 @@ public final class PowerData {
 
     public double charge() { return charge; }
     public double wear() { return wear; }
+    public long bootUntil() { return bootUntil; }
     public PowerState state() { return state; }
     public boolean overloading() { return overloadDeadline != NONE; }
 

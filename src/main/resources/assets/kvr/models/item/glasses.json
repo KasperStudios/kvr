@@ -1,420 +1,89 @@
 {
-  "ambientocclusion": false,
+  "__comment": "KVR glasses, 3D (0017). On the head vanilla CustomHeadLayer renders it with display.head: model centre = head centre, the head spans 1.6..14.4 on every axis, north (z=0) = face. Shell faces use the same sprite as the icon (tintindex 0 = dye colour), the glass sits inset behind the open visor.",
+  "gui_light": "front",
   "textures": {
-    "glasses": "kvr:block/dock_glasses",
-    "particle": "kvr:block/dock_glasses",
-    "layer0": "kvr:item/glasses"
-  },
-  "display": {
-    "head": {
-      "rotation": [
-        0,
-        0,
-        0
-      ],
-      "translation": [
-        0,
-        -2.5,
-        -0.5
-      ],
-      "scale": [
-        1.18,
-        1.18,
-        1.18
-      ]
-    },
-    "thirdperson_righthand": {
-      "rotation": [
-        0,
-        90,
-        -35
-      ],
-      "translation": [
-        0,
-        1.25,
-        -3.5
-      ],
-      "scale": [
-        0.85,
-        0.85,
-        0.85
-      ]
-    },
-    "firstperson_righthand": {
-      "rotation": [
-        0,
-        -90,
-        25
-      ],
-      "translation": [
-        1.13,
-        3.2,
-        1.13
-      ],
-      "scale": [
-        0.68,
-        0.68,
-        0.68
-      ]
-    },
-    "gui": {
-      "rotation": [
-        30,
-        225,
-        0
-      ],
-      "translation": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        0.7,
-        0.7,
-        0.7
-      ]
-    },
-    "ground": {
-      "rotation": [
-        0,
-        0,
-        0
-      ],
-      "translation": [
-        0,
-        2,
-        0
-      ],
-      "scale": [
-        0.5,
-        0.5,
-        0.5
-      ]
-    },
-    "fixed": {
-      "rotation": [
-        0,
-        180,
-        0
-      ],
-      "translation": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ]
-    }
+    "shell": "kvr:item/glasses",
+    "glass": "kvr:item/glasses_overlay",
+    "particle": "kvr:item/glasses"
   },
   "elements": [
     {
       "name": "shell",
-      "from": [
-        3.5,
-        4.5,
-        6.5
-      ],
-      "to": [
-        12.5,
-        5.5,
-        9.5
-      ],
+      "from": [1.2, 4.8, 0.4],
+      "to": [14.8, 9.6, 1.6],
       "faces": {
-        "up": {
-          "uv": [
-            0,
-            0,
-            9,
-            3
-          ],
-          "texture": "#glasses",
-          "tintindex": 0
-        },
-        "down": {
-          "uv": [
-            0,
-            6,
-            9,
-            9
-          ],
-          "texture": "#glasses",
-          "tintindex": 0
-        },
-        "north": {
-          "uv": [
-            0,
-            4,
-            9,
-            5
-          ],
-          "texture": "#glasses",
-          "tintindex": 0
-        },
-        "south": {
-          "uv": [
-            0,
-            4,
-            9,
-            5
-          ],
-          "texture": "#glasses",
-          "tintindex": 0
-        },
-        "east": {
-          "uv": [
-            10,
-            4,
-            13,
-            5
-          ],
-          "texture": "#glasses",
-          "tintindex": 0
-        },
-        "west": {
-          "uv": [
-            10,
-            4,
-            13,
-            5
-          ],
-          "texture": "#glasses",
-          "tintindex": 0
-        }
+        "north": { "uv": [1, 5, 15, 11], "texture": "#shell", "tintindex": 0 },
+        "south": { "uv": [1, 5, 15, 11], "texture": "#shell", "tintindex": 0 },
+        "up": { "uv": [1, 4, 15, 5], "texture": "#shell", "tintindex": 0 },
+        "down": { "uv": [1, 10, 15, 11], "texture": "#shell", "tintindex": 0 },
+        "west": { "uv": [1, 5, 2, 10], "texture": "#shell", "tintindex": 0 },
+        "east": { "uv": [14, 5, 15, 10], "texture": "#shell", "tintindex": 0 }
       }
     },
     {
       "name": "glass",
-      "from": [
-        4.5,
-        5.48,
-        7.5
-      ],
-      "to": [
-        11.5,
-        5.48,
-        8.5
-      ],
+      "from": [2.0, 5.6, 1.0],
+      "to": [14.0, 9.0, 1.0],
+      "shade": false,
       "faces": {
-        "up": {
-          "uv": [
-            0,
-            10,
-            7,
-            11
-          ],
-          "texture": "#glasses"
-        }
+        "north": { "uv": [2, 5, 14, 10], "texture": "#glass" }
+      }
+    },
+    {
+      "name": "status_led",
+      "from": [12.4, 5.0, 0.3],
+      "to": [13.0, 5.6, 0.4],
+      "shade": false,
+      "faces": {
+        "north": { "uv": [13, 10, 14, 11], "texture": "#glass" }
       }
     },
     {
       "name": "strap_left",
-      "from": [
-        3.5,
-        4.5,
-        9.5
-      ],
-      "to": [
-        4.5,
-        5.0,
-        13.5
-      ],
+      "from": [0.8, 6.4, 1.2],
+      "to": [1.2, 8.0, 14.8],
       "faces": {
-        "up": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "down": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "north": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "south": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "east": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "west": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        }
+        "north": { "uv": [0, 7, 1, 8], "texture": "#glass" },
+        "south": { "uv": [0, 7, 1, 8], "texture": "#glass" },
+        "up": { "uv": [0, 6, 1, 7], "texture": "#glass" },
+        "down": { "uv": [0, 8, 1, 9], "texture": "#glass" },
+        "west": { "uv": [0, 6, 1, 9], "texture": "#glass" },
+        "east": { "uv": [0, 6, 1, 9], "texture": "#glass" }
       }
     },
     {
       "name": "strap_right",
-      "from": [
-        11.5,
-        4.5,
-        9.5
-      ],
-      "to": [
-        12.5,
-        5.0,
-        13.5
-      ],
+      "from": [14.8, 6.4, 1.2],
+      "to": [15.2, 8.0, 14.8],
       "faces": {
-        "up": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "down": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "north": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "south": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "east": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "west": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        }
+        "north": { "uv": [15, 7, 16, 8], "texture": "#glass" },
+        "south": { "uv": [15, 7, 16, 8], "texture": "#glass" },
+        "up": { "uv": [15, 6, 16, 7], "texture": "#glass" },
+        "down": { "uv": [15, 8, 16, 9], "texture": "#glass" },
+        "west": { "uv": [15, 6, 16, 9], "texture": "#glass" },
+        "east": { "uv": [15, 6, 16, 9], "texture": "#glass" }
       }
     },
     {
       "name": "strap_back",
-      "from": [
-        4.5,
-        4.5,
-        12.5
-      ],
-      "to": [
-        11.5,
-        5.0,
-        13.5
-      ],
+      "from": [1.2, 6.4, 14.4],
+      "to": [14.8, 8.0, 14.8],
       "faces": {
-        "up": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "down": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "north": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "south": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "east": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        },
-        "west": {
-          "uv": [
-            0,
-            12,
-            4,
-            14
-          ],
-          "texture": "#glasses"
-        }
+        "north": { "uv": [0, 6, 1, 9], "texture": "#glass" },
+        "south": { "uv": [0, 6, 1, 9], "texture": "#glass" },
+        "up": { "uv": [0, 6, 1, 7], "texture": "#glass" },
+        "down": { "uv": [0, 8, 1, 9], "texture": "#glass" }
       }
     }
-  ]
+  ],
+  "display": {
+    "head": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [1, 1, 1] },
+    "gui": { "rotation": [15, 200, 0], "translation": [0, 0.5, 0], "scale": [1.1, 1.1, 1.1] },
+    "ground": { "rotation": [0, 0, 0], "translation": [0, 2, 0], "scale": [0.5, 0.5, 0.5] },
+    "fixed": { "rotation": [0, 180, 0], "translation": [0, 0, 0], "scale": [1, 1, 1] },
+    "thirdperson_righthand": { "rotation": [0, 180, 0], "translation": [0, 2.5, -1], "scale": [0.55, 0.55, 0.55] },
+    "thirdperson_lefthand": { "rotation": [0, 180, 0], "translation": [0, 2.5, -1], "scale": [0.55, 0.55, 0.55] },
+    "firstperson_righthand": { "rotation": [0, 200, 0], "translation": [1, 4, 0], "scale": [0.6, 0.6, 0.6] },
+    "firstperson_lefthand": { "rotation": [0, 160, 0], "translation": [1, 4, 0], "scale": [0.6, 0.6, 0.6] }
+  }
 }

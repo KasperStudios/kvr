@@ -54,6 +54,8 @@ public final class KVRClientBootstrap {
             KVRClientBootstrap::displayOn,
             () -> GlassesPower.percent(PowerClient.worn()),
             new BuiltinApps(BuiltinApps.SYSTEM_APPS)));
+        // after KVRSpatial: its tick (Alt toggle, power key) runs first, the hints read the result
+        if (KVRSpatial.ready()) provider.onClientTickStart(com.kasperstudios.kvr.power.client.PowerHints::tick);
         SpyClient.initClient();
         PublicWindowsClient.initClient();
         VfsClient.initClient();

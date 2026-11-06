@@ -23,8 +23,20 @@ public abstract class GuiMixin {
 
     private static final ResourceLocation CROSSHAIR_TEXTURE = ResourceLocation.withDefaultNamespace("hud/crosshair");
 
-    @Inject(method = "renderCrosshair", at = @At("HEAD"), cancellable = true)
+    // 1.21 replaced float partialTick with DeltaTracker in renderCrosshair
+    //? if <1.21 {
+    /*@Inject(method = "renderCrosshair", at = @At("HEAD"), cancellable = true)
     private void kvr$renderDetachedCrosshair(GuiGraphics graphics, float partialTick, CallbackInfo ci) {
+        doRenderDetached(graphics, ci);
+    }
+    *///?} else {
+    @Inject(method = "renderCrosshair", at = @At("HEAD"), cancellable = true)
+    private void kvr$renderDetachedCrosshair(GuiGraphics graphics, net.minecraft.client.DeltaTracker deltaTracker, CallbackInfo ci) {
+        doRenderDetached(graphics, ci);
+    }
+    //?}
+
+    private static void doRenderDetached(GuiGraphics graphics, CallbackInfo ci) {
         if (!KVRSpatial.ready()) return;
         SpatialCursor cursor = KVRSpatial.cursor();
         if (!cursor.active()) return;

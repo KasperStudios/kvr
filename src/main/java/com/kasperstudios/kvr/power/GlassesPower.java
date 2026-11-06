@@ -62,6 +62,19 @@ public final class GlassesPower {
         return PowerData.load(PowerNbt.read(stack));
     }
 
+    /** False for a pair that was never powered or ticked yet (no {@code kvr_power} on the stack). */
+    public static boolean hasData(ItemStack stack) {
+        return !PowerNbt.read(stack).isEmpty();
+    }
+
+    /** Out of the box: {@link PowerTable#FACTORY_CHARGE_PERCENT}, OFF, nothing simulated yet. */
+    static PowerData factoryData(PowerBuild build, long gameTime) {
+        PowerData d = new PowerData();
+        d.setChargePercent(build, PowerTable.FACTORY_CHARGE_PERCENT);
+        d.lastStep = gameTime;
+        return d;
+    }
+
     public static void save(ItemStack stack, PowerData data) {
         PowerNbt.write(stack, data.save());
     }
@@ -85,7 +98,7 @@ public final class GlassesPower {
     public static PowerSimulator.Event setState(ItemStack stack, PowerState target, long gameTime) {
         Optional<PowerBuild> b = build(stack);
         if (b.isEmpty()) return PowerSimulator.Event.NONE;
-        PowerData d = data(stack);
+        PowerData d = hasData(stack) ? data(stack) : factoryData(b.get(), gameTime);
         PowerSimulator.step(b.get(), d, gameTime); // settle consumption up to now first
         PowerSimulator.Event e = PowerSimulator.setState(b.get(), d, target, gameTime);
         save(stack, d);

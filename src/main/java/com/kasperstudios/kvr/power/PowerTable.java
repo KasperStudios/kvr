@@ -44,6 +44,12 @@ public final class PowerTable {
     /** Power is simulated in steps of this many ticks; writing the stack every tick spams inventory sync. */
     public static final int STEP_TICKS = 20;
 
+    /**
+     * Freshly assembled glasses come out of the box half charged (like a real device). Without it a new
+     * pair could never boot until the player builds a dock plate — the first live test hit exactly that.
+     */
+    public static final double FACTORY_CHARGE_PERCENT = 50;
+
     private PowerTable() {}
 
     static int index(int tier) {

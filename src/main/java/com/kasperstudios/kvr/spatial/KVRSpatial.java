@@ -129,6 +129,9 @@ public final class KVRSpatial {
     public static SpatialConfig config() { return config; }
     public static WindowManager windows() { return windows; }
     public static SpatialCursor cursor() { return cursor; }
+    public static com.kasperstudios.kvr.power.client.PowerKey powerKey() {
+        return POWER_KEY;
+    }
     public static SpatialInput input() { return input; }
     public static ToastPanel toasts() { return toasts; }
 }

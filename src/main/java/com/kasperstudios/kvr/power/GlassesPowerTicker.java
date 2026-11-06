@@ -36,6 +36,11 @@ public final class GlassesPowerTicker {
         if (build.isEmpty()) return;
 
         long now = server.getGameTime();
+        if (!GlassesPower.hasData(stack)) {
+            // brand-new pair: half charged out of the box, synced to the client right away
+            GlassesPower.save(stack, GlassesPower.factoryData(build.get(), now));
+            return;
+        }
         PowerData d = GlassesPower.data(stack);
         boolean detonationDue = d.overloading() && now >= d.overloadDeadline;
         if (!detonationDue && now % PowerTable.STEP_TICKS != 0) return;
