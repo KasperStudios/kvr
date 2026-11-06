@@ -1,0 +1,6 @@
+{
+  "sources": [
+    { "type": "single", "resource": "kvr:armor/glasses_worn" },
+    { "type": "single", "resource": "kvr:armor/hackglasses_worn" }
+  ]
+}
