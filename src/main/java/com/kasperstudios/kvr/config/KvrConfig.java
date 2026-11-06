@@ -32,7 +32,7 @@ public final class KvrConfig {
                          String hostDesktopDaemon, String hostDesktopDownloadUrl, String hostDesktopDownloadSha256,
                          String hostDesktopConsent, String hostDesktopApps, int windowOpacity, boolean desktopClipboard) {}
 
-    public record Server(boolean hostDesktopWindows, int hostDesktopMaxWindows, int publicWindowRange) {}
+    public record Server(boolean hostDesktopWindows, int hostDesktopMaxWindows, int publicWindowRange, int batteryLife) {}
 
     static final String CLIENT_FILE = "kvr-client.toml";
     private static final String CLIENT_DEFAULTS = """
@@ -101,9 +101,11 @@ public final class KvrConfig {
                 host_desktop_max_windows = 2
                 # Public windows are relayed to players within this many blocks (0 = feature off)
                 public_window_range = 48
+                # Glasses battery life: real drain = nominal module draw / this (100: T1 kit ~9 min, T5 kit ~2 h on a full cell)
+                battery_life = 100
                 """);
             server = new Server(bool(m, "enable_host_desktop_windows", false), clampInt(m, "host_desktop_max_windows", 2, 0, 8),
-                clampInt(m, "public_window_range", 48, 0, 128));
+                clampInt(m, "public_window_range", 48, 0, 128), clampInt(m, "battery_life", 100, 1, 10_000));
         }
         return server;
     }

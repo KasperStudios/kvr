@@ -44,6 +44,7 @@ public final class SpatialCursor {
         return active;
     }
 
+    /** Pointer offset from the view direction, degrees (PlayerModelMixin aims the right arm with it). */
     public float yawOffset() {
         return yawOffset;
     }

@@ -16,6 +16,20 @@ public final class PowerTable {
     /** HUD-off keeps 30% of the consumption (−70%, SPEC 2.7). */
     public static final double HUD_OFF_FACTOR = 0.3;
 
+    /**
+     * 0020 fix — "the glasses die instantly on cheap hardware": the SPEC draws are nominal FE/t, the
+     * cells were sized as if the draw were much smaller. A T1 kit (9 FE/t) emptied a T1 cell (1 000 FE)
+     * in 5.5 s, a fresh half-charged pair in under 3 s.
+     *
+     * <p>Real consumption = nominal draw / battery life. With the default 100 a full cell lasts:
+     * T1 kit on T1 ≈ 9 min, T2 ≈ 20 min, T3 ≈ 42 min, T4 ≈ 69 min, T5 kit on T5 ≈ 1 h 55 min.
+     * The overload rule still compares the NOMINAL draw with the cell's max discharge, so Note 7
+     * (T5 modules on a T1 cell) is untouched; dock charging is untouched too (T1 refills in a second,
+     * T5 in ~8 min). Server key {@code battery_life} in kvr-server.toml.
+     */
+    public static final int DEFAULT_BATTERY_LIFE = 100;
+    private static volatile int batteryLife = DEFAULT_BATTERY_LIFE;
+
     private static final int[] BATTERY_CAPACITY = {1_000, 5_000, 25_000, 100_000, 500_000};
     private static final int[] BATTERY_MAX_DISCHARGE = {10, 25, 60, 150, 500};
 
@@ -71,5 +85,19 @@ public final class PowerTable {
 
     public static int coldBootTicks(int cpuTier) {
         return COLD_BOOT_SECONDS[index(cpuTier)] * 20;
+    }
+
+    /** From {@code kvr-server.toml} at init ({@link KVRPower#init}); clamped to 1..10000. */
+    public static void setBatteryLife(int value) {
+        batteryLife = Math.max(1, Math.min(10_000, value));
+    }
+
+    public static int batteryLife() {
+        return batteryLife;
+    }
+
+    /** Factor from nominal draw to the FE actually taken from the cell. */
+    public static double drainScale() {
+        return 1.0 / batteryLife;
     }
 }

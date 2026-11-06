@@ -13,16 +13,24 @@ public final class PowerSimulator {
 
     private PowerSimulator() {}
 
-    /** Advance to {@code gameTime}; the elapsed time since the last step is consumed at once. */
+    /**
+     * Advance to {@code gameTime} in raw SPEC units (drain = nominal draw). Only the unit tests use this;
+     * the game calls {@link #step(PowerBuild, PowerData, long, double)} with {@link PowerTable#drainScale()}.
+     */
     public static Event step(PowerBuild build, PowerData d, long gameTime) {
+        return step(build, d, gameTime, 1.0);
+    }
+
+    /**
+     * Advance to {@code gameTime}; the elapsed time since the last step is consumed at once.
+     * @param drainScale FE taken from the cell per nominal FE of draw ({@link PowerTable#drainScale()})
+     */
+    public static Event step(PowerBuild build, PowerData d, long gameTime, double drainScale) {
         long dt = d.lastStep == PowerData.NONE ? 0 : Math.max(0, gameTime - d.lastStep);
         d.lastStep = gameTime;
 
         if (d.overloading() && gameTime >= d.overloadDeadline) return Event.DETONATE;
-        if (d.state == PowerState.OFF) {
-            d.lastStep = gameTime;
-            return Event.NONE;
-        }
+        if (d.state == PowerState.OFF) return Event.NONE;
 
         Event event = Event.NONE;
         if (d.bootUntil > 0 && gameTime >= d.bootUntil) {
@@ -30,7 +38,7 @@ public final class PowerSimulator {
             event = Event.BOOTED;
         }
 
-        d.charge = Math.max(0, Math.min(d.capacity(build), d.charge - build.draw(d.state) * dt));
+        d.charge = Math.max(0, Math.min(d.capacity(build), d.charge - build.draw(d.state) * drainScale * dt));
 
         if (d.overloading()) {
             d.wear = Math.max(d.wear, d.overloadProgress(gameTime)); // capacity dies with the cell
@@ -62,10 +70,8 @@ public final class PowerSimulator {
         }
         if (d.state == PowerState.OFF) {
             if (d.charge <= 0) return Event.NONE; // nothing to boot with
-            d.lastStep = gameTime;
             d.bootUntil = gameTime + build.coldBootTicks();
         }
-        d.lastStep = gameTime;
         d.state = target;
         return Event.NONE;
     }

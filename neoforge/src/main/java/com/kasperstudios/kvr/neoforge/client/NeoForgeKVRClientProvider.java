@@ -25,9 +25,16 @@ import net.neoforged.neoforge.common.NeoForge;
 public final class NeoForgeKVRClientProvider implements KVRClientProvider {
 
     private final List<KeyMapping> keys = new ArrayList<>();
+    private final List<net.minecraft.resources.ResourceLocation> extraModels = new ArrayList<>();
 
     public NeoForgeKVRClientProvider(IEventBus modBus) {
         modBus.addListener(RegisterKeyMappingsEvent.class, e -> keys.forEach(e::register));
+        //? if <1.21 {
+        /*modBus.addListener(net.neoforged.neoforge.client.event.ModelEvent.RegisterAdditional.class, e -> extraModels.forEach(e::register));
+        *///?} else if <1.21.4 {
+        modBus.addListener(net.neoforged.neoforge.client.event.ModelEvent.RegisterAdditional.class, e -> extraModels.forEach(id ->
+            e.register(net.minecraft.client.resources.model.ModelResourceLocation.standalone(id))));
+        //?}
     }
 
     @Override
@@ -73,5 +80,23 @@ public final class NeoForgeKVRClientProvider implements KVRClientProvider {
     @Override
     public void onHudRender(java.util.function.Consumer<net.minecraft.client.gui.GuiGraphics> callback) {
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.RenderGuiEvent.Post.class, e -> callback.accept(e.getGuiGraphics()));
+    }
+
+    @Override
+    public void registerExtraModel(net.minecraft.resources.ResourceLocation id) {
+        extraModels.add(id);
+    }
+
+    @Override
+    public Object extraModel(net.minecraft.resources.ResourceLocation id) {
+        //? if <1.21 {
+        /*// VERIFY on 20.4: ModelManager#getModel(ResourceLocation) is NeoForge's overload for additional models
+        return net.minecraft.client.Minecraft.getInstance().getModelManager().getModel(id);
+        *///?} else if <1.21.4 {
+        return net.minecraft.client.Minecraft.getInstance().getModelManager()
+            .getModel(net.minecraft.client.resources.model.ModelResourceLocation.standalone(id));
+        //?} else {
+        /*return null; // 1.21.4+: assets/kvr/items/*.json picks the head model by display context
+        *///?}
     }
 }

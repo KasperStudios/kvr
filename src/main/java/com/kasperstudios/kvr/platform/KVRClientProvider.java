@@ -30,6 +30,19 @@ public interface KVRClientProvider {
     /** Screen-space overlay after the vanilla GUI (used only for the overload vignette). */
     void onHudRender(Consumer<net.minecraft.client.gui.GuiGraphics> callback);
 
+    /**
+     * A model to bake that no item points to (0020: the 3D glasses for the head). Call during client
+     * init, before the first resource load.
+     */
+    void registerExtraModel(net.minecraft.resources.ResourceLocation id);
+
+    /**
+     * The baked extra model, typed {@code Object} because {@code BakedModel} is gone on 1.21.5+;
+     * null where the loader has no such model (or on 1.21.4+, where items/*.json select by context).
+     */
+    @org.jetbrains.annotations.Nullable
+    Object extraModel(net.minecraft.resources.ResourceLocation id);
+
     @FunctionalInterface
     interface WorldRender {
         /**

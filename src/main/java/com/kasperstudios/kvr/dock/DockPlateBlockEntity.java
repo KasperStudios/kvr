@@ -60,7 +60,7 @@ public class DockPlateBlockEntity extends BlockEntity {
         Optional<PowerBuild> build = GlassesPower.build(glasses);
         if (build.isPresent()) {
             PowerData d = GlassesPower.data(glasses);
-            PowerSimulator.Event event = PowerSimulator.step(build.get(), d, now);
+            PowerSimulator.Event event = PowerSimulator.step(build.get(), d, now, com.kasperstudios.kvr.power.PowerTable.drainScale());
             if (event == PowerSimulator.Event.DETONATE) {
                 ItemStack doomed = glasses;
                 glasses = ItemStack.EMPTY;

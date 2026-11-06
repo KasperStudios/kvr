@@ -1,7 +1,8 @@
 {
+  "__comment": "Flat icon (inventory, hand, ground, item frame). The 3D model on the head is glasses_worn.json (0020). layer0 = shell, tinted with the dye colour (tintindex 0); layer1 = glass overlay.",
   "parent": "minecraft:item/generated",
   "textures": {
     "layer0": "kvr:item/glasses",
-    "layer1": "kvr:item/glasses"
+    "layer1": "kvr:item/glasses_overlay"
   }
 }

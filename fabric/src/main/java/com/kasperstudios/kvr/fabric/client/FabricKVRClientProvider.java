@@ -24,6 +24,8 @@ import net.minecraft.client.KeyMapping;
  */
 public final class FabricKVRClientProvider implements KVRClientProvider {
 
+    private final java.util.List<net.minecraft.resources.ResourceLocation> extraModels = new java.util.ArrayList<>();
+
     @Override
     public void registerKeyMapping(KeyMapping key) {
         KeyBindingHelper.registerKeyBinding(key);
@@ -57,5 +59,29 @@ public final class FabricKVRClientProvider implements KVRClientProvider {
     public void onHudRender(java.util.function.Consumer<net.minecraft.client.gui.GuiGraphics> callback) {
         // (GuiGraphics, float) on 1.20.x, (GuiGraphics, DeltaTracker) on 1.21 — the lambda fits both
         net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register((graphics, tick) -> callback.accept(graphics));
+    }
+
+    @Override
+    public void registerExtraModel(net.minecraft.resources.ResourceLocation id) {
+        //? if <1.21.4 {
+        // one plugin; it reads the list when models load, so later registrations are included
+        if (extraModels.isEmpty()) {
+            net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin.register(ctx ->
+                ctx.addModels(extraModels.toArray(new net.minecraft.resources.ResourceLocation[0])));
+        }
+        //?}
+        extraModels.add(id);
+    }
+
+    @Override
+    public Object extraModel(net.minecraft.resources.ResourceLocation id) {
+        //? if <1.21 {
+        /*return net.fabricmc.fabric.api.client.model.BakedModelManagerHelper.getModel(net.minecraft.client.Minecraft.getInstance().getModelManager(), id);
+        *///?} else if <1.21.4 {
+        // VERIFY: FabricBakedModelManager#getModel(ResourceLocation), interface-injected into ModelManager by Fabric API
+        return net.minecraft.client.Minecraft.getInstance().getModelManager().getModel(id);
+        //?} else {
+        /*return null; // 1.21.4+: assets/kvr/items/*.json picks the head model by display context
+        *///?}
     }
 }

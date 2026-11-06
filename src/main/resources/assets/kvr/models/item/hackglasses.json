@@ -1,4 +1,5 @@
 {
+  "__comment": "Flat icon (inventory, hand, ground, item frame). The 3D model on the head is hackglasses_worn.json (0020).",
   "parent": "minecraft:item/generated",
   "textures": {
     "layer0": "kvr:item/hackglasses"

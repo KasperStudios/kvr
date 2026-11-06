@@ -45,7 +45,7 @@ public final class GlassesPowerTicker {
         boolean detonationDue = d.overloading() && now >= d.overloadDeadline;
         if (!detonationDue && now % PowerTable.STEP_TICKS != 0) return;
 
-        PowerSimulator.Event event = PowerSimulator.step(build.get(), d, now);
+        PowerSimulator.Event event = PowerSimulator.step(build.get(), d, now, PowerTable.drainScale());
         Location where = locate(holder, stack);
         switch (event) {
             case DETONATE -> {

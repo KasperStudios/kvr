@@ -29,6 +29,7 @@ public final class KVRPower {
     private KVRPower() {}
 
     public static void init() {
+        PowerTable.setBatteryLife(com.kasperstudios.kvr.config.KvrConfig.server().batteryLife()); // 0020: no more 5-second batteries
         KVRServer.get().onRegisterCommands(KVRPower::registerCommands);
     }
 
