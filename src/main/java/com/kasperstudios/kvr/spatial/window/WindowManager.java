@@ -72,7 +72,17 @@ public final class WindowManager {
 
     /** Gesture 3: the window in focus (last clicked or under the hand ray), unless it is locked. */
     public void minimizeFocused() {
-        if (focused != null && focused.kind() != SpatialWindow.Kind.SYSTEM && !focused.isLocked()) focused.setMinimized(true);
+        SpatialWindow target = focused;
+        if (target == null || target.isMinimized() || target.kind() == SpatialWindow.Kind.SYSTEM || target.isLocked()) {
+            // Fallback: pick the closest non-minimized app/vanilla window
+            target = windows.stream()
+                    .filter(w -> w.kind() != SpatialWindow.Kind.SYSTEM && !w.isMinimized() && !w.isLocked())
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (target != null) {
+            target.setMinimized(true);
+        }
     }
 
     /** Windows set to Public in the gear menu: materialised for other players, readable by HackGlasses. */

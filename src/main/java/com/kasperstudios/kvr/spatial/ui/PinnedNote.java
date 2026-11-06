@@ -68,11 +68,11 @@ public final class PinnedNote extends SpatialWindow {
 
     @Override
     protected void renderContent(GuiGraphics g, int mx, int my, float partialTick) {
-        GlassStyle.panel(g, 0, 0, width, height, false);
+        GlassStyle.surface(g, 0, 0, width, height, false);
         GlassStyle.text(g, title.copy().withStyle(ChatFormatting.BOLD), 8, 8, GlassStyle.ACCENT);
         Font font = Minecraft.getInstance().font;
         List<FormattedCharSequence> lines = font.split(Component.literal(text), W - 16);
         int y = 24;
-        for (int i = 0; i < lines.size() && i < 14; i++, y += LINE) g.drawString(font, lines.get(i), 8, y, GlassStyle.TEXT, false);
+        for (int i = 0; i < lines.size() && i < 14; i++, y += LINE) GlassStyle.text(g, lines.get(i), 8, y, GlassStyle.TEXT);
     }
 }

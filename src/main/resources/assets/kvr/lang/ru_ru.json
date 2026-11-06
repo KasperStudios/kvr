@@ -13,6 +13,7 @@
   "kvr.gesture.new_space": "Новое пространство",
   "kvr.screen.pin": "3D",
   "kvr.screen.pin.tooltip": "Открепить в пространство",
+  "kvr.screen.inactive": "Инвентарь занят: открыт другой контейнер. Закройте его, чтобы пользоваться этим окном.",
   "kvr.window.ram_full.title": "Не хватает памяти",
   "kvr.window.ram_full": "Открыто %s из %s приложений — закройте одно",
   "kvr.anchor.body": "С игроком",
@@ -91,7 +92,8 @@
   "kvr.hint.off": "Очки выключены — нажмите %s",
   "kvr.hint.hud_off": "Дисплей погашен (HUD выкл) — нажмите %s",
   "kvr.hint.booting": "Загрузка KVR OS… %s с",
-  "kvr.hint.ready": "KVR OS готова: %s — указатель, %s и зажать ПКМ — жесты, %s — питание",
+  "kvr.hint.os_needed": "«%s»: KVR OS не запущена — нажмите %s",
+  "kvr.hint.ready": "KVR OS готова: %s — указатель, %s и зажать ПКМ в пустоте — жесты, %s — питание",
   "kvr.settings.default_public": "Новые окна публичные",
   "kvr.settings.show_public": "Показывать публичные окна других",
   "kvr.settings.desktop": "Приложения ПК в KVR",
@@ -102,5 +104,8 @@
   "kvr.desktop.disabled_client": "Выключено в kvr-client.toml (enable_host_desktop_windows)",
   "kvr.desktop.disabled_server": "Этот сервер не разрешает окна рабочего стола",
   "kvr.desktop.limit": "Достигнут лимит окон рабочего стола",
-  "kvr.input.hint_multi": "Ввод в окно. Enter — новая строка, Ctrl+Enter или Esc — готово, Ctrl+V — вставить"
+  "kvr.input.hint_multi": "Ввод в окно. Enter — новая строка, Ctrl+Enter или Esc — готово, Ctrl+V — вставить",
+  "kvr.settings.section.windows": "Окна",
+  "kvr.settings.section.desktop": "Приложения ПК",
+  "kvr.settings.window_opacity": "Фон окон: %s%%"
 }

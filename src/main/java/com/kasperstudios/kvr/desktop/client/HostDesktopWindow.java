@@ -108,7 +108,7 @@ public final class HostDesktopWindow extends SpatialWindow {
         stream.upload((px, f, full) -> texture.upload(px, f.width(), f.height(), f.stride(),
             f.format() == DesktopProtocol.FORMAT_BGRA, rects(f), full));
 
-        GlassStyle.panel(g, 0, 0, width, height, false);
+        GlassStyle.surface(g, 0, 0, width, height, false);
         Component name = title().copy().withStyle(ChatFormatting.BOLD);
         GlassStyle.text(g, name, 8, 5, GlassStyle.TEXT);
         if (keyboard) GlassStyle.text(g, Component.translatable("kvr.desktop.keyboard_on"), width - 92, 5, GlassStyle.ACCENT);

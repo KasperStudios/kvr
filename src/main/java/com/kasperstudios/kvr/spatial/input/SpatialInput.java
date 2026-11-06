@@ -19,7 +19,8 @@ import org.jetbrains.annotations.Nullable;
  * <ul>
  *   <li>LMB on content → chrome (×, gear menu, lock) or {@code mouseClicked}/{@code mouseReleased} in window pixels.</li>
  *   <li>LMB on the grab bar → {@link GrabController} (not while the window is locked).</li>
- *   <li>RMB (Alt mode, glasses on) → gesture wheel at the hand; release picks the gesture.</li>
+ *   <li>RMB over a window → that window ({@code acceptsSecondaryClick}: detached containers, desktop apps),
+ *       otherwise swallowed. RMB over empty space (Alt mode, glasses on) → gesture wheel at the hand.</li>
  *   <li>Wheel → grab depth while holding, otherwise scroll in the hovered window.</li>
  *   <li>Keyboard (Alt mode): automatically captured by the hovered window if it {@code wantsKeyboard()}
  *       and stays with it while the hand points at empty space; hovering another window or leaving
@@ -38,7 +39,7 @@ public final class SpatialInput {
     @Nullable private SpatialRaycast.Ray lastRay;
     @Nullable private GestureWheel wheel;
     @Nullable private SpatialWindow keyboard;
-    /** RMB pressed on a desktop app: its release belongs there too. */
+    /** RMB pressed on a window that takes it: its release belongs there too. */
     @Nullable private SpatialWindow rightDown;
     private boolean attackWasDown;
 
@@ -52,11 +53,9 @@ public final class SpatialInput {
     public void tickStart() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
-        net.minecraft.client.Camera camera = mc.gameRenderer.getMainCamera();
-        if (camera == null || camera.getEntity() == null) return;
         cursor.tick();
         windows.tick();
-        PlayerView view = PlayerView.capture(camera, 1f);
+        PlayerView view = PlayerView.capture(mc.gameRenderer.getMainCamera(), 1f);
 
         if (!cursor.active() || mc.screen != null) {
             grab.end(view);
@@ -80,8 +79,7 @@ public final class SpatialInput {
         }
 
         handleAttack(mc, view, ray);
-        // Alt + RMB opens the gesture wheel or uses windows whenever Alt mode is active
-        handleUse(mc, view, ray);
+        if (glassesWorn.getAsBoolean()) handleUse(mc, view, ray);
     }
 
     /** Who gets the keyboard this tick (see class doc). */
@@ -151,17 +149,20 @@ public final class SpatialInput {
     private void handleUse(Minecraft mc, PlayerView view, SpatialRaycast.Ray ray) {
         KeyMapping use = mc.options.keyUse;
         while (use.consumeClick()) {
-            // over a desktop app (any window that takes the keyboard) RMB is the app's right click
-            if (wheel == null && rightDown == null && hover != null && hover.region() == SpatialRaycast.Region.CONTENT
-                && hover.window().wantsKeyboard() && !hover.window().isLocked()) {
-                rightDown = hover.window();
-                rightDown.click(hover.px(), hover.py(), 1, view);
+            if (wheel != null || rightDown != null) continue;
+            if (hover != null) {
+                // RMB over a window belongs to that window (0018): detached chest = split stack / place one,
+                // desktop app = right click. Windows without a use for it swallow it; never the wheel.
+                SpatialWindow w = hover.window();
+                windows.focus(w);
+                if (hover.region() == SpatialRaycast.Region.CONTENT && w.acceptsSecondaryClick() && !w.isLocked()) {
+                    rightDown = w;
+                    w.click(hover.px(), hover.py(), 1, view);
+                }
                 continue;
             }
-            if (wheel == null && rightDown == null) {
-                wheel = GestureWheel.spawn(ray, view);
-                windows.open(wheel);
-            }
+            wheel = GestureWheel.spawn(ray, view);
+            windows.open(wheel);
         }
         if (rightDown != null) {
             if (!use.isDown()) {

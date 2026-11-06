@@ -51,7 +51,7 @@ public final class PowerWindow extends SpatialWindow {
     protected void renderContent(GuiGraphics g, int mx, int my, float partialTick) {
         Optional<PowerClient.Snapshot> snap = PowerClient.snapshot();
         boolean alarm = snap.map(s -> s.data().overloading()).orElse(false);
-        GlassStyle.panel(g, 0, 0, width, height, alarm && PowerClient.strobeOn());
+        GlassStyle.surface(g, 0, 0, width, height, alarm && PowerClient.strobeOn());
 
         GlassStyle.sprite(g, alarm ? GlassStyle.id("power/warning") : GlassStyle.id("power/power"), 10, 9, 16, 16);
         GlassStyle.text(g, title().copy().withStyle(ChatFormatting.BOLD), 32, 13, GlassStyle.TEXT);

@@ -1,7 +1,5 @@
 {
   "variants": {
-    "": {
-      "model": "kvr:block/up_ore"
-    }
+    "": { "model": "kvr:block/up_ore" }
   }
 }

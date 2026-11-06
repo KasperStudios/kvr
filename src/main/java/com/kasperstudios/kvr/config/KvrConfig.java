@@ -25,10 +25,11 @@ public final class KvrConfig {
      * @param hostDesktopDownloadSha256 required SHA-256 of the download (no hash = no download)
      * @param hostDesktopConsent      SHA-256 of the binary the user agreed to run (empty = no consent)
      * @param hostDesktopApps         launcher entries, {@code ;}-separated command lines
+     * @param windowOpacity           dark backdrop under window glass, percent 0..100 (0018: readability)
      */
     public record Client(boolean hostDesktopWindows, boolean defaultWindowPublic, boolean showPublicWindows,
                          String hostDesktopDaemon, String hostDesktopDownloadUrl, String hostDesktopDownloadSha256,
-                         String hostDesktopConsent, String hostDesktopApps) {}
+                         String hostDesktopConsent, String hostDesktopApps, int windowOpacity) {}
 
     public record Server(boolean hostDesktopWindows, int hostDesktopMaxWindows, int publicWindowRange) {}
 
@@ -53,6 +54,8 @@ public final class KvrConfig {
         default_window_public = false
         # Draw other players' Public windows in the world
         show_public_windows = true
+        # Dark backdrop under window glass, percent (0 = pure glass, 100 = opaque). Higher = easier to read.
+        window_opacity = 75
         """;
 
     private static Path dir = Path.of("config");
@@ -78,7 +81,8 @@ public final class KvrConfig {
                 str(m, "host_desktop_download_url"),
                 str(m, "host_desktop_download_sha256"),
                 str(m, "host_desktop_consent"),
-                str(m, "host_desktop_apps"));
+                str(m, "host_desktop_apps"),
+                clampInt(m, "window_opacity", 75, 0, 100));
         }
         return client;
     }

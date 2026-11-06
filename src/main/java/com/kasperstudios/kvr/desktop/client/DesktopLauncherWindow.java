@@ -37,7 +37,7 @@ public final class DesktopLauncherWindow extends SpatialWindow {
 
     @Override
     protected void renderContent(GuiGraphics g, int mx, int my, float partialTick) {
-        GlassStyle.panel(g, 0, 0, width, height, false);
+        GlassStyle.surface(g, 0, 0, width, height, false);
         GlassStyle.text(g, title().copy().withStyle(ChatFormatting.BOLD), 8, 9, GlassStyle.TEXT);
         if (apps.isEmpty()) {
             GlassStyle.text(g, Component.translatable("kvr.desktop.no_apps"), 8, TOP + 4, GlassStyle.MUTED);

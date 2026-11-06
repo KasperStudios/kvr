@@ -13,6 +13,7 @@
   "kvr.gesture.new_space": "New space",
   "kvr.screen.pin": "3D",
   "kvr.screen.pin.tooltip": "Pin to space",
+  "kvr.screen.inactive": "Inventory is busy: another container is open. Close it to use this window.",
   "kvr.window.ram_full.title": "Out of memory",
   "kvr.window.ram_full": "%s of %s apps open — close one first",
   "kvr.anchor.body": "With player",
@@ -91,7 +92,8 @@
   "kvr.hint.off": "Glasses are off — press %s",
   "kvr.hint.hud_off": "Display is dark (HUD off) — press %s",
   "kvr.hint.booting": "Booting KVR OS… %s s",
-  "kvr.hint.ready": "KVR OS ready: %s — pointer, %s then hold RMB — gestures, %s — power",
+  "kvr.hint.os_needed": "\"%s\": KVR OS is not running — press %s",
+  "kvr.hint.ready": "KVR OS ready: %s — pointer, %s then hold RMB in empty space — gestures, %s — power",
   "kvr.settings.default_public": "New windows are public",
   "kvr.settings.show_public": "Show other players' public windows",
   "kvr.settings.desktop": "PC apps in KVR",
@@ -102,5 +104,8 @@
   "kvr.desktop.disabled_client": "Off in kvr-client.toml (enable_host_desktop_windows)",
   "kvr.desktop.disabled_server": "This server does not allow desktop windows",
   "kvr.desktop.limit": "Desktop window limit reached",
-  "kvr.input.hint_multi": "Typing into the window. Enter = new line, Ctrl+Enter or Esc to finish, Ctrl+V to paste"
+  "kvr.input.hint_multi": "Typing into the window. Enter = new line, Ctrl+Enter or Esc to finish, Ctrl+V to paste",
+  "kvr.settings.section.windows": "Windows",
+  "kvr.settings.section.desktop": "PC apps",
+  "kvr.settings.window_opacity": "Window background: %s%%"
 }

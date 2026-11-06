@@ -80,14 +80,14 @@ public final class ToastPanel extends SpatialWindow {
             float t = Math.min(1f, (now - s.since()) / (float) SLIDE_MS);
             int slide = Math.round((1f - t) * (1f - t) * 40f);
             int x = slide;
-            GlassStyle.panel(g, x, y + 2, W - slide, ROW - 4, false);
+            GlassStyle.surface(g, x, y + 2, W - slide, ROW - 4, false);
             g.fill(x + 6, y + 8, x + 30, y + ROW - 8, (s.toast().accent() & 0x00FFFFFF) | 0x40000000);
             GlassStyle.sprite(g, s.toast().icon(), x + 10, y + 12, 16, 16);
             int tx = x + 38;
             int maxW = W - slide - 44;
-            g.drawString(font, s.toast().title().copy().withStyle(ChatFormatting.BOLD), tx, y + 9, GlassStyle.TEXT, false);
+            GlassStyle.text(g, s.toast().title().copy().withStyle(ChatFormatting.BOLD), tx, y + 9, GlassStyle.TEXT);
             String body = font.plainSubstrByWidth(s.toast().text().getString(), maxW);
-            g.drawString(font, body, tx, y + 21, GlassStyle.MUTED, false);
+            GlassStyle.text(g, body, tx, y + 21, GlassStyle.MUTED);
             y += ROW;
         }
     }

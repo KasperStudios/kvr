@@ -32,8 +32,26 @@ public final class RenderCompat {
 
     /** Lightmap value for full brightness (LightTexture.FULL_BRIGHT). */
     private static final int FULL_BRIGHT = 0xF000F0;
+    /** Depth of nested {@link Surface#paint} calls; > 0 = GUI code is drawing into an offscreen window. */
+    private static int painting;
 
     private RenderCompat() {}
+
+    /**
+     * True while a window paints into its offscreen surface. {@code GuiGraphicsMixin} then turns
+     * scissoring off: vanilla computes scissor boxes against the main window (size, GUI scale) and
+     * ignores our pose translation, so e.g. the player model in a detached inventory was cut away.
+     */
+    public static boolean paintingSurface() {
+        return painting > 0;
+    }
+
+    /** White shader colour (GUI code multiplies everything by it). No-op on 1.21.5+ (no global colour there). */
+    public static void resetShaderColor() {
+        //? if <1.21.5 {
+        com.mojang.blaze3d.systems.RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        //?}
+    }
 
     public static Surface surface(ResourceLocation id) {
         return new Surface(id);
@@ -90,11 +108,15 @@ public final class RenderCompat {
             mv.translate(0f, 0f, -11000f);
             *///?}
             com.mojang.blaze3d.systems.RenderSystem.applyModelViewMatrix();
+            GuiState saved = GuiState.enter();
+            painting++;
             try {
                 GuiGraphics g = new GuiGraphics(mc, mc.renderBuffers().bufferSource());
                 painter.accept(g);
                 g.flush();
             } finally {
+                painting--;
+                saved.leave();
                 //? if >=1.20.5 {
                 mv.popMatrix();
                 //?} else {
@@ -119,6 +141,47 @@ public final class RenderCompat {
     }
 
     //? if <1.21.5 {
+    /**
+     * Windows are painted in the middle of the WORLD pass, where the GL state belongs to the level:
+     * fog (start/end around the render distance), level diffuse lighting, maybe a shader colour.
+     * GUI code expects the state GameRenderer sets up before the HUD. Without this, every item in a
+     * detached chest came out as one flat colour: the entity/item shaders applied the world fog
+     * (GUI vertices are hundreds of units from the origin, far past fog end) and lit it like terrain.
+     * Text and sprites use fog-less shaders, which is why only items looked wrong.
+     */
+    private record GuiState(float fogStart, float fogEnd, float[] fogColor, com.mojang.blaze3d.shaders.FogShape fogShape) {
+
+        static GuiState enter() {
+            com.mojang.blaze3d.systems.RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+            GuiState s = new GuiState(
+                com.mojang.blaze3d.systems.RenderSystem.getShaderFogStart(),
+                com.mojang.blaze3d.systems.RenderSystem.getShaderFogEnd(),
+                com.mojang.blaze3d.systems.RenderSystem.getShaderFogColor().clone(),
+                com.mojang.blaze3d.systems.RenderSystem.getShaderFogShape());
+            net.minecraft.client.renderer.FogRenderer.setupNoFog();
+            //? if >=1.20.5 {
+            com.mojang.blaze3d.platform.Lighting.setupFor3DItems();
+            //?}
+            return s;
+        }
+
+        void leave() {
+            com.mojang.blaze3d.systems.RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+            com.mojang.blaze3d.systems.RenderSystem.setShaderFogStart(fogStart);
+            com.mojang.blaze3d.systems.RenderSystem.setShaderFogEnd(fogEnd);
+            com.mojang.blaze3d.systems.RenderSystem.setShaderFogColor(fogColor[0], fogColor[1], fogColor[2], fogColor[3]);
+            com.mojang.blaze3d.systems.RenderSystem.setShaderFogShape(fogShape);
+            //? if >=1.20.5 {
+            // back to level lighting for whatever the world pass draws after us (held item, other mods).
+            // VERIFY on 1.20.4/1.20.1: there setupLevel takes the camera matrix, so we leave lighting alone.
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level != null && mc.level.effects().constantAmbientLight()) com.mojang.blaze3d.platform.Lighting.setupNetherLevel();
+            else com.mojang.blaze3d.platform.Lighting.setupLevel();
+            //?}
+            com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();
+        }
+    }
+
     /** Exposes the framebuffer's colour attachment as a normal texture; the target owns the GL id. */
     private static final class FboTexture extends net.minecraft.client.renderer.texture.AbstractTexture {
         private final Surface surface;
@@ -328,17 +391,33 @@ public final class RenderCompat {
         return Minecraft.getInstance().font.width(text);
     }
 
-    /** GUI sprite from the gui atlas ({@code kvr:panel} → textures/gui/sprites/panel.png). */
+    /**
+     * GUI sprite from the gui atlas ({@code kvr:panel} → textures/gui/sprites/panel.png).
+     * Before 1.21.2 blitSprite draws immediately with whatever blend state is current — usually
+     * blending OFF, so a button panel overwrote the window glass under it and punched a see-through
+     * hole. We switch on proper "over" blending (alpha accumulates) for the sprite and reset after.
+     */
     public static void sprite(GuiGraphics g, ResourceLocation sprite, int x, int y, int w, int h) {
         //? if >=1.21.6 {
         /*g.blitSprite(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, sprite, x, y, w, h);
         *///?} else if >=1.21.2 {
         /*g.blitSprite(net.minecraft.client.renderer.RenderType::guiTextured, sprite, x, y, w, h);
-        *///?} else if >=1.20.2 {
-        g.blitSprite(sprite, x, y, w, h);
-        //?} else {
-        /*nineSlice(g, sprite, x, y, w, h);
-        *///?}
+        *///?} else {
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        com.mojang.blaze3d.systems.RenderSystem.blendFuncSeparate(
+            com.mojang.blaze3d.platform.GlStateManager.SourceFactor.SRC_ALPHA, com.mojang.blaze3d.platform.GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
+            com.mojang.blaze3d.platform.GlStateManager.SourceFactor.ONE, com.mojang.blaze3d.platform.GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
+        try {
+            //? if >=1.20.2 {
+            g.blitSprite(sprite, x, y, w, h);
+            //?} else {
+            /*nineSlice(g, sprite, x, y, w, h);
+            *///?}
+        } finally {
+            com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
+            com.mojang.blaze3d.systems.RenderSystem.disableBlend();
+        }
+        //?}
     }
 
     //? if <1.20.2 {

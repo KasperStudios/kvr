@@ -170,7 +170,7 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
                 return;
             }
         }
-        GlassStyle.panel(g, 0, 0, width, height, false);
+        GlassStyle.surface(g, 0, 0, width, height, false);
     }
 
     private int column(GuiGraphics g, List<UiNode> nodes, int x, int y, int w, int mx, int my) {
@@ -189,7 +189,7 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
                 int jx = n.bool("glitch") && ThreadLocalRandom.current().nextInt(12) == 0 ? ThreadLocalRandom.current().nextInt(-2, 3) : 0;
                 List<FormattedCharSequence> lines = font.split(text, Math.max(10, w));
                 for (FormattedCharSequence line : lines) {
-                    g.drawString(font, line, x + jx, y, color, false);
+                    GlassStyle.text(g, line, x + jx, y, color);
                     y += 10;
                 }
                 return y;
@@ -239,7 +239,7 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
         boolean hot = GlassStyle.inside(mx, my, x, y, w, h);
         String value = localValues.getOrDefault(n.id(), n.str("value", ""));
 
-        g.fill(x, y, x + w, y + h, focus ? 0x60000000 : hot ? 0x48000000 : 0x38000000);
+        g.fill(x, y, x + w, y + h, focus ? 0x90000000 : hot ? 0x78000000 : 0x60000000);
         int edge = focus ? GlassStyle.ACCENT : 0x40FFFFFF;
         g.fill(x, y, x + w, y + 1, edge);
         g.fill(x, y + h - 1, x + w, y + h, edge);
@@ -251,18 +251,18 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
         int tw = w - 8;
         boolean caret = focus && (System.currentTimeMillis() / 500) % 2 == 0;
         if (value.isEmpty() && !focus) {
-            g.drawString(font, font.plainSubstrByWidth(n.str("placeholder", ""), tw), tx, ty, GlassStyle.MUTED, false);
+            GlassStyle.text(g, font.plainSubstrByWidth(n.str("placeholder", ""), tw), tx, ty, GlassStyle.MUTED);
         } else if (!multi) {
             String shown = font.plainSubstrByWidth(value, tw - 6, true); // tail: the caret end stays visible
-            g.drawString(font, shown, tx, ty, GlassStyle.TEXT, false);
-            if (caret) g.drawString(font, "_", tx + font.width(shown), ty, GlassStyle.ACCENT, false);
+            GlassStyle.text(g, shown, tx, ty, GlassStyle.TEXT);
+            if (caret) GlassStyle.text(g, "_", tx + font.width(shown), ty, GlassStyle.ACCENT);
         } else {
             List<FormattedCharSequence> lines = new ArrayList<>(font.split(Component.literal(value), tw - 6));
             if (lines.isEmpty() || value.endsWith("\n")) lines.add(FormattedCharSequence.EMPTY);
             int from = Math.max(0, lines.size() - rows); // follow the end while typing
             int ly = ty;
-            for (int i = from; i < lines.size(); i++, ly += LINE) g.drawString(font, lines.get(i), tx, ly, GlassStyle.TEXT, false);
-            if (caret) g.drawString(font, "_", tx + font.width(lines.get(lines.size() - 1)), ly - LINE, GlassStyle.ACCENT, false);
+            for (int i = from; i < lines.size(); i++, ly += LINE) GlassStyle.text(g, lines.get(i), tx, ly, GlassStyle.TEXT);
+            if (caret) GlassStyle.text(g, "_", tx + font.width(lines.get(lines.size() - 1)), ly - LINE, GlassStyle.ACCENT);
         }
         inputs.put(n.id(), n);
         hits.add(new Hit(n.id(), "input", x, y, w, h, 0, 0, n.bool("readOnly")));
@@ -273,7 +273,7 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
         Font font = Minecraft.getInstance().font;
         int y = TITLE_H + 8;
         for (FormattedCharSequence line : font.split(text, width - 2 * PAD)) {
-            g.drawString(font, line, PAD, y, color, false);
+            GlassStyle.text(g, line, PAD, y, color);
             y += 10;
         }
     }

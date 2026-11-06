@@ -112,6 +112,11 @@ public abstract class SpatialWindow {
         return true;
     }
 
+    /** Drawn even while the windows are hidden (HUD off): the gesture wheel is the hand's own UI. */
+    public boolean showsWhenHidden() {
+        return false;
+    }
+
     /** Gear menu + Lock shown? Default: every window that can be grabbed (not dock, toasts, wheel). */
     public boolean hasSettings() {
         return hasGrabBar();
@@ -127,6 +132,15 @@ public abstract class SpatialWindow {
         return true;
     }
 
+    /**
+     * Does RMB over the content mean something here (detached container: split a stack / place one;
+     * desktop app: right click)? If false, RMB over the window is simply swallowed — the gesture wheel
+     * opens only over empty space, never "through" a window.
+     */
+    public boolean acceptsSecondaryClick() {
+        return wantsKeyboard();
+    }
+
     // --- input ---------------------------------------------------------------------------------
 
     /** Single entry for clicks in window pixels: chrome first (gear, menu, lock, ×), then the content. */
@@ -136,6 +150,8 @@ public abstract class SpatialWindow {
             pressToContent = true;
             return mouseClicked(x, y, button);
         }
+        // RMB/MMB never operate the chrome (no accidental × or lock); over chrome or a locked window they are swallowed
+        if (button != 0 && (chrome.locked() || chrome.partAt(x, y, width, height, hasCloseButton()) != WindowChrome.Part.NONE)) return true;
         switch (chrome.click(x, y, width, height, hasCloseButton(), allowPublic())) {
             case PASS -> {
                 pressToContent = true;
@@ -193,7 +209,7 @@ public abstract class SpatialWindow {
 
     private void renderMenu(GuiGraphics g, WindowChrome.Part hot) {
         WindowChrome.Box m = WindowChrome.menu(width, height);
-        GlassStyle.panel(g, m.x(), m.y(), m.w(), m.h(), false);
+        GlassStyle.surface(g, m.x(), m.y(), m.w(), m.h(), false);
         boolean labels = WindowChrome.hasLabels(m);
 
         // header + ×

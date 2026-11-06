@@ -90,7 +90,7 @@ public final class PublicWindowRenderer {
         Font font = Minecraft.getInstance().font;
         int w = p.w();
         int h = p.h();
-        GlassStyle.panel(g, 0, 0, w, h, false);
+        GlassStyle.surface(g, 0, 0, w, h, false);
         int ownerW = font.width(p.owner());
         GlassStyle.text(g, Component.literal(p.owner()), w - ownerW - 8, 8, GlassStyle.ACCENT);
         String title = p.entry().title();
@@ -101,7 +101,7 @@ public final class PublicWindowRenderer {
         int y = 27;
         for (FormattedCharSequence line : font.split(Component.literal(p.entry().text()), w - 16)) {
             if (y > h - LINE - 2) break;
-            g.drawString(font, line, 8, y, GlassStyle.MUTED, false);
+            GlassStyle.text(g, line, 8, y, GlassStyle.MUTED);
             y += LINE;
         }
     }

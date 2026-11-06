@@ -52,14 +52,14 @@ public final class DockBar extends SpatialWindow {
 
     @Override
     protected void renderContent(GuiGraphics g, int mx, int my, float partialTick) {
-        GlassStyle.panel(g, 0, 0, width, height, false);
+        GlassStyle.surface(g, 0, 0, width, height, false);
         int x = GlassStyle.PADDING;
         int y = (height - ICON) / 2;
 
         for (SpatialConfig.DockItem item : config.apps().dockItems()) {
             boolean hot = GlassStyle.inside(mx, my, x, y, ICON, ICON);
             GlassStyle.panel(g, x, y, ICON, ICON, hot);
-            GlassStyle.sprite(g, item.icon(), x + 6, y + 6, 16, 16);
+            if (!AppIcons.draw(g, item.appId(), x + 6, y + 6)) GlassStyle.sprite(g, item.icon(), x + 6, y + 6, 16, 16);
             if (item.running()) g.fill(x + ICON / 2 - 1, y + ICON + 2, x + ICON / 2 + 1, y + ICON + 4, GlassStyle.TEXT);
             x += ICON + GAP;
         }
