@@ -20,7 +20,7 @@ import java.util.Map;
  * <p>Shift + right click disassembles them: the chassis and all five modules come back unchanged,
  * which is the contract {@link GlassesBuild} already guarantees on the data side.
  */
-public class GlassesItem extends Item {
+public class GlassesItem extends com.kasperstudios.kvr.glasses.WearableGlassesItem {
 
     public GlassesItem(Properties properties) {
         super(properties);
@@ -37,13 +37,19 @@ public class GlassesItem extends Item {
     //? if <1.21.2 {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        InteractionResult result = disassemble(level, player, hand);
-        return new InteractionResultHolder<>(result, player.getItemInHand(hand));
+        if (player.isShiftKeyDown()) {
+            InteractionResult result = disassemble(level, player, hand);
+            return new InteractionResultHolder<>(result, player.getItemInHand(hand));
+        }
+        return super.use(level, player, hand);
     }
     //?} else {
     /*@Override
     public InteractionResult use(Level level, Player player, InteractionHand hand) {
-        return disassemble(level, player, hand);
+        if (player.isShiftKeyDown()) {
+            return disassemble(level, player, hand);
+        }
+        return super.use(level, player, hand);
     }
     *///?}
 

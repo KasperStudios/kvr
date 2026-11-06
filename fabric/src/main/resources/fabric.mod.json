@@ -14,7 +14,7 @@
       "com.kasperstudios.kvr.fabric.KVRFabric"
     ],
     "client": [
-      "com.kasperstudios.kvr.fabric.KVRFabricClient"
+      "com.kasperstudios.kvr.fabric.client.KVRFabricClient"
     ]
   },
   "depends": {

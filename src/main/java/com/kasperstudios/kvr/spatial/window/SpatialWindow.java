@@ -325,9 +325,17 @@ public abstract class SpatialWindow {
     public final void setLocked(boolean locked) { if (hasSettings()) chrome.setLocked(locked); }
     public final boolean isMenuOpen() { return chrome.menuOpen(); }
 
-    /** Materialised for other players (and readable by HackGlasses). Private windows never leave the client. */
+    /**
+     * Public: materialised for other players nearby. Private: not shown to anyone — but a HackGlasses wearer
+     * (secret artifact) can intercept it, unless {@link #mayLeaveDevice()} is false.
+     */
     public final boolean isPublic() {
         return hasSettings() && allowPublic() && Boolean.TRUE.equals(chrome.publicChoice());
+    }
+
+    /** False for desktop-app windows: they are never reported to the server, not even as Private. */
+    public final boolean mayLeaveDevice() {
+        return allowPublic();
     }
 
     public final void setPublic(boolean value) { chrome.setPublic(value && allowPublic()); }

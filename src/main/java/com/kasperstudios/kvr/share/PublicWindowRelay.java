@@ -22,7 +22,8 @@ import net.minecraft.world.phys.Vec3;
  *
  * <p>What travels is the summary — pose, size, title, text (≤ 256 chars) — not pixels; viewers draw
  * it as a glass panel ({@code PublicWindowRenderer}). Pixel mirroring is a later ticket.
- * Private windows never reach the server, so they cannot be relayed.
+ * Private entries in the same summary are filtered out here ({@link WindowSummary#publicView}); only
+ * {@code SpyRelay} hands them to a HackGlasses wearer.
  */
 public final class PublicWindowRelay {
 

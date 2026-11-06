@@ -19,8 +19,10 @@ import net.minecraft.client.Minecraft;
 /**
  * Client half of the spy relay.
  * <ul>
- *   <li>Every KVR client with a lit display reports its <b>Public</b> windows to the server at 2 Hz
- *       (Private windows never leave the client).</li>
+ *   <li>Every KVR client with a lit display reports its windows to the server at 2 Hz, each flagged
+ *       Public or Private. Bystanders only ever get the Public ones; a HackGlasses wearer looking at
+ *       the owner gets all of them (Creator's decision: the artifact taps into sessions and projections).
+ *       Desktop-app windows are never reported.</li>
  *   <li>A HackGlasses wearer receives the summary of the player they look at; {@link GhostRenderer}
  *       draws it in the world for {@link HackGlasses#LINGER_TICKS} after the last update.</li>
  * </ul>
@@ -79,16 +81,20 @@ public final class SpyClient {
     }
 
     static WindowSummary summarize() {
-        List<WindowSummary.Entry> list = new ArrayList<>();
-        for (SpatialWindow w : KVRSpatial.windows().publicWindows()) {
+        List<WindowSummary.Entry> pub = new ArrayList<>();
+        List<WindowSummary.Entry> priv = new ArrayList<>();
+        for (SpatialWindow w : KVRSpatial.windows().all()) {
             SpatialPose p = w.pose();
-            if (p == null || !w.isVisible()) continue;
-            list.add(new WindowSummary.Entry(
+            // desktop apps never leave the PC (consent screen promise): not even to a HackGlasses wearer
+            if (p == null || !w.isVisible() || !w.mayLeaveDevice()) continue;
+            WindowSummary.Entry e = new WindowSummary.Entry(
                 w.title().getString(), w.kind().ordinal(),
                 p.center().x, p.center().y, p.center().z, p.yaw(), p.pitch(),
-                w.width(), w.height(), w.isMinimized(), w.spyText()));
+                w.width(), w.height(), w.isMinimized(), w.spyText(), w.isPublic());
+            (w.isPublic() ? pub : priv).add(e);
         }
-        return new WindowSummary(KVRSpatial.config().batteryPercent().getAsInt(), list);
+        pub.addAll(priv); // public first: the 16-window cap must never cut a window bystanders should see
+        return new WindowSummary(KVRSpatial.config().batteryPercent().getAsInt(), pub);
     }
 
     public static Map<UUID, Seen> seen() {

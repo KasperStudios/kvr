@@ -132,6 +132,15 @@ public final class RenderCompat {
             return surface.target == null ? 0 : surface.target.getColorTextureId();
         }
 
+        /**
+         * The entity render type asks for GL_NEAREST every frame; on a 2× supersampled window that turns
+         * text into shimmering pixel noise at a distance or an angle. The target was created GL_LINEAR, keep it.
+         */
+        @Override
+        public void setFilter(boolean blur, boolean mipmap) {
+            // intentionally empty
+        }
+
         @Override
         public void load(net.minecraft.server.packs.resources.ResourceManager manager) {
             // nothing to load: pixels come from the framebuffer

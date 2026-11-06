@@ -48,7 +48,8 @@ public final class KvrConfig {
         # Desktop launcher entries, separated by ';' (no shell, arguments split on spaces)
         host_desktop_apps = "foot;firefox --new-instance;thunar"
         # New windows are Public (materialise for other players nearby) instead of Private.
-        # Per window: gear menu. Private windows never leave this computer.
+        # Per window: gear menu. Private windows are shown to nobody - only the secret HackGlasses can intercept them.
+        # Desktop-app windows never leave this computer.
         default_window_public = false
         # Draw other players' Public windows in the world
         show_public_windows = true

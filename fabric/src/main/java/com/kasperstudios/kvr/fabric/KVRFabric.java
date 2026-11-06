@@ -39,6 +39,7 @@ public final class KVRFabric implements ModInitializer {
             KVRGuiProvider.install(new SimpleKVRGui(platform.name()));
         }
         KVR.init();
+        com.kasperstudios.kvr.bootstrap.KVRCommonBootstrap.init();
 
         // Register Creative Mode Tab for Fabric
         registerKvrTab();

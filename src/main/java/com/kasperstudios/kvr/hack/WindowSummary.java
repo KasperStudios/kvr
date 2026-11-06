@@ -5,9 +5,13 @@ import java.util.List;
 import net.minecraft.network.FriendlyByteBuf;
 
 /**
- * What a KVR client tells the server about its own <b>Public</b> floating windows (private ones are
- * never sent): world pose + size (enough to draw the panel exactly where the owner sees it), title
- * and a short text dump. Used by the HackGlasses spy view and by the public-window relay.
+ * What a KVR client tells the server about its floating windows: world pose + size (enough to draw the
+ * panel exactly where the owner sees it), title and a short text dump, and whether the window is Public.
+ * <ul>
+ *   <li>Public entries are relayed to every player nearby ({@code PublicWindowRelay}, via {@link #publicView}).</li>
+ *   <li>Private entries go only to a HackGlasses wearer looking at the owner (Creator: the secret artifact
+ *       taps into sessions and projections). Desktop-app windows are never reported at all.</li>
+ * </ul>
  * Hard limits keep a malicious client from flooding the relay.
  */
 public record WindowSummary(int battery, List<Entry> windows) {
@@ -17,7 +21,7 @@ public record WindowSummary(int battery, List<Entry> windows) {
     public static final int MAX_TEXT = 256;
 
     public record Entry(String title, int kind, double x, double y, double z, float yaw, float pitch,
-                        int width, int height, boolean minimized, String text) {}
+                        int width, int height, boolean minimized, String text, boolean isPublic) {}
 
     public void write(FriendlyByteBuf buf) {
         buf.writeVarInt(Math.max(0, Math.min(100, battery)));
@@ -36,6 +40,7 @@ public record WindowSummary(int battery, List<Entry> windows) {
             buf.writeVarInt(Math.max(0, Math.min(2048, e.height())));
             buf.writeBoolean(e.minimized());
             buf.writeUtf(clip(e.text(), MAX_TEXT), MAX_TEXT);
+            buf.writeBoolean(e.isPublic());
         }
     }
 
@@ -49,7 +54,7 @@ public record WindowSummary(int battery, List<Entry> windows) {
                 buf.readDouble(), buf.readDouble(), buf.readDouble(),
                 buf.readFloat(), buf.readFloat(),
                 Math.min(2048, buf.readVarInt()), Math.min(2048, buf.readVarInt()),
-                buf.readBoolean(), buf.readUtf(MAX_TEXT)));
+                buf.readBoolean(), buf.readUtf(MAX_TEXT), buf.readBoolean()));
         }
         return new WindowSummary(battery, List.copyOf(list));
     }
@@ -60,7 +65,7 @@ public record WindowSummary(int battery, List<Entry> windows) {
     }
 
     /**
-     * What a bystander gets of the owner's Public windows: no minimised ones, none farther than
+     * What a bystander gets: only Public windows, no minimised ones, none farther than
      * {@code range} from the owner (a modified client cannot plant panels across the map), and no
      * battery (that stays a HackGlasses read-out).
      */
@@ -68,7 +73,7 @@ public record WindowSummary(int battery, List<Entry> windows) {
         double r2 = range * range;
         List<Entry> out = new ArrayList<>();
         for (Entry e : windows) {
-            if (e.minimized()) continue;
+            if (!e.isPublic() || e.minimized()) continue;
             double dx = e.x() - ownerX;
             double dy = e.y() - ownerY;
             double dz = e.z() - ownerZ;

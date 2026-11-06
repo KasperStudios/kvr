@@ -60,9 +60,28 @@ public final class SpatialRenderer {
         for (SpatialWindow w : list) {
             drawWindow(pose, buffers, w, cam);
             if (w.hasGrabBar()) drawGrabBar(pose, buffers, w, cam, hover);
+            if (w.hasGrabBar() && hover.isPresent() && hover.get().window() == w) drawHoverFrame(pose, buffers, w, cam);
         }
         drawPointer(pose, buffers, camera, cam, hover);
         RenderCompat.flush(buffers);
+    }
+
+    /**
+     * Thin frame around the window under the hand, so it is obvious which window a click (and, for
+     * desktop apps, the keyboard) goes to. Cyan normally, red when the window is locked.
+     */
+    private static void drawHoverFrame(PoseStack pose, MultiBufferSource buffers, SpatialWindow w, Vec3 cam) {
+        SpatialPose p = w.pose();
+        double t = 1.5 / SpatialWindow.PX_PER_METER;
+        double hw = w.widthMeters();
+        double hh = w.heightMeters();
+        // a hair in front of the glass, so the frame never z-fights with the window quad
+        Vec3 c = p.center().subtract(cam).add(p.normal().scale(0.002));
+        int color = w.isLocked() ? 0xC8F43F5E : 0xB467E8F9;
+        rect(pose, buffers, c.add(p.up().scale(hh / 2)), p, hw + t, t, color);
+        rect(pose, buffers, c.subtract(p.up().scale(hh / 2)), p, hw + t, t, color);
+        rect(pose, buffers, c.subtract(p.right().scale(hw / 2)), p, t, hh + t, color);
+        rect(pose, buffers, c.add(p.right().scale(hw / 2)), p, t, hh + t, color);
     }
 
     private static void drawWindow(PoseStack pose, MultiBufferSource buffers, SpatialWindow w, Vec3 cam) {
