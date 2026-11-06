@@ -108,5 +108,14 @@
   "kvr.settings.section.windows": "Окна",
   "kvr.settings.section.desktop": "Приложения ПК",
   "kvr.settings.window_opacity": "Фон окон: %s%%",
-  "kvr.settings.desktop_clipboard": "Общий буфер обмена с приложениями ПК"
+  "kvr.settings.desktop_clipboard": "Общий буфер обмена с приложениями ПК",
+  "item.kvr.glasses": "Очки KVR",
+  "item.kvr.hackglasses": "Хакерские очки",
+  "block.kvr.up_ore": "Руда UpOre",
+  "item.kvr.up_ore": "Руда UpOre",
+  "block.kvr.compressed_up_ore": "Сжатый блок UpOre",
+  "item.kvr.compressed_up_ore": "Сжатый блок UpOre",
+  "block.kvr.dock_plate": "Док-плита",
+  "item.kvr.dock_plate": "Док-плита",
+  "itemGroup.kvr.main": "KVR — Spatial OS"
 }

@@ -108,5 +108,14 @@
   "kvr.settings.section.windows": "Windows",
   "kvr.settings.section.desktop": "PC apps",
   "kvr.settings.window_opacity": "Window background: %s%%",
-  "kvr.settings.desktop_clipboard": "Shared clipboard with PC apps"
+  "kvr.settings.desktop_clipboard": "Shared clipboard with PC apps",
+  "item.kvr.glasses": "KVR Glasses",
+  "item.kvr.hackglasses": "HackGlasses",
+  "block.kvr.up_ore": "UpOre",
+  "item.kvr.up_ore": "UpOre",
+  "block.kvr.compressed_up_ore": "Compressed UpOre Block",
+  "item.kvr.compressed_up_ore": "Compressed UpOre Block",
+  "block.kvr.dock_plate": "Dock Plate",
+  "item.kvr.dock_plate": "Dock Plate",
+  "itemGroup.kvr.main": "KVR — Spatial OS"
 }

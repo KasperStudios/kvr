@@ -28,9 +28,7 @@ public final class KVRGlassesData {
         //? if <1.20.5 {
         /*stack.getOrCreateTag().putIntArray(TAG, data);
         *///?} else {
-        CompoundTag tag = new CompoundTag();
-        tag.putIntArray(TAG, data);
-        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+        CustomData.update(DataComponents.CUSTOM_DATA, stack, tag -> tag.putIntArray(TAG, data));
         //?}
     }
 

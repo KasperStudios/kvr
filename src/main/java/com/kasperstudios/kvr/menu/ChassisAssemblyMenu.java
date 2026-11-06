@@ -143,6 +143,16 @@ public class ChassisAssemblyMenu extends AbstractContainerMenu {
             // the build is complete: the chassis stack itself becomes the glasses
             ItemStack glasses = new ItemStack(KVRContent.glasses());
             com.kasperstudios.kvr.items.KVRGlassesData.write(glasses, result.build());
+            // Initialize fresh glasses with factory charge
+            com.kasperstudios.kvr.power.PowerData factoryData = new com.kasperstudios.kvr.power.PowerData();
+            factoryData.setChargePercent(new com.kasperstudios.kvr.power.PowerBuild(
+                    result.build().tierOf(com.kasperstudios.kvr.hardware.ComponentType.CPU).level(),
+                    result.build().tierOf(com.kasperstudios.kvr.hardware.ComponentType.GPU).level(),
+                    result.build().tierOf(com.kasperstudios.kvr.hardware.ComponentType.RAM).level(),
+                    result.build().tierOf(com.kasperstudios.kvr.hardware.ComponentType.STORAGE).level(),
+                    result.build().tierOf(com.kasperstudios.kvr.hardware.ComponentType.BATTERY).level()
+            ), com.kasperstudios.kvr.power.PowerTable.FACTORY_CHARGE_PERCENT);
+            com.kasperstudios.kvr.power.GlassesPower.save(glasses, factoryData);
             GlassesPaint paint = KVRPaintData.paint(chassisStack);
             if (paint != null) {
                 KVRPaintData.paint(glasses, paint);

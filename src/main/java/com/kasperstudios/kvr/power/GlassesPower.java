@@ -99,7 +99,7 @@ public final class GlassesPower {
         Optional<PowerBuild> b = build(stack);
         if (b.isEmpty()) return PowerSimulator.Event.NONE;
         PowerData d = hasData(stack) ? data(stack) : factoryData(b.get(), gameTime);
-        PowerSimulator.step(b.get(), d, gameTime); // settle consumption up to now first
+        d.lastStep = gameTime; // sync time stamp directly to prevent stale deltas
         PowerSimulator.Event e = PowerSimulator.setState(b.get(), d, target, gameTime);
         save(stack, d);
         return e;

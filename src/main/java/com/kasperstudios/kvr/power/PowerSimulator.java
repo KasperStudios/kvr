@@ -19,7 +19,10 @@ public final class PowerSimulator {
         d.lastStep = gameTime;
 
         if (d.overloading() && gameTime >= d.overloadDeadline) return Event.DETONATE;
-        if (d.state == PowerState.OFF) return Event.NONE;
+        if (d.state == PowerState.OFF) {
+            d.lastStep = gameTime;
+            return Event.NONE;
+        }
 
         Event event = Event.NONE;
         if (d.bootUntil > 0 && gameTime >= d.bootUntil) {
@@ -59,8 +62,10 @@ public final class PowerSimulator {
         }
         if (d.state == PowerState.OFF) {
             if (d.charge <= 0) return Event.NONE; // nothing to boot with
+            d.lastStep = gameTime;
             d.bootUntil = gameTime + build.coldBootTicks();
         }
+        d.lastStep = gameTime;
         d.state = target;
         return Event.NONE;
     }

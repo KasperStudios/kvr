@@ -12,6 +12,7 @@
     "client.MinecraftMixin",
     "client.MouseHandlerMixin",
     "client.PlayerModelMixin",
+    "client.PlayerRendererMixin",
     "client.ScreenMixin"
   ],
   "injectors": {
