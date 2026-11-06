@@ -17,6 +17,8 @@ public final class KVRFabric implements ModInitializer {
         KVRPlatform platform = new FabricPlatform();
         KVRPlatformProvider.install(platform);
         KVRRegistryProvider.install(new FabricRegistrar());
+        com.kasperstudios.kvr.platform.KVRServer.install(new FabricKVRServerProvider());
+        com.kasperstudios.kvr.platform.KVRNetwork.install(new FabricKVRNetworkProvider());
         KVRContent.init();
 
         // Wire KVRDock: register BlockEntityType and install
