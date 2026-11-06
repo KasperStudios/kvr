@@ -15,7 +15,7 @@ import org.jetbrains.annotations.Nullable;
  * <ul>
  *   <li>Windows: default Public/Private, show other players' public windows, window background
  *       opacity (readability, 0018);</li>
- *   <li>PC apps: the desktop apps switch and the kvr-desktopd consent.</li>
+ *   <li>PC apps: the desktop apps switch, clipboard sharing with PC apps (D2) and the kvr-desktopd consent.</li>
  * </ul>
  * Writes {@code kvr-client.toml} key by key. The opacity slider writes once, when the screen closes
  * (not on every drag step); windows pick the new value up on the next frame.
@@ -74,6 +74,10 @@ public final class KvrSettingsScreen extends Screen {
                 // switching it on without consent goes straight to the consent dialog
                 if (v && !info.consented() && minecraft != null) minecraft.setScreen(new DesktopConsentScreen(this, null));
             }));
+        y += ROW;
+        addRenderableWidget(CycleButton.onOffBuilder(c.desktopClipboard())
+            .create(x, y, W, 20, Component.translatable("kvr.settings.desktop_clipboard"),
+                (b, v) -> KvrConfig.updateClient("desktop_clipboard_sync", v)));
         y += ROW;
         addRenderableWidget(Button.builder(Component.translatable("kvr.settings.consent"),
             b -> { if (minecraft != null) minecraft.setScreen(new DesktopConsentScreen(this, null)); })

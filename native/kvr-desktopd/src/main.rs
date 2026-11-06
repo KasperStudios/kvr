@@ -8,6 +8,8 @@
 mod protocol;
 
 #[cfg(target_os = "linux")]
+mod clipboard;
+#[cfg(target_os = "linux")]
 mod compositor;
 #[cfg(target_os = "linux")]
 mod ipc;
@@ -15,6 +17,8 @@ mod ipc;
 mod launch;
 #[cfg(target_os = "linux")]
 mod shm;
+#[cfg(target_os = "linux")]
+mod surfaces;
 
 #[cfg(not(target_os = "linux"))]
 fn main() {

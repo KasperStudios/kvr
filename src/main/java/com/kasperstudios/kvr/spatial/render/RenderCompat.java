@@ -53,6 +53,27 @@ public final class RenderCompat {
         //?}
     }
 
+    /**
+     * Whole texture into a GUI rect, blended as PREMULTIPLIED alpha (Wayland buffers are premultiplied):
+     * desktop app cursors. Straight-alpha blending would leave dark fringes.
+     */
+    public static void blitPremultiplied(GuiGraphics g, ResourceLocation tex, int x, int y, int w, int h, int texW, int texH) {
+        //? if <1.21.2 {
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        com.mojang.blaze3d.systems.RenderSystem.blendFunc(
+            com.mojang.blaze3d.platform.GlStateManager.SourceFactor.ONE, com.mojang.blaze3d.platform.GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
+        try {
+            g.blit(tex, x, y, w, h, 0f, 0f, texW, texH, texW, texH);
+        } finally {
+            com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
+            com.mojang.blaze3d.systems.RenderSystem.disableBlend();
+        }
+        //?} else {
+        /*// VERIFY on 1.21.11: needs a premultiplied GUI pipeline; straight alpha is close enough for a cursor
+        g.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, tex, x, y, 0f, 0f, w, h, texW, texH, texW, texH);
+        *///?}
+    }
+
     public static Surface surface(ResourceLocation id) {
         return new Surface(id);
     }

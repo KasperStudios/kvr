@@ -1,7 +1,5 @@
 {
   "variants": {
-    "": {
-      "model": "kvr:block/compressed_up_ore"
-    }
+    "": { "model": "kvr:block/compressed_up_ore" }
   }
 }

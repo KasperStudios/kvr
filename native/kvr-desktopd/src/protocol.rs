@@ -3,14 +3,22 @@
 //!
 //! message = u16 type, u16 flags (0), u32 payload length, payload   (little-endian)
 //! str     = u16 byte length + UTF-8 (<= 4096 bytes)
-//! Pixels never go through the socket: they live in the stream's shared-memory file (see shm.rs).
+//! lstr    = u32 byte length + UTF-8 (<= 60000 bytes, clipboard text)
+//! bytes   = u32 length + raw bytes (cursor pixels, <= 64x64x4)
+//! Pixels of windows never go through the socket: they live in the stream's shared-memory file (see shm.rs).
+//!
+//! v2 (D2): CLIPBOARD_SET (mod -> daemon), CURSOR and CLIPBOARD (daemon -> mod). Popups and
+//! subsurfaces need no messages: the daemon composites them into the stream's frame.
 
 use std::io;
 
-pub const VERSION: u16 = 1;
+pub const VERSION: u16 = 2;
 pub const HEADER: usize = 8;
 pub const MAX_PAYLOAD: usize = 64 * 1024;
 pub const MAX_STRING: usize = 4096;
+pub const MAX_CLIPBOARD: usize = 60_000;
+/// Cursor images larger than this (per side) are scaled down by the daemon.
+pub const MAX_CURSOR: usize = 64;
 pub const MAX_RECTS: usize = 16;
 pub const SHM_MAGIC: u32 = 0x5352_564B;
 pub const SHM_HEADER: usize = 64;
@@ -18,6 +26,13 @@ pub const SHM_HEADER: usize = 64;
 pub const FORMAT_BGRA: u8 = 0;
 /// Capability bits in HELLO_OK.
 pub const CAP_HOSTED: u32 = 1;
+pub const CAP_CLIPBOARD: u32 = 2;
+pub const CAP_CURSOR: u32 = 4;
+pub const CAP_POPUPS: u32 = 8;
+/// CURSOR.shape
+pub const CURSOR_HIDDEN: u8 = 0;
+pub const CURSOR_NAMED: u8 = 1;
+pub const CURSOR_IMAGE: u8 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rect {
@@ -40,6 +55,8 @@ pub enum Msg {
     Key { stream: u32, scancode: u32, glfw_key: i32, pressed: bool },
     Focus { stream: u32, focused: bool },
     Close { stream: u32 },
+    /// KVR / system clipboard text offered to the apps (they paste it with Ctrl+V)
+    ClipboardSet { text: String },
     // daemon -> mod
     HelloOk { version: u16, caps: u32 },
     Stream { stream: u32, req: u32, title: String, app_id: String },
@@ -48,6 +65,11 @@ pub enum Msg {
     Title { stream: u32, title: String },
     Closed { stream: u32, reason: String },
     Error { req: u32, message: String },
+    /// The app's pointer cursor over `stream`: hidden, a named shape (`name`, e.g. "text"), or a BGRA
+    /// premultiplied image `width`x`height` with its hotspot. Coordinates in frame pixels.
+    Cursor { stream: u32, shape: u8, name: String, hot_x: u16, hot_y: u16, width: u16, height: u16, pixels: Vec<u8> },
+    /// An app copied text
+    Clipboard { text: String },
 }
 
 impl Msg {
@@ -63,6 +85,7 @@ impl Msg {
             Msg::Key { .. } => 8,
             Msg::Focus { .. } => 9,
             Msg::Close { .. } => 10,
+            Msg::ClipboardSet { .. } => 11,
             Msg::HelloOk { .. } => 101,
             Msg::Stream { .. } => 102,
             Msg::Buffer { .. } => 103,
@@ -70,6 +93,8 @@ impl Msg {
             Msg::Title { .. } => 105,
             Msg::Closed { .. } => 106,
             Msg::Error { .. } => 107,
+            Msg::Cursor { .. } => 108,
+            Msg::Clipboard { .. } => 109,
         }
     }
 
@@ -126,6 +151,18 @@ impl Msg {
                 p.u8(*focused as u8);
             }
             Msg::Close { stream } => p.u32(*stream),
+            Msg::ClipboardSet { text } => p.lstr(text),
+            Msg::Cursor { stream, shape, name, hot_x, hot_y, width, height, pixels } => {
+                p.u32(*stream);
+                p.u8(*shape);
+                p.str(name);
+                p.u16(*hot_x);
+                p.u16(*hot_y);
+                p.u16(*width);
+                p.u16(*height);
+                p.bytes(pixels);
+            }
+            Msg::Clipboard { text } => p.lstr(text),
             Msg::HelloOk { version, caps } => {
                 p.u16(*version);
                 p.u32(*caps);
@@ -206,6 +243,17 @@ impl Msg {
             8 => Msg::Key { stream: r.u32()?, scancode: r.u32()?, glfw_key: r.u32()? as i32, pressed: r.u8()? != 0 },
             9 => Msg::Focus { stream: r.u32()?, focused: r.u8()? != 0 },
             10 => Msg::Close { stream: r.u32()? },
+            11 => Msg::ClipboardSet { text: r.lstr()? },
+            108 => {
+                let (stream, shape, name) = (r.u32()?, r.u8()?, r.str()?);
+                let (hot_x, hot_y, width, height) = (r.u16()?, r.u16()?, r.u16()?, r.u16()?);
+                let pixels = r.bytes()?;
+                if shape == CURSOR_IMAGE && pixels.len() != width as usize * height as usize * 4 {
+                    return Err(bad("cursor size mismatch"));
+                }
+                Msg::Cursor { stream, shape, name, hot_x, hot_y, width, height, pixels }
+            }
+            109 => Msg::Clipboard { text: r.lstr()? },
             101 => Msg::HelloOk { version: r.u16()?, caps: r.u32()? },
             102 => Msg::Stream { stream: r.u32()?, req: r.u32()?, title: r.str()?, app_id: r.str()? },
             103 => Msg::Buffer { stream: r.u32()?, generation: r.u16()?, path: r.str()?, slots: r.u8()?, slot_size: r.u32()? },
@@ -248,18 +296,32 @@ impl W {
         self.0.extend_from_slice(&v.to_le_bytes());
     }
     fn str(&mut self, s: &str) {
-        let mut b = s.as_bytes();
-        if b.len() > MAX_STRING {
-            // cut on a char boundary
-            let mut end = MAX_STRING;
-            while !s.is_char_boundary(end) {
-                end -= 1;
-            }
-            b = &b[..end];
-        }
+        let b = cut(s, MAX_STRING);
         self.u16(b.len() as u16);
         self.0.extend_from_slice(b);
     }
+    fn lstr(&mut self, s: &str) {
+        let b = cut(s, MAX_CLIPBOARD);
+        self.u32(b.len() as u32);
+        self.0.extend_from_slice(b);
+    }
+    fn bytes(&mut self, b: &[u8]) {
+        let n = b.len().min(MAX_CURSOR * MAX_CURSOR * 4);
+        self.u32(n as u32);
+        self.0.extend_from_slice(&b[..n]);
+    }
+}
+
+/// UTF-8 bytes of `s`, cut to at most `max` bytes on a char boundary.
+fn cut(s: &str, max: usize) -> &[u8] {
+    if s.len() <= max {
+        return s.as_bytes();
+    }
+    let mut end = max;
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s.as_bytes()[..end]
 }
 
 struct R<'a> {
@@ -294,6 +356,20 @@ impl R<'_> {
             return Err(bad("string too long"));
         }
         String::from_utf8(self.take(n)?.to_vec()).map_err(|_| bad("bad UTF-8"))
+    }
+    fn lstr(&mut self) -> io::Result<String> {
+        let n = self.u32()? as usize;
+        if n > MAX_CLIPBOARD {
+            return Err(bad("clipboard text too long"));
+        }
+        String::from_utf8(self.take(n)?.to_vec()).map_err(|_| bad("bad UTF-8"))
+    }
+    fn bytes(&mut self) -> io::Result<Vec<u8>> {
+        let n = self.u32()? as usize;
+        if n > MAX_CURSOR * MAX_CURSOR * 4 {
+            return Err(bad("cursor image too large"));
+        }
+        Ok(self.take(n)?.to_vec())
     }
 }
 

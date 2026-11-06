@@ -24,6 +24,15 @@ public final class DesktopStream {
         void upload(ByteBuffer pixels, DesktopProtocol.Frame frame, boolean full);
     }
 
+    /**
+     * The app's cursor (D2). {@code version} grows with every change, so the window re-uploads an image
+     * cursor only when it really changed. Sizes and hotspot in frame (app) pixels.
+     */
+    public record CursorState(int shape, String name, int hotX, int hotY, int width, int height, byte[] pixels, int version) {}
+
+    @Nullable private volatile CursorState cursor;
+    private int cursorVersion;
+
     private final DesktopBridge bridge;
     private final int id;
     private final int req;
@@ -101,6 +110,15 @@ public final class DesktopStream {
     }
 
     void retitle(String t) { this.title = t; }
+
+    /** Reader thread: CURSOR. */
+    synchronized void setCursor(DesktopProtocol.Cursor c) {
+        cursor = new CursorState(c.shape(), c.name(), c.hotX(), c.hotY(), c.width(), c.height(), c.pixels(), ++cursorVersion);
+    }
+
+    /** Null until the app set a cursor over this window. */
+    @Nullable
+    public CursorState cursor() { return cursor; }
 
     void markClosed(String reason) {
         closed = true;

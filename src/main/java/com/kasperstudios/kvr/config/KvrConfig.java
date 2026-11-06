@@ -26,10 +26,11 @@ public final class KvrConfig {
      * @param hostDesktopConsent      SHA-256 of the binary the user agreed to run (empty = no consent)
      * @param hostDesktopApps         launcher entries, {@code ;}-separated command lines
      * @param windowOpacity           dark backdrop under window glass, percent 0..100 (0018: readability)
+     * @param desktopClipboard        share clipboard text between PC apps in KVR and the system (D2)
      */
     public record Client(boolean hostDesktopWindows, boolean defaultWindowPublic, boolean showPublicWindows,
                          String hostDesktopDaemon, String hostDesktopDownloadUrl, String hostDesktopDownloadSha256,
-                         String hostDesktopConsent, String hostDesktopApps, int windowOpacity) {}
+                         String hostDesktopConsent, String hostDesktopApps, int windowOpacity, boolean desktopClipboard) {}
 
     public record Server(boolean hostDesktopWindows, int hostDesktopMaxWindows, int publicWindowRange) {}
 
@@ -48,6 +49,8 @@ public final class KvrConfig {
         host_desktop_consent = ""
         # Desktop launcher entries, separated by ';' (no shell, arguments split on spaces)
         host_desktop_apps = "foot;firefox --new-instance;thunar"
+        # Clipboard text shared between PC apps in KVR and your system clipboard (copy in the app -> paste anywhere)
+        desktop_clipboard_sync = true
         # New windows are Public (materialise for other players nearby) instead of Private.
         # Per window: gear menu. Private windows are shown to nobody - only the secret HackGlasses can intercept them.
         # Desktop-app windows never leave this computer.
@@ -82,7 +85,8 @@ public final class KvrConfig {
                 str(m, "host_desktop_download_sha256"),
                 str(m, "host_desktop_consent"),
                 str(m, "host_desktop_apps"),
-                clampInt(m, "window_opacity", 75, 0, 100));
+                clampInt(m, "window_opacity", 75, 0, 100),
+                bool(m, "desktop_clipboard_sync", true));
         }
         return client;
     }

@@ -17,15 +17,21 @@ import java.util.List;
  * shm file = 64-byte header (u32 magic 'KVRS', u32 version, u32 slots, u32 slotSize, rest 0) + slots × slotSize
  * </pre>
  *
- * Mod → daemon: HELLO, LAUNCH, CONFIGURE, ACK, POINTER, BUTTON, AXIS, KEY, FOCUS, CLOSE.
- * Daemon → mod: HELLO_OK, STREAM, BUFFER, FRAME, TITLE, CLOSED, ERROR.
+ * Mod → daemon: HELLO, LAUNCH, CONFIGURE, ACK, POINTER, BUTTON, AXIS, KEY, FOCUS, CLOSE, CLIPBOARD_SET.
+ * Daemon → mod: HELLO_OK, STREAM, BUFFER, FRAME, TITLE, CLOSED, ERROR, CURSOR, CLIPBOARD.
+ *
+ * <p>v2 (D2): clipboard both ways and the app's cursor. Popups/menus need no messages: the daemon
+ * composites them into the window's frame. {@code lstr} = u32 length + UTF-8 (≤ 60000 bytes),
+ * {@code bytes} = u32 length + raw bytes.
  */
 public final class DesktopProtocol {
 
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
     public static final int HEADER = 8;
     public static final int MAX_PAYLOAD = 64 * 1024;
     public static final int MAX_STRING = 4096;
+    public static final int MAX_CLIPBOARD = 60_000;
+    public static final int MAX_CURSOR = 64;
     public static final int MAX_RECTS = 16;
     public static final int SHM_MAGIC = 0x5352564B;
     public static final int SHM_HEADER = 64;
@@ -36,6 +42,15 @@ public final class DesktopProtocol {
     public static final int BTN_LEFT = 0x110;
     public static final int BTN_RIGHT = 0x111;
     public static final int BTN_MIDDLE = 0x112;
+    /** HELLO_OK capability bits. */
+    public static final int CAP_HOSTED = 1;
+    public static final int CAP_CLIPBOARD = 2;
+    public static final int CAP_CURSOR = 4;
+    public static final int CAP_POPUPS = 8;
+    /** CURSOR.shape */
+    public static final int CURSOR_HIDDEN = 0;
+    public static final int CURSOR_NAMED = 1;
+    public static final int CURSOR_IMAGE = 2;
 
     public static final int T_HELLO = 1;
     public static final int T_LAUNCH = 2;
@@ -47,6 +62,7 @@ public final class DesktopProtocol {
     public static final int T_KEY = 8;
     public static final int T_FOCUS = 9;
     public static final int T_CLOSE = 10;
+    public static final int T_CLIPBOARD_SET = 11;
     public static final int T_HELLO_OK = 101;
     public static final int T_STREAM = 102;
     public static final int T_BUFFER = 103;
@@ -54,13 +70,15 @@ public final class DesktopProtocol {
     public static final int T_TITLE = 105;
     public static final int T_CLOSED = 106;
     public static final int T_ERROR = 107;
+    public static final int T_CURSOR = 108;
+    public static final int T_CLIPBOARD = 109;
 
     private DesktopProtocol() {}
 
     public record Rect(int x, int y, int w, int h) {}
 
-    public sealed interface Msg permits Hello, Launch, Configure, Ack, Pointer, Button, Axis, Key, Focus, Close,
-        HelloOk, Stream, Buffer, Frame, Title, Closed, Error {}
+    public sealed interface Msg permits Hello, Launch, Configure, Ack, Pointer, Button, Axis, Key, Focus, Close, ClipboardSet,
+        HelloOk, Stream, Buffer, Frame, Title, Closed, Error, Cursor, Clipboard {}
 
     public record Hello(int version, String token) implements Msg {}
     public record Launch(int req, List<String> argv) implements Msg {}
@@ -84,6 +102,15 @@ public final class DesktopProtocol {
     public record Title(int stream, String title) implements Msg {}
     public record Closed(int stream, String reason) implements Msg {}
     public record Error(int req, String message) implements Msg {}
+    /** KVR / system clipboard text offered to the apps (they paste it with Ctrl+V). */
+    public record ClipboardSet(String text) implements Msg {}
+    /**
+     * The app's cursor over {@code stream}: hidden, a named shape ({@code name}: "default", "text", "pointer"…)
+     * or a premultiplied BGRA image {@code width}×{@code height} with its hotspot, in frame pixels.
+     */
+    public record Cursor(int stream, int shape, String name, int hotX, int hotY, int width, int height, byte[] pixels) implements Msg {}
+    /** An app copied text. */
+    public record Clipboard(String text) implements Msg {}
 
     // --- encode --------------------------------------------------------------------------------
 
@@ -125,6 +152,20 @@ public final class DesktopProtocol {
         } else if (m instanceof Close c) {
             p.putInt(c.stream());
             type = T_CLOSE;
+        } else if (m instanceof ClipboardSet c) {
+            lstr(p, c.text());
+            type = T_CLIPBOARD_SET;
+        } else if (m instanceof Cursor c) {
+            p.putInt(c.stream()).put((byte) c.shape());
+            str(p, c.name());
+            p.putShort((short) c.hotX()).putShort((short) c.hotY()).putShort((short) c.width()).putShort((short) c.height());
+            byte[] px = c.pixels() == null ? new byte[0] : c.pixels();
+            int n = Math.min(px.length, MAX_CURSOR * MAX_CURSOR * 4);
+            p.putInt(n).put(px, 0, n);
+            type = T_CURSOR;
+        } else if (m instanceof Clipboard c) {
+            lstr(p, c.text());
+            type = T_CLIPBOARD;
         } else if (m instanceof HelloOk h) {
             p.putShort((short) h.version()).putInt(h.caps());
             type = T_HELLO_OK;
@@ -171,10 +212,24 @@ public final class DesktopProtocol {
     }
 
     private static void str(ByteBuffer p, String s) {
+        byte[] b = utf8(s, MAX_STRING);
+        p.putShort((short) b.length);
+        p.put(b);
+    }
+
+    private static void lstr(ByteBuffer p, String s) {
+        byte[] b = utf8(s, MAX_CLIPBOARD);
+        p.putInt(b.length);
+        p.put(b);
+    }
+
+    /** UTF-8 bytes cut to {@code max} on a character boundary (never half a letter). */
+    static byte[] utf8(String s, int max) {
         byte[] b = (s == null ? "" : s).getBytes(StandardCharsets.UTF_8);
-        int n = Math.min(MAX_STRING, b.length);
-        p.putShort((short) n);
-        p.put(b, 0, n);
+        if (b.length <= max) return b;
+        int n = max;
+        while (n > 0 && (b[n] & 0xC0) == 0x80) n--;
+        return java.util.Arrays.copyOf(b, n);
     }
 
     // --- decode --------------------------------------------------------------------------------
@@ -200,6 +255,23 @@ public final class DesktopProtocol {
             case T_KEY -> new Key(p.getInt(), p.getInt(), p.getInt(), u8(p) != 0);
             case T_FOCUS -> new Focus(p.getInt(), u8(p) != 0);
             case T_CLOSE -> new Close(p.getInt());
+            case T_CLIPBOARD_SET -> new ClipboardSet(lstr(p));
+            case T_CURSOR -> {
+                int stream = p.getInt();
+                int shape = u8(p);
+                String name = str(p);
+                int hx = u16(p);
+                int hy = u16(p);
+                int w = u16(p);
+                int h = u16(p);
+                int n = p.getInt();
+                if (n < 0 || n > MAX_CURSOR * MAX_CURSOR * 4 || n > p.remaining()) throw new IllegalArgumentException("bad cursor size " + n);
+                if (shape == CURSOR_IMAGE && n != w * h * 4) throw new IllegalArgumentException("cursor size mismatch");
+                byte[] px = new byte[n];
+                p.get(px);
+                yield new Cursor(stream, shape, name, hx, hy, w, h, px);
+            }
+            case T_CLIPBOARD -> new Clipboard(lstr(p));
             case T_HELLO_OK -> new HelloOk(u16(p), p.getInt());
             case T_STREAM -> new Stream(p.getInt(), p.getInt(), str(p), str(p));
             case T_BUFFER -> new Buffer(p.getInt(), u16(p), str(p), u8(p), p.getInt());
@@ -235,6 +307,14 @@ public final class DesktopProtocol {
     private static String str(ByteBuffer p) {
         int n = u16(p);
         if (n > MAX_STRING || n > p.remaining()) throw new IllegalArgumentException("bad string length " + n);
+        byte[] b = new byte[n];
+        p.get(b);
+        return new String(b, StandardCharsets.UTF_8);
+    }
+
+    private static String lstr(ByteBuffer p) {
+        int n = p.getInt();
+        if (n < 0 || n > MAX_CLIPBOARD || n > p.remaining()) throw new IllegalArgumentException("bad text length " + n);
         byte[] b = new byte[n];
         p.get(b);
         return new String(b, StandardCharsets.UTF_8);

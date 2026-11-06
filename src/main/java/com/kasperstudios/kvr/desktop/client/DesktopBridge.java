@@ -49,6 +49,7 @@ public final class DesktopBridge implements AutoCloseable {
     @Nullable private volatile SocketChannel channel;
     private volatile State state = State.CONNECTING;
     private volatile String reason = "";
+    private volatile int caps;
 
     public DesktopBridge(Path socket, String token, Listener listener) {
         this.socket = socket;
@@ -149,7 +150,10 @@ public final class DesktopBridge implements AutoCloseable {
     private void handle(DesktopProtocol.Msg m) throws IOException {
         Minecraft mc = Minecraft.getInstance();
         if (m instanceof DesktopProtocol.HelloOk ok) {
-            if (ok.version() != DesktopProtocol.VERSION) throw new IOException("protocol " + ok.version() + ", mod speaks " + DesktopProtocol.VERSION);
+            if (ok.version() != DesktopProtocol.VERSION) {
+                throw new IOException("kvr-desktopd speaks protocol " + ok.version() + ", the mod " + DesktopProtocol.VERSION + " — update kvr-desktopd");
+            }
+            caps = ok.caps();
             state = State.READY;
             DesktopDaemon.markRunning();
             DesktopProtocol.Msg q;
@@ -176,6 +180,11 @@ public final class DesktopBridge implements AutoCloseable {
             }
         } else if (m instanceof DesktopProtocol.Error e) {
             mc.execute(() -> listener.launchFailed(e.req(), e.message()));
+        } else if (m instanceof DesktopProtocol.Cursor c) {
+            DesktopStream stream = streams.get(c.stream());
+            if (stream != null) stream.setCursor(c);
+        } else if (m instanceof DesktopProtocol.Clipboard c) {
+            mc.execute(() -> DesktopClipboard.fromApp(c.text()));
         }
     }
 
@@ -210,5 +219,7 @@ public final class DesktopBridge implements AutoCloseable {
 
     public State state() { return state; }
     public String reason() { return reason; }
+    /** HELLO_OK capability bits ({@link DesktopProtocol#CAP_CLIPBOARD} …); 0 until READY. */
+    public int caps() { return caps; }
     public int streamCount() { return streams.size(); }
 }

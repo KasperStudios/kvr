@@ -1,6 +1,6 @@
 [package]
 name = "kvr-desktopd"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.80"
 description = "KVR desktop daemon: runs PC apps in a hidden Wayland compositor and streams them into Minecraft"

@@ -2,24 +2,31 @@
 //! connect to it (WAYLAND_DISPLAY=kvr-desktop-<pid>), draw into wl_shm buffers, and each xdg_toplevel
 //! becomes a KVR stream. Nothing is ever shown on the real desktop: we have no backend at all.
 //!
-//! D1 scope (honest list):
-//! * wl_shm only (no linux-dmabuf): GTK/Qt/Firefox/foot fall back to software rendering — fine for
-//!   terminals, file managers, editors, browsers at 30–60 fps.
-//! * toplevels only: popups (menus) and subsurfaces are configured and kept alive, but not yet
-//!   composited into the frame (D2). Server-side decorations are requested: KVR draws the title bar.
+//! Scope after D2 (honest list):
+//! * wl_shm only (no linux-dmabuf, D4): GTK/Qt/Firefox/foot fall back to software rendering.
+//! * toplevel + subsurfaces + popups (menus, tooltips, combo boxes, context menus) composited into
+//!   one frame per window (surfaces.rs). Popups are kept inside the window (xdg_positioner
+//!   constraint = the window geometry), so the frame size never jumps when a menu opens.
+//! * popup grabs: keyboard goes to the open menu; a click outside the menus closes them (and is eaten,
+//!   like on a desktop).
+//! * the app's cursor (wl_pointer.set_cursor surface or a named shape) goes to the mod (CURSOR).
+//! * clipboard text both ways (clipboard.rs).
 //! * pointer, buttons, wheel, keyboard (xkb us+ru, Alt+Shift switches like a desktop).
 //!
 //! Smithay API written against 0.6 / smallvil from memory: lines marked VERIFY are the likely spots
 //! for compile errors. Send the exact `cargo build` output.
 
+use crate::clipboard;
 use crate::ipc::{token_eq, Conn};
 use crate::launch::Launches;
-use crate::protocol::{Msg, Rect, CAP_HOSTED, FORMAT_BGRA, MAX_RECTS, VERSION};
+use crate::protocol::{Msg, Rect, CAP_CLIPBOARD, CAP_CURSOR, CAP_HOSTED, CAP_POPUPS, CURSOR_HIDDEN, CURSOR_IMAGE, CURSOR_NAMED, FORMAT_BGRA, MAX_RECTS, VERSION};
 use crate::shm::{self, ShmRing, SLOTS};
-use anyhow::{bail, Context};
+use crate::surfaces::{self, IRect, Layer};
+use anyhow::Context;
+use std::os::fd::OwnedFd;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -27,7 +34,7 @@ use tracing::{info, warn};
 
 use smithay::backend::input::{Axis, AxisSource, ButtonState, KeyState};
 use smithay::input::keyboard::{FilterResult, XkbConfig};
-use smithay::input::pointer::{AxisFrame, ButtonEvent, MotionEvent};
+use smithay::input::pointer::{AxisFrame, ButtonEvent, CursorImageStatus, CursorImageSurfaceData, MotionEvent};
 use smithay::input::{Seat, SeatHandler, SeatState};
 use smithay::output::{Mode as OutputMode, Output, PhysicalProperties, Scale, Subpixel};
 use smithay::reexports::calloop::generic::Generic;
@@ -35,17 +42,22 @@ use smithay::reexports::calloop::{EventLoop, Interest, Mode, PostAction};
 use smithay::reexports::wayland_protocols::xdg::decoration::zv1::server::zxdg_toplevel_decoration_v1::Mode as DecorationMode;
 use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel;
 use smithay::reexports::wayland_server::backend::{ClientData, ClientId, DisconnectReason};
-use smithay::reexports::wayland_server::protocol::{wl_buffer::WlBuffer, wl_callback::WlCallback, wl_seat::WlSeat, wl_shm, wl_surface::WlSurface};
+use smithay::reexports::wayland_server::protocol::{wl_buffer::WlBuffer, wl_callback::WlCallback, wl_seat::WlSeat, wl_surface::WlSurface};
 use smithay::reexports::wayland_server::{Client, Display, DisplayHandle, Resource};
-use smithay::utils::{Serial, Transform, SERIAL_COUNTER};
+use smithay::utils::{Logical, Rectangle, Serial, Transform, SERIAL_COUNTER};
 use smithay::wayland::buffer::BufferHandler;
-use smithay::wayland::compositor::{with_states, BufferAssignment, CompositorClientState, CompositorHandler, CompositorState, Damage, SurfaceAttributes};
+use smithay::wayland::compositor::{with_states, CompositorClientState, CompositorHandler, CompositorState};
 use smithay::wayland::output::{OutputHandler, OutputManagerState};
+use smithay::wayland::selection::data_device::{
+    request_data_device_client_selection, set_data_device_focus, set_data_device_selection, ClientDndGrabHandler, DataDeviceHandler, DataDeviceState,
+    ServerDndGrabHandler,
+};
+use smithay::wayland::selection::{SelectionHandler, SelectionSource, SelectionTarget};
 use smithay::wayland::shell::xdg::decoration::{XdgDecorationHandler, XdgDecorationState};
 use smithay::wayland::shell::xdg::{PopupSurface, PositionerState, ToplevelSurface, XdgPopupSurfaceData, XdgShellHandler, XdgShellState, XdgToplevelSurfaceData};
-use smithay::wayland::shm::{with_buffer_contents, ShmHandler, ShmState};
+use smithay::wayland::shm::{ShmHandler, ShmState};
 use smithay::wayland::socket::ListeningSocketSource;
-use smithay::{delegate_compositor, delegate_output, delegate_seat, delegate_shm, delegate_xdg_decoration, delegate_xdg_shell};
+use smithay::{delegate_compositor, delegate_data_device, delegate_output, delegate_seat, delegate_shm, delegate_xdg_decoration, delegate_xdg_shell};
 
 static STOP: AtomicBool = AtomicBool::new(false);
 
@@ -53,19 +65,11 @@ extern "C" fn on_term(_: libc::c_int) {
     STOP.store(true, Ordering::Relaxed);
 }
 
-/// A committed buffer we hold until it is copied into the ring (the app double-buffers meanwhile).
-struct Pending {
-    buffer: WlBuffer,
-    /// None = everything changed
-    damage: Option<Vec<Rect>>,
-}
-
 pub struct Stream {
     id: u32,
     toplevel: ToplevelSurface,
     ring: Option<ShmRing>,
     next_generation: u16,
-    pending: Option<Pending>,
     callbacks: Vec<WlCallback>,
     fps: u8,
     visible: bool,
@@ -73,6 +77,38 @@ pub struct Stream {
     seq: u32,
     title: String,
     app_id: String,
+    /// something changed since the last published frame
+    dirty: bool,
+    /// changed rectangles in frame coordinates since the last published frame; None = everything
+    damage: Option<Vec<Rect>>,
+    last_size: (u16, u16),
+}
+
+impl Stream {
+    fn add_damage(&mut self, rects: impl IntoIterator<Item = Rect>) {
+        if let Some(d) = self.damage.as_mut() {
+            d.extend(rects);
+            if d.len() > MAX_RECTS {
+                self.damage = None;
+            }
+        }
+    }
+
+    fn damage_all(&mut self) {
+        self.dirty = true;
+        self.damage = None;
+    }
+}
+
+/// An xdg_popup (menu, tooltip, combo box list). `rel` = its window geometry relative to the parent's
+/// window geometry, exactly as configured (already constrained into the window).
+struct Popup {
+    surface: PopupSurface,
+    parent: Option<WlSurface>,
+    stream: u32,
+    rel: IRect,
+    grabbed: bool,
+    dismissed: bool,
 }
 
 #[derive(Default)]
@@ -91,6 +127,7 @@ pub struct State {
     xdg_shell_state: XdgShellState,
     shm_state: ShmState,
     seat_state: SeatState<State>,
+    data_device_state: DataDeviceState,
     seat: Seat<State>,
     _decoration_state: XdgDecorationState,
     _output_state: OutputManagerState,
@@ -102,10 +139,21 @@ pub struct State {
     ever_connected: bool,
     started: Instant,
     streams: Vec<Stream>,
-    popups: Vec<PopupSurface>,
+    popups: Vec<Popup>,
     launches: Launches,
     next_stream: u32,
     running: bool,
+    /// stream under the mod's pointer (gets the CURSOR messages) and its last position (frame px)
+    pointer_stream: u32,
+    pointer_pos: (f64, f64),
+    /// stream with the mod's keyboard capture (0 = none)
+    kbd_stream: u32,
+    /// presses that only closed a menu: their releases are eaten too
+    swallowed: Vec<u32>,
+    cursor_surface: Option<WlSurface>,
+    clip_request: Option<String>,
+    clip_reader: Option<clipboard::Reader>,
+    clip_writers: Vec<clipboard::Writer>,
 }
 
 pub fn run(socket: PathBuf, shm_dir: PathBuf, token: String) -> anyhow::Result<()> {
@@ -126,6 +174,7 @@ pub fn run(socket: PathBuf, shm_dir: PathBuf, token: String) -> anyhow::Result<(
     let shm_state = ShmState::new::<State>(&dh, vec![]);
     let decoration_state = XdgDecorationState::new::<State>(&dh);
     let output_state = OutputManagerState::new_with_xdg_output::<State>(&dh);
+    let data_device_state = DataDeviceState::new::<State>(&dh);
     let mut seat_state = SeatState::new();
     let mut seat = seat_state.new_wl_seat(&dh, "kvr");
     // us+ru, Alt+Shift switches the layout inside the app, like on a desktop
@@ -186,6 +235,7 @@ pub fn run(socket: PathBuf, shm_dir: PathBuf, token: String) -> anyhow::Result<(
         xdg_shell_state,
         shm_state,
         seat_state,
+        data_device_state,
         seat,
         _decoration_state: decoration_state,
         _output_state: output_state,
@@ -201,6 +251,14 @@ pub fn run(socket: PathBuf, shm_dir: PathBuf, token: String) -> anyhow::Result<(
         launches: Launches::new(),
         next_stream: 1,
         running: true,
+        pointer_stream: 0,
+        pointer_pos: (0.0, 0.0),
+        kbd_stream: 0,
+        swallowed: Vec::new(),
+        cursor_surface: None,
+        clip_request: None,
+        clip_reader: None,
+        clip_writers: Vec::new(),
     };
     info!(wayland_display = %state.wayland_display, control = %socket.display(), "kvr-desktopd ready");
 
@@ -275,8 +333,9 @@ impl State {
             return;
         }
         self.poll_mod();
+        self.reap_popups();
+        self.poll_clipboard();
         self.publish_frames();
-        self.popups.retain(|p| p.alive());
         self.launches.reap();
         if let Some(c) = self.conn.as_mut() {
             if let Err(e) = c.flush() {
@@ -326,12 +385,12 @@ impl State {
                     if let Some(c) = self.conn.as_mut() {
                         c.authed = true;
                     }
-                    self.send(Msg::HelloOk { version: VERSION, caps: CAP_HOSTED });
+                    self.send(Msg::HelloOk { version: VERSION, caps: CAP_HOSTED | CAP_CLIPBOARD | CAP_CURSOR | CAP_POPUPS });
                     info!("mod authenticated");
                 }
                 _ => {
-                    warn!("unauthenticated or wrong-version HELLO, dropping connection");
-                    self.conn = None; // a stranger: drop it, but keep waiting for the real mod
+                    warn!("unauthenticated or wrong-version HELLO (daemon speaks v{VERSION}), dropping connection");
+                    self.conn = None; // a stranger (or an older mod): drop it, but keep waiting for the real mod
                 }
             }
             return;
@@ -351,7 +410,7 @@ impl State {
                     }
                 }
             }
-            Msg::Pointer { stream, x, y } => self.pointer_motion(stream, x, y),
+            Msg::Pointer { stream, x, y } => self.pointer_motion(stream, x as f64, y as f64),
             Msg::Button { stream, button, pressed } => self.pointer_button(stream, button, pressed),
             Msg::Axis { stream, dx, dy } => self.pointer_axis(stream, dx, dy),
             Msg::Key { stream, scancode, pressed, .. } => self.key(stream, scancode, pressed),
@@ -360,6 +419,10 @@ impl State {
                 if let Some(s) = self.streams.iter().find(|s| s.id == stream) {
                     s.toplevel.send_close();
                 }
+            }
+            Msg::ClipboardSet { text } => {
+                // we own the clipboard now; an app pasting is served by send_selection
+                set_data_device_selection(&self.dh, &self.seat, clipboard::offered_mimes(), Arc::new(text)); // VERIFY signature (0.6)
             }
             other => warn!("unexpected message from mod: {other:?}"),
         }
@@ -383,36 +446,40 @@ impl State {
         }
     }
 
-    /// Copies held buffers into free ring slots at each stream's fps and paces the apps with frame
-    /// callbacks (hidden / fps 0 = no callbacks = the app stops drawing, zero CPU).
+    /// Composes and publishes dirty streams at their fps and paces the apps with frame callbacks
+    /// (hidden / fps 0 = no callbacks = the app stops drawing, zero CPU).
     fn publish_frames(&mut self) {
         let now = Instant::now();
         let time = self.now_ms();
         let mut out = Vec::new();
-        for s in &mut self.streams {
-            if !s.visible || s.fps == 0 {
-                continue;
+        for idx in 0..self.streams.len() {
+            {
+                let s = &self.streams[idx];
+                if !s.visible || s.fps == 0 {
+                    continue;
+                }
+                let interval = Duration::from_micros(1_000_000 / s.fps as u64);
+                if now.duration_since(s.last_publish) < interval {
+                    continue;
+                }
             }
-            let interval = Duration::from_micros(1_000_000 / s.fps as u64);
-            if now.duration_since(s.last_publish) < interval {
-                continue;
-            }
-            if let Some(p) = s.pending.take() {
-                match copy_into_ring(s, &p, &self.shm_dir) {
+            if self.streams[idx].dirty {
+                let (frame, layers) = self.frame_layers(idx);
+                let s = &mut self.streams[idx];
+                match publish(s, frame, &layers, &self.shm_dir) {
                     Ok(Some(mut msgs)) => {
                         out.append(&mut msgs);
-                        p.buffer.release();
+                        s.dirty = false;
+                        s.damage = Some(Vec::new());
                     }
-                    Ok(None) => {
-                        s.pending = Some(p); // every slot is with the mod: keep the buffer, try next loop
-                        continue;
-                    }
+                    Ok(None) => continue, // every slot is with the mod: try again next loop
                     Err(e) => {
                         warn!(stream = s.id, "frame dropped: {e}");
-                        p.buffer.release();
+                        s.dirty = false;
                     }
                 }
             }
+            let s = &mut self.streams[idx];
             for cb in s.callbacks.drain(..) {
                 cb.done(time);
             }
@@ -423,39 +490,163 @@ impl State {
         }
     }
 
-    fn surface_of(&self, id: u32) -> Option<WlSurface> {
-        self.streams.iter().find(|s| s.id == id).map(|s| s.toplevel.wl_surface().clone())
+    /// Frame size and the layers of a stream (toplevel tree, then its popups), in frame coordinates.
+    fn frame_layers(&self, idx: usize) -> ((i32, i32), Vec<Layer>) {
+        let s = &self.streams[idx];
+        let root = s.toplevel.wl_surface();
+        let f = surfaces::frame_rect(root);
+        let mut layers = Vec::new();
+        surfaces::layers(root, (-f.x, -f.y), &mut layers);
+        for p in self.popups.iter().filter(|p| p.stream == s.id && !p.dismissed && p.surface.alive()) {
+            if let Some(origin) = self.popup_buffer_origin(p) {
+                surfaces::layers(p.surface.wl_surface(), origin, &mut layers);
+            }
+        }
+        ((f.w, f.h), layers)
+    }
+
+    fn stream_index_of(&self, surface: &WlSurface) -> Option<usize> {
+        self.streams.iter().position(|s| s.toplevel.wl_surface() == surface)
+    }
+
+    /// Stream a toplevel or popup surface belongs to.
+    fn stream_of(&self, surface: &WlSurface) -> Option<u32> {
+        if let Some(i) = self.stream_index_of(surface) {
+            return Some(self.streams[i].id);
+        }
+        self.popups.iter().find(|p| p.surface.wl_surface() == surface).map(|p| p.stream).filter(|id| *id != 0)
+    }
+
+    /// Frame position of the window-geometry origin of a toplevel ((0, 0)) or popup (recursive).
+    fn geometry_origin(&self, surface: &WlSurface, depth: u8) -> Option<(i32, i32)> {
+        if depth > 16 {
+            return None;
+        }
+        if self.stream_index_of(surface).is_some() {
+            return Some((0, 0));
+        }
+        let p = self.popups.iter().find(|p| p.surface.wl_surface() == surface)?;
+        let (px, py) = self.geometry_origin(p.parent.as_ref()?, depth + 1)?;
+        Some((px + p.rel.x, py + p.rel.y))
+    }
+
+    /// Frame position of the popup's buffer (its window geometry may start inside the buffer).
+    fn popup_buffer_origin(&self, p: &Popup) -> Option<(i32, i32)> {
+        let (gx, gy) = self.geometry_origin(p.surface.wl_surface(), 0)?;
+        let own = surfaces::window_geometry(p.surface.wl_surface()).map(|g| (g.x, g.y)).unwrap_or((0, 0));
+        Some((gx - own.0, gy - own.1))
+    }
+
+    /// Where a popup of `parent` may go: the whole window, relative to the parent's window geometry.
+    fn constraint_target(&self, parent: &WlSurface, stream: u32) -> Option<Rectangle<i32, Logical>> {
+        let s = self.streams.iter().find(|s| s.id == stream)?;
+        let f = surfaces::frame_rect(s.toplevel.wl_surface());
+        if f.w <= 0 || f.h <= 0 {
+            return None;
+        }
+        let (px, py) = self.geometry_origin(parent, 0)?;
+        // VERIFY: smithay 0.6 may prefer Rectangle::new(loc.into(), size.into()) (from_loc_and_size deprecated)
+        Some(Rectangle::from_loc_and_size((-px, -py), (f.w, f.h)))
+    }
+
+    fn mark_full(&mut self, stream: u32) {
+        if let Some(s) = self.streams.iter_mut().find(|s| s.id == stream) {
+            s.damage_all();
+        }
+    }
+
+    /// Popups the app destroyed (menu closed): repaint the window, give the keyboard back.
+    fn reap_popups(&mut self) {
+        let mut gone = Vec::new();
+        self.popups.retain(|p| {
+            let alive = p.surface.alive();
+            if !alive && p.stream != 0 {
+                gone.push(p.stream);
+            }
+            alive
+        });
+        for id in gone {
+            self.mark_full(id);
+            if self.kbd_stream == id {
+                self.refocus_keyboard(id);
+            }
+        }
     }
 
     // --- input ---------------------------------------------------------------------------------
 
-    fn pointer_motion(&mut self, id: u32, x: f32, y: f32) {
-        let Some(surface) = self.surface_of(id) else { return };
+    /// Topmost surface with pixels under a frame point (popups first), with its frame position.
+    fn hit(&self, id: u32, x: f64, y: f64) -> Option<(WlSurface, (i32, i32))> {
+        let idx = self.streams.iter().position(|s| s.id == id)?;
+        let (_, layers) = self.frame_layers(idx);
+        if let Some(l) = layers.iter().rev().find(|l| l.rect.contains(x, y)) {
+            return Some((l.surface.clone(), (l.rect.x, l.rect.y)));
+        }
+        // outside every surface (e.g. not drawn yet): the toplevel still gets motion
+        let root = self.streams[idx].toplevel.wl_surface().clone();
+        let f = surfaces::frame_rect(&root);
+        Some((root, (-f.x, -f.y)))
+    }
+
+    fn pointer_motion(&mut self, id: u32, x: f64, y: f64) {
+        let Some((surface, (ox, oy))) = self.hit(id, x, y) else { return };
         let Some(ptr) = self.seat.get_pointer() else { return };
+        self.pointer_stream = id;
+        self.pointer_pos = (x, y);
         let time = self.now_ms();
-        // VERIFY: focus origin is Point<f64, Logical> in recent smithay ((0, 0) i32 in older ones)
-        ptr.motion(self, Some((surface, (0.0, 0.0).into())), &MotionEvent { location: (x as f64, y as f64).into(), serial: SERIAL_COUNTER.next_serial(), time });
+        // global space = this stream's frame; the focused surface sits at its frame position
+        ptr.motion(self, Some((surface, (ox as f64, oy as f64).into())), &MotionEvent { location: (x, y).into(), serial: SERIAL_COUNTER.next_serial(), time });
         ptr.frame(self);
     }
 
     fn pointer_button(&mut self, id: u32, button: u32, pressed: bool) {
-        let Some(surface) = self.surface_of(id) else { return };
+        let Some(idx) = self.streams.iter().position(|s| s.id == id) else { return };
         let Some(ptr) = self.seat.get_pointer() else { return };
         let serial = SERIAL_COUNTER.next_serial();
         let time = self.now_ms();
         if pressed {
-            // a click gives the app keyboard focus, like on any desktop
-            if let Some(kbd) = self.seat.get_keyboard() {
-                kbd.set_focus(self, Some(surface), serial);
+            let open_menu = self.popups.iter().any(|p| p.stream == id && p.grabbed && !p.dismissed);
+            if open_menu {
+                let (x, y) = self.pointer_pos;
+                let on_menu = self
+                    .hit(id, x, y)
+                    .map(|(s, _)| surfaces::root_of(&s))
+                    .is_some_and(|root| self.popups.iter().any(|p| p.surface.wl_surface() == &root));
+                if !on_menu {
+                    // click beside an open menu closes it and is eaten, like on a desktop
+                    self.dismiss_popups(id);
+                    self.swallowed.push(button);
+                    return;
+                }
+            } else {
+                // a click gives the app keyboard focus, like on any desktop
+                let top = self.streams[idx].toplevel.wl_surface().clone();
+                if let Some(kbd) = self.seat.get_keyboard() {
+                    kbd.set_focus(self, Some(top), serial);
+                }
             }
+        } else if let Some(i) = self.swallowed.iter().position(|b| *b == button) {
+            self.swallowed.remove(i);
+            return;
         }
         let state = if pressed { ButtonState::Pressed } else { ButtonState::Released };
         ptr.button(self, &ButtonEvent { serial, time, button, state });
         ptr.frame(self);
     }
 
+    fn dismiss_popups(&mut self, id: u32) {
+        for p in self.popups.iter_mut().rev().filter(|p| p.stream == id && !p.dismissed) {
+            p.surface.send_popup_done();
+            p.dismissed = true;
+        }
+        self.mark_full(id);
+        if self.kbd_stream == id {
+            self.refocus_keyboard(id);
+        }
+    }
+
     fn pointer_axis(&mut self, id: u32, dx: f32, dy: f32) {
-        if self.surface_of(id).is_none() {
+        if !self.streams.iter().any(|s| s.id == id) {
             return;
         }
         let Some(ptr) = self.seat.get_pointer() else { return };
@@ -473,7 +664,7 @@ impl State {
     }
 
     fn key(&mut self, id: u32, scancode: u32, pressed: bool) {
-        if self.surface_of(id).is_none() || scancode < 8 {
+        if !self.streams.iter().any(|s| s.id == id) || scancode < 8 {
             return;
         }
         let Some(kbd) = self.seat.get_keyboard() else { return };
@@ -485,12 +676,105 @@ impl State {
     }
 
     fn focus(&mut self, id: u32, focused: bool) {
-        let Some(kbd) = self.seat.get_keyboard() else { return };
-        let target = if focused { self.surface_of(id) } else { None };
-        if focused && target.is_none() {
-            return;
+        if focused {
+            if !self.streams.iter().any(|s| s.id == id) {
+                return;
+            }
+            self.kbd_stream = id;
+            self.refocus_keyboard(id);
+        } else {
+            if self.kbd_stream == id {
+                self.kbd_stream = 0;
+            }
+            let Some(kbd) = self.seat.get_keyboard() else { return };
+            kbd.set_focus(self, None, SERIAL_COUNTER.next_serial());
         }
+    }
+
+    /// Keyboard to the topmost grabbing menu of the stream, else to the window itself.
+    fn refocus_keyboard(&mut self, id: u32) {
+        let target = self
+            .popups
+            .iter()
+            .rev()
+            .find(|p| p.stream == id && p.grabbed && !p.dismissed && p.surface.alive())
+            .map(|p| p.surface.wl_surface().clone())
+            .or_else(|| self.streams.iter().find(|s| s.id == id).map(|s| s.toplevel.wl_surface().clone()));
+        let Some(kbd) = self.seat.get_keyboard() else { return };
         kbd.set_focus(self, target, SERIAL_COUNTER.next_serial());
+    }
+
+    // --- cursor --------------------------------------------------------------------------------
+
+    fn set_cursor(&mut self, image: CursorImageStatus) {
+        let stream = self.pointer_stream;
+        // VERIFY: smithay 0.6 CursorImageStatus = Hidden | Named(CursorIcon) | Surface(WlSurface)
+        match image {
+            CursorImageStatus::Hidden => {
+                self.cursor_surface = None;
+                self.send(Msg::Cursor { stream, shape: CURSOR_HIDDEN, name: String::new(), hot_x: 0, hot_y: 0, width: 0, height: 0, pixels: Vec::new() });
+            }
+            CursorImageStatus::Named(icon) => {
+                self.cursor_surface = None;
+                self.send(Msg::Cursor { stream, shape: CURSOR_NAMED, name: icon.name().to_string(), hot_x: 0, hot_y: 0, width: 0, height: 0, pixels: Vec::new() });
+            }
+            CursorImageStatus::Surface(surface) => {
+                self.cursor_surface = Some(surface);
+                self.send_cursor_image();
+            }
+        }
+    }
+
+    /// The cursor surface got pixels (or became the cursor): send them with the hotspot.
+    fn send_cursor_image(&mut self) {
+        let Some(surface) = self.cursor_surface.clone() else { return };
+        let Some((w, h, pixels, div)) = surfaces::cursor_pixels(&surface) else { return };
+        // VERIFY: CursorImageSurfaceData = Mutex<CursorImageAttributes { hotspot, .. }> (smithay 0.4+)
+        let hotspot = with_states(&surface, |states| {
+            states.data_map.get::<CursorImageSurfaceData>().map(|d| d.lock().unwrap().hotspot).unwrap_or_default()
+        });
+        let c = |v: i32| (v.max(0) as usize / div).min(u16::MAX as usize) as u16;
+        self.send(Msg::Cursor {
+            stream: self.pointer_stream,
+            shape: CURSOR_IMAGE,
+            name: String::new(),
+            hot_x: c(hotspot.x),
+            hot_y: c(hotspot.y),
+            width: w as u16,
+            height: h as u16,
+            pixels,
+        });
+    }
+
+    // --- clipboard -----------------------------------------------------------------------------
+
+    fn poll_clipboard(&mut self) {
+        if let Some(mime) = self.clip_request.take() {
+            match clipboard::pipe() {
+                // VERIFY signature (0.6): request_data_device_client_selection(&Seat<D>, String, OwnedFd)
+                Ok((read, write)) => match request_data_device_client_selection(&self.seat, mime, write) {
+                    Ok(()) => self.clip_reader = Some(clipboard::Reader::new(read)),
+                    Err(e) => warn!("clipboard request: {e:?}"),
+                },
+                Err(e) => warn!("clipboard pipe: {e}"),
+            }
+        }
+        if let Some(r) = self.clip_reader.as_mut() {
+            match r.poll() {
+                clipboard::Poll::Pending => {}
+                clipboard::Poll::Done(text) => {
+                    self.clip_reader = None;
+                    if !text.is_empty() {
+                        self.send(Msg::Clipboard { text });
+                    }
+                }
+                clipboard::Poll::Failed => {
+                    self.clip_reader = None;
+                    warn!("clipboard: the app did not deliver its selection");
+                }
+            }
+        }
+        self.clip_writers.retain_mut(|w| !w.poll());
     }
 
     fn shutdown(&mut self) {
@@ -502,101 +786,56 @@ impl State {
     }
 }
 
-/// Copies the held buffer into a free slot (recreating the ring if the surface grew).
+/// Composes the stream into a free slot (recreating the ring if the frame grew).
 /// `Ok(None)` = no free slot right now.
-fn copy_into_ring(s: &mut Stream, p: &Pending, dir: &std::path::Path) -> anyhow::Result<Option<Vec<Msg>>> {
+fn publish(s: &mut Stream, frame: (i32, i32), layers: &[Layer], dir: &Path) -> anyhow::Result<Option<Vec<Msg>>> {
     let mut msgs = Vec::new();
-    let res = with_buffer_contents(&p.buffer, |ptr, len, data| -> anyhow::Result<Option<()>> {
-        let opaque = match data.format {
-            wl_shm::Format::Argb8888 => false,
-            wl_shm::Format::Xrgb8888 => true,
-            other => bail!("unsupported wl_shm format {other:?} (only ARGB/XRGB8888 in D1)"),
-        };
-        let (w, h) = (data.width.max(0) as usize, data.height.max(0) as usize);
-        let (stride, offset) = (data.stride.max(0) as usize, data.offset.max(0) as usize);
-        let tight = w * 4;
-        if w == 0 || h == 0 || w > 4096 || h > 4096 || stride < tight || offset + stride * (h - 1) + tight > len {
-            bail!("bad buffer {w}x{h} stride {stride}");
-        }
-        let need = tight * h;
-        let mut recreated = false;
-        if s.ring.as_ref().map_or(true, |r| r.slot_size < need) {
-            let generation = s.next_generation;
-            s.next_generation = s.next_generation.wrapping_add(1);
-            let ring = ShmRing::create(dir, s.id, generation, need)?;
-            msgs.push(Msg::Buffer {
-                stream: s.id,
-                generation,
-                path: ring.path.to_string_lossy().into_owned(),
-                slots: SLOTS as u8,
-                slot_size: ring.slot_size as u32,
-            });
-            s.ring = Some(ring);
-            recreated = true;
-        }
-        let ring = s.ring.as_mut().expect("ring");
-        let Some(slot) = ring.free_slot() else { return Ok(None) };
-        // SAFETY: smithay guarantees ptr..ptr+len is the mapped wl_shm pool for the duration of the closure
-        let src = unsafe { std::slice::from_raw_parts(ptr, len) };
-        let dst = ring.slot_mut(slot);
-        for y in 0..h {
-            let row = &src[offset + y * stride..offset + y * stride + tight];
-            let d = &mut dst[y * tight..(y + 1) * tight];
-            d.copy_from_slice(row);
-            if opaque {
-                for px in d.chunks_exact_mut(4) {
-                    px[3] = 0xFF; // XRGB: the X byte is undefined, KVR must not see a transparent window
-                }
-            }
-        }
-        ring.mark_busy(slot);
-        s.seq = s.seq.wrapping_add(1);
-        let damage = if recreated { Vec::new() } else { clamp_damage(p.damage.as_deref(), w, h) };
-        msgs.push(Msg::Frame {
+    let (fw, fh) = frame;
+    if fw <= 0 || fh <= 0 || layers.is_empty() {
+        return Ok(Some(msgs)); // nothing drawn yet
+    }
+    let (w, h) = (fw as usize, fh as usize);
+    let need = w * h * 4;
+    let mut recreated = false;
+    if s.ring.as_ref().map_or(true, |r| r.slot_size < need) {
+        let generation = s.next_generation;
+        s.next_generation = s.next_generation.wrapping_add(1);
+        let ring = ShmRing::create(dir, s.id, generation, need)?;
+        msgs.push(Msg::Buffer {
             stream: s.id,
-            generation: ring.generation,
-            slot: slot as u8,
-            seq: s.seq,
-            width: w as u16,
-            height: h as u16,
-            stride: tight as u32,
-            format: FORMAT_BGRA,
-            damage,
+            generation,
+            path: ring.path.to_string_lossy().into_owned(),
+            slots: SLOTS as u8,
+            slot_size: ring.slot_size as u32,
         });
-        Ok(Some(()))
-    });
-    match res {
-        Ok(Ok(Some(()))) => Ok(Some(msgs)),
-        Ok(Ok(None)) => Ok(None),
-        Ok(Err(e)) => Err(e),
-        Err(e) => bail!("buffer access: {e:?}"),
+        s.ring = Some(ring);
+        recreated = true;
     }
-}
-
-/// Empty = full repaint (also when the app reported more rectangles than the protocol carries).
-fn clamp_damage(damage: Option<&[Rect]>, w: usize, h: usize) -> Vec<Rect> {
-    let Some(d) = damage else { return Vec::new() };
-    if d.is_empty() || d.len() > MAX_RECTS {
-        return Vec::new();
-    }
-    d.iter()
-        .filter_map(|r| {
-            let x = (r.x as usize).min(w);
-            let y = (r.y as usize).min(h);
-            let rw = (r.w as usize).min(w - x);
-            let rh = (r.h as usize).min(h - y);
-            (rw > 0 && rh > 0).then_some(Rect { x: x as u16, y: y as u16, w: rw as u16, h: rh as u16 })
-        })
-        .collect()
-}
-
-fn to_rect(d: &Damage) -> Rect {
-    let (x, y, w, h) = match d {
-        Damage::Surface(r) => (r.loc.x, r.loc.y, r.size.w, r.size.h),
-        Damage::Buffer(r) => (r.loc.x, r.loc.y, r.size.w, r.size.h),
+    let ring = s.ring.as_mut().expect("ring");
+    let Some(slot) = ring.free_slot() else { return Ok(None) };
+    surfaces::compose(layers, ring.slot_mut(slot), w, h);
+    ring.mark_busy(slot);
+    s.seq = s.seq.wrapping_add(1);
+    let size = (w as u16, h as u16);
+    // empty damage = full repaint: new buffer file, new size, or "everything changed"
+    let damage = if recreated || size != s.last_size {
+        Vec::new()
+    } else {
+        s.damage.as_deref().map(|d| d.to_vec()).unwrap_or_default()
     };
-    let c = |v: i32| v.clamp(0, u16::MAX as i32) as u16;
-    Rect { x: c(x), y: c(y), w: c(w), h: c(h) }
+    s.last_size = size;
+    msgs.push(Msg::Frame {
+        stream: s.id,
+        generation: ring.generation,
+        slot: slot as u8,
+        seq: s.seq,
+        width: size.0,
+        height: size.1,
+        stride: (w * 4) as u32,
+        format: FORMAT_BGRA,
+        damage,
+    });
+    Ok(Some(msgs))
 }
 
 fn initial_configure_sent_toplevel(surface: &WlSurface) -> bool {
@@ -628,79 +867,68 @@ impl CompositorHandler for State {
             if !initial_configure_sent_toplevel(surface) {
                 let _ = s.toplevel.send_configure();
             }
-        } else if let Some(p) = self.popups.iter().find(|p| p.wl_surface() == surface) {
+        } else if let Some(p) = self.popups.iter().find(|p| p.surface.wl_surface() == surface) {
             if !initial_configure_sent_popup(surface) {
-                let _ = p.send_configure();
+                let _ = p.surface.send_configure();
             }
         }
 
-        // VERIFY: smithay 0.4+ cached state API (`get::<T>().current()`); 0.3 used `current::<T>()`
-        let (buffer, damage, callbacks) = with_states(surface, |states| {
-            let mut guard = states.cached_state.get::<SurfaceAttributes>();
-            let attrs = guard.current();
-            let buffer = attrs.buffer.take();
-            let damage: Vec<Rect> = attrs.damage.drain(..).map(|d| to_rect(&d)).collect();
-            let callbacks: Vec<WlCallback> = attrs.frame_callbacks.drain(..).collect();
-            (buffer, damage, callbacks)
-        });
-
+        // pick up every new buffer of this surface's tree (a synced subsurface lands with its parent)
+        let root = surfaces::root_of(surface);
+        let tc = surfaces::take_tree(&root);
         let time = self.now_ms();
-        let Some(idx) = self.streams.iter().position(|s| s.toplevel.wl_surface() == surface) else {
-            // popup / subsurface / cursor: not composited in D1 — release and tick it so the app never stalls
-            if let Some(BufferAssignment::NewBuffer(b)) = buffer {
-                b.release();
-            }
-            for cb in callbacks {
-                cb.done(time);
-            }
-            return;
-        };
 
-        let (title, app_id) = with_states(surface, |states| {
-            states
-                .data_map
-                .get::<XdgToplevelSurfaceData>()
-                .map(|d| {
-                    let d = d.lock().unwrap();
-                    (d.title.clone().unwrap_or_default(), d.app_id.clone().unwrap_or_default())
-                })
-                .unwrap_or_default()
-        });
-
-        let s = &mut self.streams[idx];
-        s.callbacks.extend(callbacks);
-        match buffer {
-            Some(BufferAssignment::NewBuffer(b)) => {
-                let merged = match s.pending.take() {
-                    Some(old) => {
-                        if old.buffer != b {
-                            old.buffer.release(); // replaced before we copied it
-                        }
-                        match old.damage {
-                            Some(mut d) if d.len() + damage.len() <= MAX_RECTS => {
-                                d.extend(damage);
-                                Some(d)
-                            }
-                            _ => None,
-                        }
-                    }
-                    None => Some(damage),
-                };
-                s.pending = Some(Pending { buffer: b, damage: merged });
-            }
-            Some(BufferAssignment::Removed) => {
-                if let Some(old) = s.pending.take() {
-                    old.buffer.release();
+        if let Some(idx) = self.stream_index_of(&root) {
+            let has_popups = self.popups.iter().any(|p| p.stream == self.streams[idx].id && !p.dismissed);
+            let f = surfaces::frame_rect(&root);
+            let (title, app_id) = with_states(&root, |states| {
+                states
+                    .data_map
+                    .get::<XdgToplevelSurfaceData>()
+                    .map(|d| {
+                        let d = d.lock().unwrap();
+                        (d.title.clone().unwrap_or_default(), d.app_id.clone().unwrap_or_default())
+                    })
+                    .unwrap_or_default()
+            });
+            let s = &mut self.streams[idx];
+            s.callbacks.extend(tc.callbacks);
+            if tc.changed {
+                s.dirty = true;
+                if tc.simple && !has_popups && !tc.damage.is_empty() {
+                    // root-surface damage → frame coordinates (window geometry may start inside the buffer)
+                    let rects: Vec<Rect> = tc.damage.iter().filter_map(|r| IRect::new(r.x - f.x, r.y - f.y, r.w, r.h).clip(f.w, f.h)).collect();
+                    s.add_damage(rects);
+                } else {
+                    s.damage = None;
                 }
             }
-            None => {}
+            let changed = title != s.title || app_id != s.app_id;
+            let id = s.id;
+            if changed {
+                s.title = title.clone();
+                s.app_id = app_id;
+                self.send(Msg::Title { stream: id, title });
+            }
+            return;
         }
-        let changed = title != s.title || app_id != s.app_id;
-        let id = s.id;
-        if changed {
-            s.title = title.clone();
-            s.app_id = app_id;
-            self.send(Msg::Title { stream: id, title });
+
+        if let Some(stream) = self.popups.iter().find(|p| p.surface.wl_surface() == &root).map(|p| p.stream) {
+            if let Some(s) = self.streams.iter_mut().find(|s| s.id == stream) {
+                s.callbacks.extend(tc.callbacks);
+                if tc.changed {
+                    s.damage_all();
+                }
+                return;
+            }
+        }
+
+        // the cursor or a surface without a role yet: never let the app stall on it
+        for cb in tc.callbacks {
+            cb.done(time);
+        }
+        if tc.changed && self.cursor_surface.as_ref() == Some(&root) {
+            self.send_cursor_image();
         }
     }
 }
@@ -723,7 +951,53 @@ impl SeatHandler for State {
     fn seat_state(&mut self) -> &mut SeatState<Self> {
         &mut self.seat_state
     }
+
+    fn cursor_image(&mut self, _seat: &Seat<Self>, image: CursorImageStatus) {
+        self.set_cursor(image);
+    }
+
+    /// The focused app gets the clipboard offers (smallvil pattern).
+    fn focus_changed(&mut self, seat: &Seat<Self>, focused: Option<&WlSurface>) {
+        let client = focused.and_then(|s| self.dh.get_client(s.id()).ok());
+        set_data_device_focus(&self.dh, seat, client);
+    }
 }
+
+impl SelectionHandler for State {
+    type SelectionUserData = Arc<String>;
+
+    /// An app copied (or cleared) something: fetch its text on the next tick.
+    fn new_selection(&mut self, ty: SelectionTarget, source: Option<SelectionSource>, _seat: Seat<Self>) {
+        if !matches!(ty, SelectionTarget::Clipboard) {
+            return; // primary selection (middle click) stays between the apps
+        }
+        // VERIFY: SelectionSource::mime_types() -> Vec<String>
+        if let Some(mime) = source.and_then(|s| clipboard::pick_text_mime(&s.mime_types())) {
+            self.clip_request = Some(mime);
+        }
+    }
+
+    /// An app pastes while we own the clipboard (text from KVR).
+    fn send_selection(&mut self, ty: SelectionTarget, mime_type: String, fd: OwnedFd, _seat: Seat<Self>, user_data: &Self::SelectionUserData) {
+        if !matches!(ty, SelectionTarget::Clipboard) || !clipboard::TEXT_MIMES.contains(&mime_type.as_str()) {
+            return; // dropping fd closes it: the app sees an empty paste
+        }
+        match clipboard::Writer::new(fd, user_data.clone()) {
+            Ok(w) => self.clip_writers.push(w),
+            Err(e) => warn!("clipboard write: {e}"),
+        }
+    }
+}
+
+impl DataDeviceHandler for State {
+    fn data_device_state(&self) -> &DataDeviceState {
+        &self.data_device_state
+    }
+}
+
+/// Drag and drop between apps works inside the daemon; nothing to add.
+impl ClientDndGrabHandler for State {}
+impl ServerDndGrabHandler for State {}
 
 impl XdgShellHandler for State {
     fn xdg_shell_state(&mut self) -> &mut XdgShellState {
@@ -745,7 +1019,6 @@ impl XdgShellHandler for State {
             toplevel: surface,
             ring: None,
             next_generation: 0,
-            pending: None,
             callbacks: Vec::new(),
             fps: 30,
             visible: true,
@@ -753,6 +1026,9 @@ impl XdgShellHandler for State {
             seq: 0,
             title: String::new(),
             app_id: String::new(),
+            dirty: false,
+            damage: None,
+            last_size: (0, 0),
         });
         self.send(Msg::Stream { stream: id, req, title: String::new(), app_id: String::new() });
     }
@@ -761,25 +1037,67 @@ impl XdgShellHandler for State {
         if let Some(i) = self.streams.iter().position(|s| s.toplevel == surface) {
             let s = self.streams.remove(i);
             info!(stream = s.id, "window closed");
+            if self.kbd_stream == s.id {
+                self.kbd_stream = 0;
+            }
             self.send(Msg::Closed { stream: s.id, reason: "closed".into() });
         }
     }
 
     fn new_popup(&mut self, surface: PopupSurface, positioner: PositionerState) {
-        surface.with_pending_state(|st| st.geometry = positioner.get_geometry());
-        self.popups.push(surface);
+        let parent = surface.get_parent_surface();
+        let stream = parent.as_ref().and_then(|p| self.stream_of(p)).unwrap_or(0);
+        // keep menus inside the window: flip / slide them like a desktop does at the screen edge
+        let geo = match parent.as_ref().and_then(|p| self.constraint_target(p, stream)) {
+            Some(target) => positioner.clone().get_unconstrained_geometry(target), // VERIFY: PositionerState::get_unconstrained_geometry
+            None => positioner.get_geometry(),
+        };
+        surface.with_pending_state(|st| {
+            st.geometry = geo;
+            st.positioner = positioner;
+        });
+        self.popups.push(Popup {
+            surface,
+            parent,
+            stream,
+            rel: IRect::new(geo.loc.x, geo.loc.y, geo.size.w, geo.size.h),
+            grabbed: false,
+            dismissed: false,
+        });
+        if stream != 0 {
+            self.mark_full(stream);
+        }
     }
 
-    fn grab(&mut self, _surface: PopupSurface, _seat: WlSeat, _serial: Serial) {
-        // popup grabs arrive with menus in D2
+    fn grab(&mut self, surface: PopupSurface, _seat: WlSeat, _serial: Serial) {
+        let Some(p) = self.popups.iter_mut().find(|p| p.surface == surface) else { return };
+        p.grabbed = true;
+        let stream = p.stream;
+        if stream != 0 && self.kbd_stream == stream {
+            self.refocus_keyboard(stream); // arrows / Enter / Esc work in the open menu
+        }
     }
 
     fn reposition_request(&mut self, surface: PopupSurface, positioner: PositionerState, token: u32) {
+        let (parent, stream) = match self.popups.iter().find(|p| p.surface == surface) {
+            Some(p) => (p.parent.clone(), p.stream),
+            None => (surface.get_parent_surface(), 0),
+        };
+        let geo = match parent.as_ref().and_then(|p| self.constraint_target(p, stream)) {
+            Some(target) => positioner.clone().get_unconstrained_geometry(target),
+            None => positioner.get_geometry(),
+        };
         surface.with_pending_state(|st| {
-            st.geometry = positioner.get_geometry();
+            st.geometry = geo;
             st.positioner = positioner;
         });
         surface.send_repositioned(token);
+        if let Some(p) = self.popups.iter_mut().find(|p| p.surface == surface) {
+            p.rel = IRect::new(geo.loc.x, geo.loc.y, geo.size.w, geo.size.h);
+        }
+        if stream != 0 {
+            self.mark_full(stream);
+        }
     }
 }
 
@@ -806,6 +1124,7 @@ impl OutputHandler for State {}
 delegate_compositor!(State);
 delegate_shm!(State);
 delegate_seat!(State);
+delegate_data_device!(State);
 delegate_xdg_shell!(State);
 delegate_xdg_decoration!(State);
 delegate_output!(State);

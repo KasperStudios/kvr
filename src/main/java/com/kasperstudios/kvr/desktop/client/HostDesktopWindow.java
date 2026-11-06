@@ -23,6 +23,10 @@ import org.lwjgl.glfw.GLFW;
  *
  * <p>Input: LMB/RMB/wheel/pointer in app pixels; in Alt mode the keyboard is captured automatically
  * while the hand hovers the window (badge in the title bar). Keys go as GLFW scancodes (Linux: evdev + 8).
+ *
+ * <p>D2: menus and popups arrive already composited into the frame; the app's cursor is drawn at the hand
+ * pointer; the system clipboard is offered to the app on keyboard capture and on Ctrl+V / Shift+Insert,
+ * text the app copies lands in the system clipboard ({@link DesktopClipboard}).
  */
 public final class HostDesktopWindow extends SpatialWindow {
 
@@ -37,6 +41,9 @@ public final class HostDesktopWindow extends SpatialWindow {
 
     private final DesktopStream stream;
     private final RenderCompat.StreamTexture texture;
+    /** The app's cursor image (D2), uploaded when {@link DesktopStream.CursorState#version()} changes. */
+    private final RenderCompat.StreamTexture cursorTexture;
+    private int cursorUploaded = -1;
     private int sentW = -1;
     private int sentH = -1;
     private int sentFps = -1;
@@ -48,6 +55,7 @@ public final class HostDesktopWindow extends SpatialWindow {
         super("desktop:" + stream.id(), Kind.APP, CONTENT_W, CONTENT_H + TITLE_H + BAR_H, anchor);
         this.stream = stream;
         this.texture = new RenderCompat.StreamTexture(GlassStyle.id("desktop/stream_" + stream.id()));
+        this.cursorTexture = new RenderCompat.StreamTexture(GlassStyle.id("desktop/cursor_" + stream.id()));
     }
 
     public DesktopStream stream() {
@@ -95,6 +103,7 @@ public final class HostDesktopWindow extends SpatialWindow {
     public void onClosed() {
         if (!stream.closed()) stream.bridge().send(new DesktopProtocol.Close(stream.id()));
         texture.close();
+        cursorTexture.close();
         super.onClosed();
     }
 
@@ -117,6 +126,7 @@ public final class HostDesktopWindow extends SpatialWindow {
         int ch = contentH();
         if (texture.ready()) {
             g.blit(texture.texture(), 0, top, width, ch, 0f, 0f, texture.width(), texture.height(), texture.width(), texture.height());
+            if (mx >= 0 && my >= top && my < top + ch) drawCursor(g, mx, my);
         } else {
             g.fill(0, top, width, top + ch, 0x60000000);
             GlassStyle.text(g, Component.translatable("kvr.desktop.waiting"), 8, top + 8, GlassStyle.MUTED);
@@ -132,6 +142,34 @@ public final class HostDesktopWindow extends SpatialWindow {
         List<int[]> out = new ArrayList<>(f.damage().size());
         for (DesktopProtocol.Rect r : f.damage()) out.add(new int[] {r.x(), r.y(), r.w(), r.h()});
         return out;
+    }
+
+    /**
+     * The app's own cursor at the hand pointer (D2): the shape the app asked for (text beam over a text
+     * field, resize arrows on a split view…). Nothing until the app set one; hidden when the app hides it.
+     */
+    private void drawCursor(GuiGraphics g, int mx, int my) {
+        DesktopStream.CursorState c = stream.cursor();
+        if (c == null || c.shape() == DesktopProtocol.CURSOR_HIDDEN) return;
+        if (c.shape() == DesktopProtocol.CURSOR_NAMED) {
+            DesktopCursors.draw(g, c.name(), mx, my);
+            return;
+        }
+        if (c.width() <= 0 || c.height() <= 0 || c.pixels() == null || c.pixels().length < c.width() * c.height() * 4) return;
+        if (c.version() != cursorUploaded) {
+            java.nio.ByteBuffer px = java.nio.ByteBuffer.allocateDirect(c.width() * c.height() * 4);
+            px.put(c.pixels(), 0, c.width() * c.height() * 4).flip();
+            cursorTexture.upload(px, c.width(), c.height(), c.width() * 4, true, List.of(), true);
+            cursorUploaded = c.version();
+        }
+        // app pixels → GUI pixels, same scale as the app surface itself
+        float sx = (float) width / Math.max(1, texture.width());
+        float sy = (float) contentH() / Math.max(1, texture.height());
+        int x = Math.round(mx - c.hotX() * sx);
+        int y = Math.round(my - c.hotY() * sy);
+        int w = Math.max(1, Math.round(c.width() * sx));
+        int h = Math.max(1, Math.round(c.height() * sy));
+        RenderCompat.blitPremultiplied(g, cursorTexture.texture(), x, y, w, h, c.width(), c.height());
     }
 
     // --- input ---------------------------------------------------------------------------------
@@ -190,6 +228,8 @@ public final class HostDesktopWindow extends SpatialWindow {
     @Override
     public void keyboardFocus(boolean focused) {
         keyboard = focused;
+        // what the player copied outside is ready before the first Ctrl+V
+        if (focused) DesktopClipboard.offer(stream.bridge());
         stream.bridge().send(new DesktopProtocol.Focus(stream.id(), focused));
     }
 
@@ -197,6 +237,10 @@ public final class HostDesktopWindow extends SpatialWindow {
     public void keyEvent(int key, int scancode, int action, int mods) {
         // the app repeats keys itself (wl_keyboard repeat_info), so GLFW repeats are dropped
         if (action == GLFW.GLFW_REPEAT) return;
+        boolean paste = (key == GLFW.GLFW_KEY_V && (mods & GLFW.GLFW_MOD_CONTROL) != 0)
+            || (key == GLFW.GLFW_KEY_INSERT && (mods & GLFW.GLFW_MOD_SHIFT) != 0);
+        // the socket keeps order: the daemon owns the fresh text before the app sees the key
+        if (paste && action == GLFW.GLFW_PRESS) DesktopClipboard.offer(stream.bridge());
         stream.bridge().send(new DesktopProtocol.Key(stream.id(), scancode, key, action == GLFW.GLFW_PRESS));
     }
 }

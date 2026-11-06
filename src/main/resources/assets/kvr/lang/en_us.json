@@ -107,5 +107,6 @@
   "kvr.input.hint_multi": "Typing into the window. Enter = new line, Ctrl+Enter or Esc to finish, Ctrl+V to paste",
   "kvr.settings.section.windows": "Windows",
   "kvr.settings.section.desktop": "PC apps",
-  "kvr.settings.window_opacity": "Window background: %s%%"
+  "kvr.settings.window_opacity": "Window background: %s%%",
+  "kvr.settings.desktop_clipboard": "Shared clipboard with PC apps"
 }

@@ -67,6 +67,7 @@ public final class HostDesktopClient implements DesktopBridge.Listener {
         DesktopBridge b = bridge;
         bridge = null;
         if (b != null) b.close();
+        DesktopClipboard.reset();
         DesktopDaemon.stop();
     }
 
@@ -119,6 +120,7 @@ public final class HostDesktopClient implements DesktopBridge.Listener {
             Path socket = DesktopDaemon.start();
             DesktopBridge fresh = new DesktopBridge(socket, DesktopDaemon.token(), INSTANCE);
             bridge = fresh;
+            DesktopClipboard.reset();
             fresh.start();
             return true;
         } catch (IOException | RuntimeException e) {

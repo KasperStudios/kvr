@@ -107,5 +107,6 @@
   "kvr.input.hint_multi": "Ввод в окно. Enter — новая строка, Ctrl+Enter или Esc — готово, Ctrl+V — вставить",
   "kvr.settings.section.windows": "Окна",
   "kvr.settings.section.desktop": "Приложения ПК",
-  "kvr.settings.window_opacity": "Фон окон: %s%%"
+  "kvr.settings.window_opacity": "Фон окон: %s%%",
+  "kvr.settings.desktop_clipboard": "Общий буфер обмена с приложениями ПК"
 }
