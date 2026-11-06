@@ -52,9 +52,11 @@ public final class SpatialInput {
     public void tickStart() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
+        net.minecraft.client.Camera camera = mc.gameRenderer.getMainCamera();
+        if (camera == null || camera.getEntity() == null) return;
         cursor.tick();
         windows.tick();
-        PlayerView view = PlayerView.capture(mc.gameRenderer.getMainCamera(), 1f);
+        PlayerView view = PlayerView.capture(camera, 1f);
 
         if (!cursor.active() || mc.screen != null) {
             grab.end(view);

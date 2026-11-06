@@ -44,6 +44,14 @@ public final class SpatialCursor {
         return active;
     }
 
+    public float yawOffset() {
+        return yawOffset;
+    }
+
+    public float pitchOffset() {
+        return pitchOffset;
+    }
+
     public void setActive(boolean active) {
         this.active = active;
         if (!active) {

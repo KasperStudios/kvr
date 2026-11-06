@@ -12,7 +12,8 @@ public record PlayerView(Vec3 eye, float yaw, float pitch, Vec3 feet) {
     private static final double EYE_HEIGHT = 1.62;
 
     public static PlayerView capture(Camera camera, float partialTick) {
-        Vec3 feet = camera.getEntity().getPosition(partialTick);
+        net.minecraft.world.entity.Entity entity = camera.getEntity();
+        Vec3 feet = entity != null ? entity.getPosition(partialTick) : camera.getPosition();
         return new PlayerView(camera.getPosition(), camera.getYRot(), camera.getXRot(), feet);
     }
 

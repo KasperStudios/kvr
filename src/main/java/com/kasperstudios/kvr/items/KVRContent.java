@@ -119,6 +119,38 @@ public final class KVRContent {
         });
         KVRMenus.init();
 
+        // Wire GlassesPower
+        com.kasperstudios.kvr.power.GlassesPower.install(
+                stack -> stack.is(glasses()) || stack.is(item("hackglasses")),
+                stack -> {
+                    com.kasperstudios.kvr.hardware.GlassesBuild b = KVRGlassesData.read(stack);
+                    if (b != null) {
+                        return java.util.Optional.of(new com.kasperstudios.kvr.power.PowerBuild(
+                                b.tierOf(com.kasperstudios.kvr.hardware.ComponentType.CPU).level(),
+                                b.tierOf(com.kasperstudios.kvr.hardware.ComponentType.GPU).level(),
+                                b.tierOf(com.kasperstudios.kvr.hardware.ComponentType.RAM).level(),
+                                b.tierOf(com.kasperstudios.kvr.hardware.ComponentType.STORAGE).level(),
+                                b.tierOf(com.kasperstudios.kvr.hardware.ComponentType.BATTERY).level()
+                        ));
+                    }
+                    // HackGlasses or raw glasses: default tier 5 power build
+                    if (stack.is(item("hackglasses")) || stack.is(glasses())) {
+                        return java.util.Optional.of(new com.kasperstudios.kvr.power.PowerBuild(5, 5, 5, 5, 5));
+                    }
+                    return java.util.Optional.empty();
+                },
+                stack -> {
+                    com.kasperstudios.kvr.hardware.GlassesBuild b = KVRGlassesData.read(stack);
+                    if (b == null) return java.util.List.of();
+                    java.util.List<net.minecraft.world.item.ItemStack> list = new java.util.ArrayList<>();
+                    list.add(new net.minecraft.world.item.ItemStack(chassis(b.chassisTier())));
+                    for (var entry : b.parts()) {
+                        list.add(new net.minecraft.world.item.ItemStack(component(entry.getKey(), entry.getValue())));
+                    }
+                    return list;
+                }
+        );
+
         ChassisDyeRecipe.SERIALIZER = ChassisDyeRecipe.createSerializer();
         registrar.recipeSerializer(KVRIds.id("crafting_special_chassis_dye"), () -> ChassisDyeRecipe.SERIALIZER);
 
