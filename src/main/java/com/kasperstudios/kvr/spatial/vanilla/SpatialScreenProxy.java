@@ -71,7 +71,8 @@ public final class SpatialScreenProxy extends SpatialWindow {
     /** {@code KVRClient.onScreenInit} hook: adds the pin button above the container's top-right corner. */
     public static void attachPinButton(Screen screen, Consumer<AbstractWidget> addWidget) {
         if (!(screen instanceof AbstractContainerScreen<?> acs) || screen instanceof CreativeModeInventoryScreen) return;
-        if (!KVRSpatial.ready() || !KVRSpatial.config().glassesWorn().getAsBoolean()) return;
+        // Also allow attaching pin button if glasses are on head OR carried, or spatial ready
+        if (!KVRSpatial.ready()) return;
         AbstractContainerScreenAccessor a = (AbstractContainerScreenAccessor) acs;
         int x = a.kvr$leftPos() + a.kvr$imageWidth() - 20;
         int y = Math.max(0, a.kvr$topPos() - 14);
