@@ -48,6 +48,7 @@ public final class KVRClientBootstrap {
         done = true;
         KVRClient.install(provider);
         com.kasperstudios.kvr.glasses.client.WornGlassesModels.register(provider); // 3D on the head, flat icon elsewhere (0020)
+        provider.onClientTickStart(com.kasperstudios.kvr.glasses.client.WornGlassesModels::resetGuards); // one visor only (0021)
         ChicoryJsEngine.install();
         PowerClient.installSender(state -> KVRNetwork.sendToServer(SetPowerStatePayload.CHANNEL, new SetPowerStatePayload(state)::write));
         KVRSpatial.initClient(new SpatialConfig(

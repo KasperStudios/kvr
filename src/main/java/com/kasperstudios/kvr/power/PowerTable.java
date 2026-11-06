@@ -30,6 +30,13 @@ public final class PowerTable {
     public static final int DEFAULT_BATTERY_LIFE = 100;
     private static volatile int batteryLife = DEFAULT_BATTERY_LIFE;
 
+    /**
+     * 0021 guard: one simulation step never drains more than this many ticks of consumption. Normal steps
+     * are 20 ticks; a longer gap means the glasses were not ticked (in a chest, or a missing ticker like the
+     * 0020 bug) — that must never empty the cell in one go. Overload deadlines stay absolute.
+     */
+    public static final int MAX_CATCH_UP_TICKS = 60 * 20;
+
     private static final int[] BATTERY_CAPACITY = {1_000, 5_000, 25_000, 100_000, 500_000};
     private static final int[] BATTERY_MAX_DISCHARGE = {10, 25, 60, 150, 500};
 

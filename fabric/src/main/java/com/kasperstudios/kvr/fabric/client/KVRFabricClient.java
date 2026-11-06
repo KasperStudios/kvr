@@ -24,10 +24,6 @@ public final class KVRFabricClient implements ClientModInitializer {
         // ← your client-side KVRNetwork setup goes BEFORE this line, if it has one
 
         // 1) the whole KVR OS client: Chicory, spatial UI, keys Alt + O, renderer, network clients
-        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
-            com.kasperstudios.kvr.client.model.GlassesWornModel.LAYER_LOCATION,
-            com.kasperstudios.kvr.client.model.GlassesWornModel::createBodyLayer
-        );
         net.minecraft.client.gui.screens.MenuScreens.register(com.kasperstudios.kvr.menu.KVRMenus.chassisAssembly(), com.kasperstudios.kvr.client.ChassisAssemblyScreen::new);
         KVRClientBootstrap.init(new FabricKVRClientProvider());
 

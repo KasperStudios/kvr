@@ -5,16 +5,17 @@
   "plugin": "com.kasperstudios.kvr.mixin.KvrSpatialMixinPlugin",
   "compatibilityLevel": "JAVA_17",
   "client": [
-  "client.AbstractContainerScreenAccessor",
-  "client.GuiGraphicsMixin",
-  "client.GuiMixin",
-  "client.ItemRendererMixin",
-  "client.KeyboardHandlerMixin",
-  "client.MinecraftMixin",
-  "client.MouseHandlerMixin",
-  "client.PlayerModelMixin",
-  "client.PlayerRendererMixin",
-  "client.ScreenMixin"
+    "client.AbstractContainerScreenAccessor",
+    "client.CustomHeadLayerMixin",
+    "client.GuiGraphicsMixin",
+    "client.GuiMixin",
+    "client.HumanoidArmorLayerMixin",
+    "client.ItemRendererMixin",
+    "client.KeyboardHandlerMixin",
+    "client.MinecraftMixin",
+    "client.MouseHandlerMixin",
+    "client.PlayerModelMixin",
+    "client.ScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -38,7 +38,8 @@ public final class PowerSimulator {
             event = Event.BOOTED;
         }
 
-        d.charge = Math.max(0, Math.min(d.capacity(build), d.charge - build.draw(d.state) * drainScale * dt));
+        long drainTicks = Math.min(dt, PowerTable.MAX_CATCH_UP_TICKS); // a stale lastStep never empties the cell at once
+        d.charge = Math.max(0, Math.min(d.capacity(build), d.charge - build.draw(d.state) * drainScale * drainTicks));
 
         if (d.overloading()) {
             d.wear = Math.max(d.wear, d.overloadProgress(gameTime)); // capacity dies with the cell

@@ -1,8 +1,11 @@
 {
-  "__comment": "Flat icon (inventory, hand, ground, item frame). The 3D model on the head is glasses_worn.json (0020). layer0 = shell, tinted with the dye colour (tintindex 0); layer1 = glass overlay.",
+  "__comment": "Flat icon (inventory, hand, ground, item frame). The 3D model on the head is glasses_worn.json (0020). layer0 = shell, tinted with the dye colour (tintindex 0); layer1 = glass overlay. display.head scale 0 (0021): the flat sprite must never appear on a head — if the 3D model failed to load, nothing is drawn and the log says why, instead of a sprite floating above the head (item/generated's head transform sits 13 px up).",
   "parent": "minecraft:item/generated",
   "textures": {
     "layer0": "kvr:item/glasses",
     "layer1": "kvr:item/glasses_overlay"
+  },
+  "display": {
+    "head": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0, 0, 0] }
   }
 }

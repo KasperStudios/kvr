@@ -1,7 +1,10 @@
 {
-  "__comment": "Flat icon (inventory, hand, ground, item frame). The 3D model on the head is hackglasses_worn.json (0020).",
+  "__comment": "Flat icon (inventory, hand, ground, item frame). The 3D model on the head is hackglasses_worn.json (0020). display.head scale 0 (0021): the flat sprite never appears on a head.",
   "parent": "minecraft:item/generated",
   "textures": {
     "layer0": "kvr:item/hackglasses"
+  },
+  "display": {
+    "head": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0, 0, 0] }
   }
 }
