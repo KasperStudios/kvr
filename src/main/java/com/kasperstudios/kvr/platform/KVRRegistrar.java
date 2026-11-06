@@ -33,7 +33,18 @@ public interface KVRRegistrar {
     /** Registers a recipe serializer. */
     void recipeSerializer(ResourceLocation id, Supplier<net.minecraft.world.item.crafting.RecipeSerializer<?>> serializer);
 
-    /** Adds worldgen ore features to biomes (Overworld and Nether). */
+    /** Registers a block entity type. */
+    <T extends net.minecraft.world.level.block.entity.BlockEntity> void blockEntityType(
+            ResourceLocation id, Supplier<net.minecraft.world.level.block.entity.BlockEntityType<T>> type);
+
+    /** Creates a BlockEntityType using the loader API or reflection. */
+    <T extends net.minecraft.world.level.block.entity.BlockEntity> net.minecraft.world.level.block.entity.BlockEntityType<T> createBlockEntityType(
+            BlockEntityFactory<T> factory, Block... blocks);
+
+    @FunctionalInterface
+    interface BlockEntityFactory<T extends net.minecraft.world.level.block.entity.BlockEntity> {
+        T create(net.minecraft.core.BlockPos pos, net.minecraft.world.level.block.state.BlockState state);
+    }
     void registerWorldgen();
 
     /** Builds a menu type through the loader API - vanilla's constructor is not public. */

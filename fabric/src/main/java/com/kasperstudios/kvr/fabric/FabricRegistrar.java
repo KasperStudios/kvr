@@ -50,6 +50,19 @@ final class FabricRegistrar implements KVRRegistrar {
     }
 
     @Override
+    public <T extends net.minecraft.world.level.block.entity.BlockEntity> void blockEntityType(
+            ResourceLocation id, Supplier<net.minecraft.world.level.block.entity.BlockEntityType<T>> type) {
+        Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, id, type.get());
+    }
+
+    @Override
+    public <T extends net.minecraft.world.level.block.entity.BlockEntity> net.minecraft.world.level.block.entity.BlockEntityType<T> createBlockEntityType(
+            BlockEntityFactory<T> factory, Block... blocks) {
+        return net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder.create(
+                factory::create, blocks).build();
+    }
+
+    @Override
     public void registerWorldgen() {
         net.fabricmc.fabric.api.biome.v1.BiomeModifications.addFeature(
                 net.fabricmc.fabric.api.biome.v1.BiomeSelectors.foundInOverworld(),

@@ -18,6 +18,23 @@ public final class KVRFabric implements ModInitializer {
         KVRPlatformProvider.install(platform);
         KVRRegistryProvider.install(new FabricRegistrar());
         KVRContent.init();
+
+        // Wire KVRDock: register BlockEntityType and install
+        net.minecraft.world.level.block.Block dockBlock = KVRContent.block("dock_plate");
+        net.minecraft.world.level.block.entity.BlockEntityType<com.kasperstudios.kvr.dock.DockPlateBlockEntity> dockBeType =
+            net.minecraft.world.level.block.entity.BlockEntityType.Builder
+                .of(com.kasperstudios.kvr.dock.DockPlateBlockEntity::new, dockBlock)
+                .build(null);
+        net.minecraft.core.Registry.register(
+            net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE,
+            com.kasperstudios.kvr.core.KVRIds.id("dock_plate"),
+            dockBeType
+        );
+        com.kasperstudios.kvr.dock.KVRDock.install(
+            () -> dockBeType,
+            stack -> stack.is(KVRContent.item("solar_upgrade")),
+            () -> new net.minecraft.world.item.ItemStack(KVRContent.item("solar_upgrade"))
+        );
         if (platform.isClient()) {
             KVRGuiProvider.install(new SimpleKVRGui(platform.name()));
         }

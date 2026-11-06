@@ -122,6 +122,19 @@ public final class KVRContent {
         ChassisDyeRecipe.SERIALIZER = ChassisDyeRecipe.createSerializer();
         registrar.recipeSerializer(KVRIds.id("crafting_special_chassis_dye"), () -> ChassisDyeRecipe.SERIALIZER);
 
+        // Register DockPlateBlockEntity and wire KVRDock
+        net.minecraft.world.level.block.entity.BlockEntityType<com.kasperstudios.kvr.dock.DockPlateBlockEntity> dockBeType =
+                registrar.createBlockEntityType(
+                        com.kasperstudios.kvr.dock.DockPlateBlockEntity::new,
+                        block("dock_plate")
+                );
+        registrar.blockEntityType(KVRIds.id("dock_plate"), () -> dockBeType);
+        com.kasperstudios.kvr.dock.KVRDock.install(
+                () -> dockBeType,
+                stack -> stack.is(item("solar_upgrade")),
+                () -> new net.minecraft.world.item.ItemStack(item("solar_upgrade"))
+        );
+
         registrar.registerWorldgen();
 
         KVR.logger().info("KVR content registered: items={} blocks={}",

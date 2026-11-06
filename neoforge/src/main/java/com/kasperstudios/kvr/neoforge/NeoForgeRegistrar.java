@@ -22,6 +22,8 @@ final class NeoForgeRegistrar implements KVRRegistrar {
     private final DeferredRegister.Items items = DeferredRegister.createItems(KVR.MOD_ID);
     private final DeferredRegister.Blocks blocks = DeferredRegister.createBlocks(KVR.MOD_ID);
     private final DeferredRegister<EntityType<?>> entityTypes = DeferredRegister.create(Registries.ENTITY_TYPE, KVR.MOD_ID);
+    private final DeferredRegister<net.minecraft.world.level.block.entity.BlockEntityType<?>> blockEntities =
+            DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, KVR.MOD_ID);
     private final DeferredRegister<MenuType<?>> menus = DeferredRegister.create(Registries.MENU, KVR.MOD_ID);
     private final DeferredRegister<net.minecraft.world.item.crafting.RecipeSerializer<?>> recipeSerializers =
             DeferredRegister.create(Registries.RECIPE_SERIALIZER, KVR.MOD_ID);
@@ -29,6 +31,7 @@ final class NeoForgeRegistrar implements KVRRegistrar {
     NeoForgeRegistrar(IEventBus modBus) {
         items.register(modBus);
         blocks.register(modBus);
+        blockEntities.register(modBus);
         entityTypes.register(modBus);
         menus.register(modBus);
         recipeSerializers.register(modBus);
@@ -57,6 +60,18 @@ final class NeoForgeRegistrar implements KVRRegistrar {
     @Override
     public void recipeSerializer(ResourceLocation id, Supplier<net.minecraft.world.item.crafting.RecipeSerializer<?>> serializer) {
         recipeSerializers.register(id.getPath(), serializer);
+    }
+
+    @Override
+    public <T extends net.minecraft.world.level.block.entity.BlockEntity> void blockEntityType(
+            ResourceLocation id, Supplier<net.minecraft.world.level.block.entity.BlockEntityType<T>> type) {
+        blockEntities.register(id.getPath(), type);
+    }
+
+    @Override
+    public <T extends net.minecraft.world.level.block.entity.BlockEntity> net.minecraft.world.level.block.entity.BlockEntityType<T> createBlockEntityType(
+            BlockEntityFactory<T> factory, Block... blocks) {
+        return net.minecraft.world.level.block.entity.BlockEntityType.Builder.of(factory::create, blocks).build(null);
     }
 
     @Override

@@ -37,6 +37,23 @@ public final class KVRNeoForge {
         KVRPlatformProvider.install(platform);
         KVRRegistryProvider.install(new NeoForgeRegistrar(modBus));
         KVRContent.init();
+
+        // Wire KVRDock: register BlockEntityType and install
+        modBus.addListener(net.neoforged.neoforge.registries.RegisterEvent.class, event -> {
+            event.register(net.minecraft.core.registries.Registries.BLOCK_ENTITY_TYPE, helper -> {
+                net.minecraft.world.level.block.Block dockBlock = KVRContent.block("dock_plate");
+                net.minecraft.world.level.block.entity.BlockEntityType<com.kasperstudios.kvr.dock.DockPlateBlockEntity> dockBeType =
+                    net.minecraft.world.level.block.entity.BlockEntityType.Builder
+                        .of(com.kasperstudios.kvr.dock.DockPlateBlockEntity::new, dockBlock)
+                        .build(null);
+                helper.register(com.kasperstudios.kvr.core.KVRIds.id("dock_plate"), dockBeType);
+                com.kasperstudios.kvr.dock.KVRDock.install(
+                    () -> dockBeType,
+                    stack -> stack.is(KVRContent.item("solar_upgrade")),
+                    () -> new net.minecraft.world.item.ItemStack(KVRContent.item("solar_upgrade"))
+                );
+            });
+        });
         if (platform.isClient()) {
             KVRGuiProvider.install(new SimpleKVRGui(platform.name()));
             NeoForgeClientScreens.register(modBus);
