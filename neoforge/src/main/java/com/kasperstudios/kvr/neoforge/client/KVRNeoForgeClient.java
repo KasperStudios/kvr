@@ -6,7 +6,6 @@ import com.kasperstudios.kvr.desktop.client.HostDesktopClient;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
 
 /**
@@ -16,6 +15,8 @@ import net.neoforged.neoforge.common.NeoForge;
  *     ... your common init → KVRCommonBootstrap.init();
  *     if (dist.isClient()) KVRNeoForgeClient.init(modBus, container);
  * }
+ * // 20.4 (no constructor injection, DevNotes 13):
+ * //   KVRNeoForgeClient.init(FMLJavaModLoadingContext.get().getModEventBus(), ModList.get().getModContainerById("kvr").orElseThrow());
  * }</pre>
  * Must run in the constructor (not in FMLClientSetupEvent): the provider hands our key mappings
  * (Left Alt, O) to {@code RegisterKeyMappingsEvent}, which fires before client setup.
@@ -27,7 +28,13 @@ public final class KVRNeoForgeClient {
     public static void init(IEventBus modBus, ModContainer container) {
         KVRClientBootstrap.init(new NeoForgeKVRClientProvider(modBus));
         // "Config" button in the mod list → KVR settings (window defaults, desktop apps, kvr-desktopd consent)
-        container.registerExtensionPoint(IConfigScreenFactory.class, (c, parent) -> new KvrSettingsScreen(parent));
+        //? if >=1.20.5 {
+        container.registerExtensionPoint(net.neoforged.neoforge.client.gui.IConfigScreenFactory.class, (c, parent) -> new KvrSettingsScreen(parent));
+        //?} else {
+        /*// 20.4: IConfigScreenFactory does not exist yet; the Forge-era ConfigScreenFactory record does
+        container.registerExtensionPoint(net.neoforged.neoforge.client.ConfigScreenHandler.ConfigScreenFactory.class,
+            () -> new net.neoforged.neoforge.client.ConfigScreenHandler.ConfigScreenFactory((mc, parent) -> new KvrSettingsScreen(parent)));
+        *///?}
         // leaving a server: close desktop apps and stop kvr-desktopd
         NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingOut.class, e -> HostDesktopClient.reset());
     }

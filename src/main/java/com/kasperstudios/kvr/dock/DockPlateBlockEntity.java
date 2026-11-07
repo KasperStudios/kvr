@@ -144,7 +144,7 @@ public class DockPlateBlockEntity extends BlockEntity {
 
     private void changedContents() {
         setChanged();
-        if (level != null && !level.isClientSide) {
+        if (level != null && !com.kasperstudios.kvr.compat.VersionCompat.clientSide(level)) {
             syncState(level, worldPosition, false);
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
         }

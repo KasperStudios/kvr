@@ -51,7 +51,12 @@ public final class TextInputScreen extends Screen {
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {}
 
     public boolean charTyped(char c, int modifiers) {
-        if (net.minecraft.util.StringUtil.isAllowedChatCharacter(c) && value.length() < target.maxLength()) {
+        //? if >=1.21 {
+        boolean allowed = net.minecraft.util.StringUtil.isAllowedChatCharacter(c);
+        //? } else {
+        /*boolean allowed = net.minecraft.SharedConstants.isAllowedChatCharacter(c);
+        *///? }
+        if (allowed && value.length() < target.maxLength()) {
             value += c;
             target.set(value);
         }

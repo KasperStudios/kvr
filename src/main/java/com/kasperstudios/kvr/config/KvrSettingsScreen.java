@@ -95,12 +95,12 @@ public final class KvrSettingsScreen extends Screen {
         *///?}
         super.render(g, mx, my, partialTick);
         int x = width / 2 - W / 2;
-        g.drawCenteredString(font, title, width / 2, 14, 0xFFFFFF);
-        g.drawString(font, Component.translatable("kvr.settings.section.windows"), x, windowsY, 0x67E8F9);
-        g.drawString(font, Component.translatable("kvr.settings.section.desktop"), x, desktopY, 0x67E8F9);
-        g.drawCenteredString(font, Component.translatable("kvr.settings.desktop_note"), width / 2, statusY, 0xA0AEC0);
+        g.drawCenteredString(font, title, width / 2, 14, 0xFFFFFFFF);
+        g.drawString(font, Component.translatable("kvr.settings.section.windows"), x, windowsY, 0xFF67E8F9);
+        g.drawString(font, Component.translatable("kvr.settings.section.desktop"), x, desktopY, 0xFF67E8F9);
+        g.drawCenteredString(font, Component.translatable("kvr.settings.desktop_note"), width / 2, statusY, 0xFFA0AEC0);
         Component status = Component.translatable(info.consented() ? "kvr.settings.consent_yes" : "kvr.settings.consent_no");
-        g.drawCenteredString(font, status, width / 2, statusY + 12, info.consented() ? 0x4ADE80 : 0xFBBF24);
+        g.drawCenteredString(font, status, width / 2, statusY + 12, info.consented() ? 0xFF4ADE80 : 0xFFFBBF24);
     }
 
     @Override

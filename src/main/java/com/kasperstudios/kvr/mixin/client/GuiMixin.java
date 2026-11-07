@@ -21,7 +21,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Gui.class)
 public abstract class GuiMixin {
 
+    //? if >=1.21 {
     private static final ResourceLocation CROSSHAIR_TEXTURE = ResourceLocation.withDefaultNamespace("hud/crosshair");
+    //? } else {
+    /*private static final ResourceLocation GUI_ICONS_LOCATION = new ResourceLocation("textures/gui/icons.png");
+    *///? }
 
     // 1.21 replaced float partialTick with DeltaTracker in renderCrosshair
     //? if <1.21 {
@@ -68,7 +72,11 @@ public abstract class GuiMixin {
                 GlStateManager.DestFactor.ZERO
         );
 
+        //? if >=1.21 {
         graphics.blitSprite(CROSSHAIR_TEXTURE, cx - 7, cy - 7, 15, 15);
+        //? } else {
+        /*graphics.blit(GUI_ICONS_LOCATION, cx - 7, cy - 7, 0, 0, 15, 15);
+        *///? }
         RenderSystem.defaultBlendFunc();
     }
 }

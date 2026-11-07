@@ -6,7 +6,6 @@ import com.kasperstudios.kvr.spatial.window.SpatialWindow;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import net.minecraft.ChatFormatting;
-import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -33,12 +32,17 @@ public final class ToastPanel extends SpatialWindow {
 
     private final Deque<Shown> shown = new ArrayDeque<>();
 
+    /** Monotonic ms, like vanilla Util.getMillis() (that class moved package on newer nodes, 0026). */
+    private static long nowMs() {
+        return System.nanoTime() / 1_000_000L;
+    }
+
     public ToastPanel() {
         super("kvr:toasts", Kind.SYSTEM, W, ROW * MAX, new LazyFollowAnchor(1.0, 0.18, 22));
     }
 
     public void push(Toast toast) {
-        shown.addFirst(new Shown(toast, Util.getMillis()));
+        shown.addFirst(new Shown(toast, nowMs()));
         while (shown.size() > MAX) shown.removeLast();
         Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_TOAST_IN, 1.2f));
     }
@@ -67,14 +71,14 @@ public final class ToastPanel extends SpatialWindow {
 
     @Override
     public void tick() {
-        long now = Util.getMillis();
+        long now = nowMs();
         shown.removeIf(s -> now - s.since() > s.toast().durationMs());
     }
 
     @Override
     protected void renderContent(GuiGraphics g, int mx, int my, float partialTick) {
         Font font = Minecraft.getInstance().font;
-        long now = Util.getMillis();
+        long now = nowMs();
         int y = 0;
         for (Shown s : shown) {
             float t = Math.min(1f, (now - s.since()) / (float) SLIDE_MS);

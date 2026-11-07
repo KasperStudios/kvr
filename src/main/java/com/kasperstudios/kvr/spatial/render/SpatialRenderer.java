@@ -54,7 +54,7 @@ public final class SpatialRenderer {
         }
 
         // 2) world pass, far to near so the glass blends correctly
-        Vec3 cam = camera.getPosition();
+        Vec3 cam = com.kasperstudios.kvr.compat.client.ClientCompat.cameraPos(camera);
         list.sort(Comparator.comparingDouble((SpatialWindow w) -> w.pose().center().distanceToSqr(cam)).reversed());
         MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
         for (SpatialWindow w : list) {
@@ -63,19 +63,6 @@ public final class SpatialRenderer {
             if (w.hasGrabBar() && hover.isPresent() && hover.get().window() == w) drawHoverFrame(pose, buffers, w, cam);
         }
         drawPointer(pose, buffers, camera, cam, hover);
-        RenderCompat.flush(buffers);
-    }
-
-    public static void drawGhostPointer(PoseStack pose, Camera camera, Vec3 cam, com.kasperstudios.kvr.hack.client.GhostRaycast.GhostHit hit) {
-        MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
-        double dist = hit.distance() - 0.004;
-        Optional<SpatialRaycast.Ray> ray = KVRSpatial.input().ray();
-        if (ray.isEmpty()) return;
-        Vec3 at = ray.get().origin().add(ray.get().dir().scale(dist)).subtract(cam);
-        Vec3 left = new Vec3(camera.getLeftVector()).scale(POINTER * 1.2);
-        Vec3 up = new Vec3(camera.getUpVector()).scale(POINTER * 1.2);
-        // Green hacking crosshair pointer on victim's window
-        RenderCompat.quad(pose, buffers, GlassStyle.GRAB_HANDLE_TEXTURE, at.add(left).add(up), at.add(left).subtract(up), at.subtract(left).subtract(up), at.subtract(left).add(up), 0f, 0f, 1f, 1f, 0xFF4ADE80);
         RenderCompat.flush(buffers);
     }
 

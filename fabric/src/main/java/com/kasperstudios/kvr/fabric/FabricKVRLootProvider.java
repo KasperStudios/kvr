@@ -19,7 +19,7 @@ public final class FabricKVRLootProvider implements KVRLoot.Provider {
     public void addToEveryChest(Supplier<Item> item, float chance) {
         //? if >=1.20.5 {
         net.fabricmc.fabric.api.loot.v3.LootTableEvents.MODIFY.register((key, builder, source, registries) -> {
-            if (KVRLoot.isChestTable(key.location().getPath())) builder.withPool(pool(item, chance));
+            if (KVRLoot.isChestTable(com.kasperstudios.kvr.compat.VersionCompat.keyId(key).getPath())) builder.withPool(pool(item, chance));
         });
         //?} else {
         /*net.fabricmc.fabric.api.loot.v2.LootTableEvents.MODIFY.register((resourceManager, lootManager, id, builder, source) -> {

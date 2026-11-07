@@ -38,7 +38,7 @@ public final class VfsServer {
     public static void init() {
         KVRNetwork.registerServerReceiver(VfsProtocol.REQUEST, (player, buf) -> {
             VfsProtocol.Request req = VfsProtocol.Request.read(buf);
-            MinecraftServer server = player.getServer();
+            MinecraftServer server = com.kasperstudios.kvr.compat.VersionCompat.server(player);
             if (server != null) server.execute(() -> reply(player, handle(player, req)));
         });
     }
@@ -54,7 +54,7 @@ public final class VfsServer {
         ItemStack glasses = player.getItemBySlot(EquipmentSlot.HEAD);
         Optional<PowerBuild> build = GlassesPower.build(glasses);
         if (build.isEmpty() || !GlassesPower.active(glasses, player.level().getGameTime())) return Optional.empty();
-        return Optional.of(new Context(new VfsStore(root(player.getServer(), glasses)), VfsQuota.forStorageTier(build.get().storage())));
+        return Optional.of(new Context(new VfsStore(root(com.kasperstudios.kvr.compat.VersionCompat.server(player), glasses)), VfsQuota.forStorageTier(build.get().storage())));
     }
 
     static VfsProtocol.Reply handle(ServerPlayer player, VfsProtocol.Request req) {
@@ -67,7 +67,7 @@ public final class VfsServer {
             }
             String path = VfsPath.normalize(req.path());
             boolean write = req.op() == VfsProtocol.Op.WRITE || req.op() == VfsProtocol.Op.DELETE;
-            VfsStore store = new VfsStore(root(player.getServer(), glasses));
+            VfsStore store = new VfsStore(root(com.kasperstudios.kvr.compat.VersionCompat.server(player), glasses));
             if (req.op() != VfsProtocol.Op.USAGE && !VfsPath.canAccess(path, req.appId(), write)
                 // 0025: an installed package that declared fs_read_all may READ every /data/<app>/ (never write)
                 && !(!write && path.startsWith("/data/") && com.kasperstudios.kvr.apps.AppsServer.grants(store, req.appId(), com.kasperstudios.kvr.apps.AppPermissions.FS_READ_ALL))) {
@@ -112,7 +112,7 @@ public final class VfsServer {
     }
 
     private static void rateLimit(ServerPlayer player) throws VfsException {
-        int second = player.getServer().getTickCount() / 20;
+        int second = com.kasperstudios.kvr.compat.VersionCompat.server(player).getTickCount() / 20;
         int[] r = RATE.computeIfAbsent(player.getUUID(), k -> new int[] {second, 0});
         if (r[0] != second) {
             r[0] = second;

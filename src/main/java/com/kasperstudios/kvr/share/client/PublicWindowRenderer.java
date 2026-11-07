@@ -70,7 +70,7 @@ public final class PublicWindowRenderer {
         }
 
         // 2) world pass, far to near
-        Vec3 cam = camera.getPosition();
+        Vec3 cam = com.kasperstudios.kvr.compat.client.ClientCompat.cameraPos(camera);
         panels.sort((a, b) -> Double.compare(distSq(b.entry(), cam), distSq(a.entry(), cam)));
         MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
         for (Panel p : panels) {

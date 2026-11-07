@@ -31,7 +31,7 @@ public final class HostDesktopServer {
 
     public static void init() {
         KVRNetwork.registerServerReceiver(QUERY, (player, buf) -> {
-            var server = player.getServer();
+            var server = com.kasperstudios.kvr.compat.VersionCompat.server(player);
             if (server == null) return;
             server.execute(() -> {
                 KvrConfig.Server cfg = KvrConfig.server();

@@ -79,6 +79,50 @@ public final class RenderCompat {
     }
 
     /**
+     * Vanilla crosshair (15×15) centred on {@code cx, cy}, inverted against the background exactly like vanilla.
+     * 0026 report: 1.20.1 has no GUI sprite atlas (crosshair = {@code textures/gui/icons.png} at 0,0) and no
+     * {@code withDefaultNamespace} (1.21+). No-op on 1.21.5+ (no render backend there, client mixins skipped).
+     */
+    public static void crosshair(GuiGraphics g, int cx, int cy) {
+        //? if >=1.21.5 {
+        /*// spatial UI is inert on this node
+        *///?} else if >=1.21.2 {
+        /*g.blitSprite(net.minecraft.client.renderer.RenderType::crosshair, ResourceLocation.withDefaultNamespace("hud/crosshair"), cx - 7, cy - 7, 15, 15);
+        *///?} else {
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        com.mojang.blaze3d.systems.RenderSystem.blendFuncSeparate(
+            com.mojang.blaze3d.platform.GlStateManager.SourceFactor.ONE_MINUS_DST_COLOR, com.mojang.blaze3d.platform.GlStateManager.DestFactor.ONE_MINUS_SRC_COLOR,
+            com.mojang.blaze3d.platform.GlStateManager.SourceFactor.ONE, com.mojang.blaze3d.platform.GlStateManager.DestFactor.ZERO);
+        try {
+            //? if >=1.21 {
+            g.blitSprite(ResourceLocation.withDefaultNamespace("hud/crosshair"), cx - 7, cy - 7, 15, 15);
+            //?} else if >=1.20.2 {
+            /*g.blitSprite(new ResourceLocation("hud/crosshair"), cx - 7, cy - 7, 15, 15);
+            *///?} else {
+            /*g.blit(new ResourceLocation("textures/gui/icons.png"), cx - 7, cy - 7, 0, 0, 15, 15);
+            *///?}
+        } finally {
+            com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
+            com.mojang.blaze3d.systems.RenderSystem.disableBlend();
+        }
+        //?}
+    }
+
+    /**
+     * Whole texture stretched into a GUI rect, normal (straight) alpha: desktop app frames (0026 — the
+     * {@code blit(ResourceLocation, x, y, w, h, u, v, ...)} overload is gone on 1.21.2+).
+     */
+    public static void blit(GuiGraphics g, ResourceLocation tex, int x, int y, int w, int h, int texW, int texH) {
+        //? if >=1.21.6 {
+        /*g.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, tex, x, y, 0f, 0f, w, h, texW, texH, texW, texH);
+        *///?} else if >=1.21.2 {
+        /*g.blit(net.minecraft.client.renderer.RenderType::guiTextured, tex, x, y, 0f, 0f, w, h, texW, texH, texW, texH);
+        *///?} else {
+        g.blit(tex, x, y, w, h, 0f, 0f, texW, texH, texW, texH);
+        //?}
+    }
+
+    /**
      * Offscreen colour target a window paints into with plain {@link GuiGraphics}. Registered in the
      * TextureManager under {@link #texture()}, so the world pass can use it like any texture.
      */

@@ -28,7 +28,7 @@ public final class MessengerServer {
     public static void init() {
         KVRNetwork.registerServerReceiver(MessengerProtocol.SEND, (player, buf) -> {
             MessengerProtocol.Send msg = MessengerProtocol.Send.read(buf);
-            MinecraftServer server = player.getServer();
+            MinecraftServer server = com.kasperstudios.kvr.compat.VersionCompat.server(player);
             if (server != null) server.execute(() -> {
                 MessengerProtocol.Ack ack = handle(server, player, msg);
                 KVRNetwork.sendToPlayer(player, MessengerProtocol.ACK, ack::write);

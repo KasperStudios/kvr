@@ -125,7 +125,7 @@ public final class HostDesktopWindow extends SpatialWindow {
         int top = TITLE_H;
         int ch = contentH();
         if (texture.ready()) {
-            g.blit(texture.texture(), 0, top, width, ch, 0f, 0f, texture.width(), texture.height(), texture.width(), texture.height());
+            com.kasperstudios.kvr.spatial.render.RenderCompat.blit(g, texture.texture(), 0, top, width, ch, texture.width(), texture.height());
             if (mx >= 0 && my >= top && my < top + ch) drawCursor(g, mx, my);
         } else {
             g.fill(0, top, width, top + ch, 0x60000000);

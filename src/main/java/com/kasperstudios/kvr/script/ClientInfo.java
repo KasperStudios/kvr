@@ -25,7 +25,7 @@ public final class ClientInfo {
         BlockPos p = mc.player.blockPosition();
         String self = mc.player.getName().getString();
         List<String> online = ticks++ % 20 == 0 || snap.online().isEmpty() ? online(mc, self) : snap.online();
-        snap = new Snapshot(p.getX(), p.getY(), p.getZ(), mc.level.dimension().location().toString(), self, online, mc.options.languageCode);
+        snap = new Snapshot(p.getX(), p.getY(), p.getZ(), com.kasperstudios.kvr.compat.VersionCompat.keyId(mc.level.dimension()).toString(), self, online, mc.options.languageCode);
     }
 
     public static Snapshot get() {
@@ -35,7 +35,7 @@ public final class ClientInfo {
     private static List<String> online(Minecraft mc, String self) {
         if (mc.getConnection() == null) return List.of();
         return mc.getConnection().getOnlinePlayers().stream()
-            .map(info -> info.getProfile().getName())
+            .map(info -> com.kasperstudios.kvr.compat.VersionCompat.profileName(info.getProfile()))
             .filter(n -> !n.equals(self))
             .sorted()
             .toList();

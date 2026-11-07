@@ -57,27 +57,27 @@ public final class DesktopConsentScreen extends Screen {
         int w = Math.min(420, width - 40);
         int x = (width - w) / 2;
         int y = 20;
-        g.drawCenteredString(font, title.copy().withStyle(ChatFormatting.BOLD), width / 2, y, 0xFFFFFF);
+        g.drawCenteredString(font, title.copy().withStyle(ChatFormatting.BOLD), width / 2, y, 0xFFFFFFFF);
         y += 18;
         for (String key : List.of("kvr.desktop.consent.what", "kvr.desktop.consent.hidden", "kvr.desktop.consent.private", "kvr.desktop.consent.stop")) {
             FormattedText line = Component.translatable(key);
-            g.drawWordWrap(font, line, x, y, w, 0xE2E8F0);
+            g.drawWordWrap(font, line, x, y, w, 0xFFE2E8F0);
             y += font.wordWrapHeight(line, w) + 4;
         }
         y += 6;
-        g.drawString(font, Component.translatable("kvr.desktop.consent.file", info.binary().toAbsolutePath().toString()), x, y, 0xA0AEC0, false);
+        g.drawString(font, Component.translatable("kvr.desktop.consent.file", info.binary().toAbsolutePath().toString()), x, y, 0xFFA0AEC0, false);
         y += 12;
         if (info.exists()) {
-            g.drawString(font, Component.literal("SHA-256: " + info.sha256()), x, y, 0x67E8F9, false);
+            g.drawString(font, Component.literal("SHA-256: " + info.sha256()), x, y, 0xFF67E8F9, false);
         } else if (info.canDownload()) {
-            g.drawWordWrap(font, Component.translatable("kvr.desktop.consent.download", info.downloadUrl()), x, y, w, 0xFBBF24);
+            g.drawWordWrap(font, Component.translatable("kvr.desktop.consent.download", info.downloadUrl()), x, y, w, 0xFFFBBF24);
             y += font.wordWrapHeight(Component.translatable("kvr.desktop.consent.download", info.downloadUrl()), w) + 2;
-            g.drawString(font, Component.literal("SHA-256: " + info.downloadSha256()), x, y, 0x67E8F9, false);
+            g.drawString(font, Component.literal("SHA-256: " + info.downloadSha256()), x, y, 0xFF67E8F9, false);
         } else {
-            g.drawWordWrap(font, Component.translatable("kvr.desktop.consent.missing"), x, y, w, 0xF43F5E);
+            g.drawWordWrap(font, Component.translatable("kvr.desktop.consent.missing"), x, y, w, 0xFFF43F5E);
         }
         if (info.consented()) {
-            g.drawCenteredString(font, Component.translatable("kvr.desktop.consent.already"), width / 2, height - 50, 0x4ADE80);
+            g.drawCenteredString(font, Component.translatable("kvr.desktop.consent.already"), width / 2, height - 50, 0xFF4ADE80);
         }
     }
 

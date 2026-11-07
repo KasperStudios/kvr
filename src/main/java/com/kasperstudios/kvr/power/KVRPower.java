@@ -40,7 +40,7 @@ public final class KVRPower {
             .then(Commands.literal("hud_off").executes(c -> set(c, PowerState.HUD_OFF)))
             .then(Commands.literal("off").executes(c -> set(c, PowerState.OFF)))
             .then(Commands.literal("charge")
-                .requires(s -> s.hasPermission(2))
+                .requires(com.kasperstudios.kvr.compat.VersionCompat::isGamemaster)
                 .then(Commands.argument("percent", IntegerArgumentType.integer(0, 100)).executes(KVRPower::charge)))));
     }
 

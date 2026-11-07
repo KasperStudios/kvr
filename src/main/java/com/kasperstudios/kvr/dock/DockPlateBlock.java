@@ -125,11 +125,7 @@ public class DockPlateBlock extends Block implements EntityBlock {
     }
 
     private static boolean clientSide(Level level) {
-        //? if >=1.21.9 {
-        /*return level.isClientSide();
-        *///?} else {
-        return level.isClientSide;
-        //?}
+        return com.kasperstudios.kvr.compat.VersionCompat.clientSide(level); // 0026: one boundary for the whole mod
     }
 
     // --- version-specific overrides --------------------------------------------------------------
