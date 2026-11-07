@@ -46,8 +46,7 @@ public final class VirtualMirrorWindow extends SpatialWindow {
         float mouseY = my >= 0 ? my : cy - 40;
 
         try {
-            //? if >=1.20.4 {
-            InventoryScreen.renderEntityInInventoryFollowsMouse(
+            com.kasperstudios.kvr.compat.client.ClientCompat.renderEntityFollowsMouse(
                 g,
                 cx - 50, cy - 100, cx + 50, cy + 20,
                 scale,
@@ -55,11 +54,6 @@ public final class VirtualMirrorWindow extends SpatialWindow {
                 mouseX, mouseY,
                 player
             );
-            //? } else {
-            /*InventoryScreen.renderEntityInInventoryFollowsMouse(
-                g, cx, cy + 10, scale, (float) (cx - mouseX), (float) (cy - 40 - mouseY), player
-            );
-            *///? }
         } catch (RuntimeException ignored) {
             // Guard against render crashes during dimension switches
         }

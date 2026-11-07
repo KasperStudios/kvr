@@ -72,11 +72,6 @@ public abstract class GuiMixin {
                 GlStateManager.DestFactor.ZERO
         );
 
-        //? if >=1.21 {
-        graphics.blitSprite(CROSSHAIR_TEXTURE, cx - 7, cy - 7, 15, 15);
-        //? } else {
-        /*graphics.blit(GUI_ICONS_LOCATION, cx - 7, cy - 7, 0, 0, 15, 15);
-        *///? }
-        RenderSystem.defaultBlendFunc();
+        com.kasperstudios.kvr.spatial.render.RenderCompat.crosshair(graphics, cx, cy);
     }
 }

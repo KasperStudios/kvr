@@ -1,6 +1,5 @@
 package com.kasperstudios.kvr.script.ui;
 
-import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -51,12 +50,7 @@ public final class TextInputScreen extends Screen {
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {}
 
     public boolean charTyped(char c, int modifiers) {
-        //? if >=1.21 {
-        boolean allowed = net.minecraft.util.StringUtil.isAllowedChatCharacter(c);
-        //? } else {
-        /*boolean allowed = net.minecraft.SharedConstants.isAllowedChatCharacter(c);
-        *///? }
-        if (allowed && value.length() < target.maxLength()) {
+        if (com.kasperstudios.kvr.compat.VersionCompat.allowedChatChar(c) && value.length() < target.maxLength()) {
             value += c;
             target.set(value);
         }
