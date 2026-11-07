@@ -83,6 +83,17 @@ packages all Matrix entries, and the core tests pass on every node.
         floating windows and battery percentage with green `hack_grid` overlay in real-time.
       - Animated item texture (10 frames) `hackglasses.png` + `.mcmeta` + model `hackglasses.json`.
       - Unit tests: `SpyMathTest`, `WindowSummaryTest` (102 tests total passed, 0 failures).
+- [x] HackGlasses Part 2 & Multiplayer Alt Hand Synchronization:
+      - `HackProtocol`: C2S `kvr:hack_input`, S2C `kvr:inject_input`, S2C `kvr:hack_targets` (radar for KVR players in range).
+      - `GhostRaycast` & `SpatialInput`: raycasting against victim ghost windows in Alt mode, drawing green crosshair on target, remote click/release/char injection.
+      - Multiplayer Alt Hand Pose Sync (ADR-001): `HandPose`, `HandPoseRelay` (C2S `kvr:hand_report`, S2C `kvr:hand_view`), `HandPoseClient`, and `PlayerModelMixin` updated so remote players' right arms actively track their spatial cursor in multiplayer.
+      - Unit tests: `HackProtocolTest`, `HandPoseTest` passing.
+- [x] Complete System Apps & Spatial Gestures Pipeline (SPEC Block 5.3 & ADR-001):
+      - `kvr.storage`: fast local key-value persistence in `config/kvr/data/<appId>/storage.json` (`AppStorage` + `kvr.storage.get/set/remove/keys`). Unit-tested in `AppStorageTest`.
+      - Builtin app `kvr.player`: in-visor music & disc player with Play/Stop/Next/Prev, live status, and track memory.
+      - Builtin app `kvr.ide`: live JavaScript code studio with multiline text editor, live `eval()` execution, log output, shake/sound effects, and VFS file save/load (`/home/script.js`).
+      - In-visor system screens: `SettingsWindow` (opacity, visibility, desktop toggle, power), `AppLauncherWindow` (ADR-001 Gesture 1), `VirtualMirrorWindow` (ADR-001 Gesture 4: 3D player avatar mirror), `WorkspaceWindow` (ADR-001 Gesture 5: create empty space/monitor).
+      - Full unit test verification across ChicoryJsEngineTest and Stonecutter matrix.
 - [x] Block 5 Skeleton: Script Engine Core & Watchdog (Task 0007 from Retool):
       - Engine-agnostic contract: `JsEngine` (eval, call with JSON args, host functions, interrupt, memory measurement).
       - Fixed-step clock: `ScriptClock` implementing CPU tiers (10/20/50/100/200 Hz) with max 3-tick catch-up limit.

@@ -59,8 +59,11 @@ public final class KVRClientBootstrap {
         // after KVRSpatial: its tick (Alt toggle, power key) runs first, the hints read the result
         if (KVRSpatial.ready()) provider.onClientTickStart(com.kasperstudios.kvr.power.client.PowerHints::tick);
         SpyClient.initClient();
+        com.kasperstudios.kvr.spatial.input.HandPoseClient.initClient();
         PublicWindowsClient.initClient();
         VfsClient.initClient();
+        com.kasperstudios.kvr.apps.client.AppsClient.initClient(); // 0025: kvr:apps (.vrapp client cache and protocol)
+        if (KVRSpatial.ready()) provider.onClientTickStart(com.kasperstudios.kvr.apps.client.AppCatalog::tick); // 0025: dev apps hot reload watcher
         MessengerClient.initClient();
         HostDesktopClient.initClient();
         KVR.logger().info("KVR client ready: spatial UI {}, keys: Left Alt = pointer, O = power (hold 1 s = Power Off)",

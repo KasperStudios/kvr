@@ -46,8 +46,44 @@ public final class SpyClient {
             WindowSummary s = WindowSummary.read(buf);
             Minecraft.getInstance().execute(() -> store(id, name, s));
         });
+        KVRNetwork.registerClientReceiver(com.kasperstudios.kvr.hack.HackProtocol.S2C_INJECT_INPUT, buf -> {
+            com.kasperstudios.kvr.hack.HackProtocol.InputInjection p = com.kasperstudios.kvr.hack.HackProtocol.InputInjection.read(buf);
+            Minecraft.getInstance().execute(() -> receiveInjectedInput(p));
+        });
         KVRClient.get().onClientTickStart(SpyClient::tick);
         if (RenderCompat.SUPPORTED) KVRClient.get().onWorldRender(GhostRenderer::render);
+    }
+
+    private static void receiveInjectedInput(com.kasperstudios.kvr.hack.HackProtocol.InputInjection p) {
+        if (!KVRSpatial.ready()) return;
+        List<SpatialWindow> list = KVRSpatial.windows().all();
+        SpatialWindow target = null;
+        if (p.windowIndex() >= 0 && p.windowIndex() < list.size()) {
+            SpatialWindow w = list.get(p.windowIndex());
+            if (w.title().getString().equals(p.windowTitle())) {
+                target = w;
+            }
+        }
+        if (target == null) {
+            for (SpatialWindow w : list) {
+                if (w.title().getString().equals(p.windowTitle())) {
+                    target = w;
+                    break;
+                }
+            }
+        }
+        if (target == null || target.isLocked() || !target.isVisible()) return;
+
+        Minecraft mc = Minecraft.getInstance();
+        var view = com.kasperstudios.kvr.spatial.PlayerView.capture(mc.gameRenderer.getMainCamera(), 1f);
+        switch (p.action()) {
+            case CLICK -> {
+                KVRSpatial.windows().focus(target);
+                target.click(p.px(), p.py(), p.buttonOrChar(), view);
+            }
+            case RELEASE -> target.release(p.px(), p.py(), p.buttonOrChar());
+            case CHAR -> target.charTyped(p.buttonOrChar(), 0);
+        }
     }
 
     private static void store(UUID id, String name, WindowSummary s) {

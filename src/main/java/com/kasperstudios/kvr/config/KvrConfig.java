@@ -73,6 +73,10 @@ public final class KvrConfig {
         server = null;
     }
 
+    public static synchronized Path directory() {
+        return dir;
+    }
+
     public static synchronized Client client() {
         if (client == null) {
             Map<String, String> m = load(CLIENT_FILE, CLIENT_DEFAULTS);

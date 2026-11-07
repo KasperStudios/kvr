@@ -138,6 +138,15 @@
       anchor: (mode) => host('window.option', { key: 'anchor', value: mode === 'body' ? 'body' : 'world' }),
     },
     sound: { play: (id) => host('sound.play', String(id)) },
+    storage: Object.freeze({
+      get: (k, def = null) => {
+        const v = host('storage.get', String(k));
+        return v === null || v === undefined ? def : v;
+      },
+      set: (k, v) => host('storage.set', { key: String(k), val: String(v) }),
+      remove: (k) => host('storage.remove', String(k)),
+      keys: () => host('storage.keys') || [],
+    }),
     // note window (coords etc.): opens in front of the player, Body anchor; gear menu + × like any window
     pin: (title, text) => host('window.pin', { title: String(title), text: String(text === undefined ? '' : text) }),
     player: Object.freeze({

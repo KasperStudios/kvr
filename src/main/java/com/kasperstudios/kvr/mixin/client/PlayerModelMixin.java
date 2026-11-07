@@ -1,6 +1,7 @@
 package com.kasperstudios.kvr.mixin.client;
 
 import com.kasperstudios.kvr.spatial.KVRSpatial;
+import com.kasperstudios.kvr.spatial.input.HandPose;
 import com.kasperstudios.kvr.spatial.input.SpatialCursor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
@@ -12,8 +13,14 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Positions the player's right arm to follow the spatial Alt pointer / cursor in 1st & 3rd person.
- * Concept: "Альт режим это когда на альт нажал и переходишь в режим который правую руку за курсором водит"
+ * Positions a player's right arm along the spatial Alt pointer (ADR-001).
+ *
+ * <p>Two sources, one pose:
+ * <ul>
+ *   <li>the local player reads {@link SpatialCursor} directly (zero latency);</li>
+ *   <li>everybody else reads {@link HandPose}, filled by {@code HandPoseRelay} — so the arm motion is
+ *       visible to the whole server in multiplayer, not just to the person moving it.</li>
+ * </ul>
  */
 @Mixin(PlayerModel.class)
 public abstract class PlayerModelMixin<T extends LivingEntity> extends HumanoidModel<T> {
@@ -26,17 +33,24 @@ public abstract class PlayerModelMixin<T extends LivingEntity> extends HumanoidM
     private void kvr$aimArmAtCursor(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch, CallbackInfo ci) {
         if (!KVRSpatial.ready()) return;
         Minecraft mc = Minecraft.getInstance();
-        if (entity != mc.player) return;
 
-        SpatialCursor cursor = KVRSpatial.cursor();
-        if (!cursor.active()) return;
+        float yawOffset;
+        float pitchOffset;
+        if (entity == mc.player) {
+            SpatialCursor cursor = KVRSpatial.cursor();
+            if (!cursor.active()) return;
+            yawOffset = cursor.yawOffset();
+            pitchOffset = cursor.pitchOffset();
+        } else {
+            // remote players: only what the server relayed (active = Alt mode is on)
+            HandPose.Pose pose = HandPose.get(entity.getId());
+            if (!pose.active()) return;
+            yawOffset = pose.yaw();
+            pitchOffset = pose.pitch();
+        }
 
-        // When Alt mode is active, the right arm aims towards the cursor ray
-        float targetPitch = (float) Math.toRadians(headPitch + cursor.pitchOffset() - 90.0f);
-        float targetYaw = (float) Math.toRadians(netHeadYaw + cursor.yawOffset());
-
-        this.rightArm.xRot = targetPitch;
-        this.rightArm.yRot = targetYaw;
+        this.rightArm.xRot = (float) Math.toRadians(headPitch + pitchOffset - 90.0f);
+        this.rightArm.yRot = (float) Math.toRadians(netHeadYaw + yawOffset);
         this.rightArm.zRot = 0.0f;
     }
 }

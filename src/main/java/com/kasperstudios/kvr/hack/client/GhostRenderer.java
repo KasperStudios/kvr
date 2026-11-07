@@ -2,9 +2,11 @@ package com.kasperstudios.kvr.hack.client;
 
 import com.kasperstudios.kvr.hack.HackGlasses;
 import com.kasperstudios.kvr.hack.WindowSummary;
+import com.kasperstudios.kvr.spatial.KVRSpatial;
 import com.kasperstudios.kvr.spatial.SpatialPose;
 import com.kasperstudios.kvr.spatial.render.GlassStyle;
 import com.kasperstudios.kvr.spatial.render.RenderCompat;
+import com.kasperstudios.kvr.spatial.render.SpatialRenderer;
 import com.kasperstudios.kvr.spatial.window.SpatialWindow;
 import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.ArrayList;
@@ -51,6 +53,11 @@ public final class GhostRenderer {
             Player victim = mc.level.getPlayerByUUID(e.getKey());
             if (victim != null) battery(pose, buffers, camera, cam, victim, s.summary().battery());
         }
+        KVRSpatial.input().ray().ifPresent(ray -> {
+            GhostRaycast.pick(ray).ifPresent(hit -> {
+                SpatialRenderer.drawGhostPointer(pose, camera, cam, hit);
+            });
+        });
         RenderCompat.flush(buffers);
     }
 

@@ -30,6 +30,11 @@ public final class VfsStore {
         this.root = root.toAbsolutePath().normalize();
     }
 
+    /** Folder of these glasses on the server disk (cache key for the App Manager). */
+    public Path root() {
+        return root;
+    }
+
     public List<Entry> list(String path) throws VfsException {
         Path dir = resolve(path);
         if (path.equals("/")) ensureSkeleton();
@@ -70,6 +75,58 @@ public final class VfsStore {
             if (u.bytes() - old + bytes.length > quota.bytes()) throw new VfsException(VfsException.Code.QUOTA_BYTES, (u.bytes() - old + bytes.length) + "/" + quota.bytes());
             Files.createDirectories(f.getParent());
             Files.write(f, bytes);
+        } catch (IOException e) {
+            throw new VfsException(VfsException.Code.IO, e.getMessage());
+        }
+    }
+
+    /**
+     * Binary write for the App Manager ({@code /apps/<id>.vrapp}, 0025). Same quota rules as {@link #write},
+     * no per-packet cap: the installer assembled the bytes from chunks and validated the package already.
+     * Atomic (temp file + move), so a crash mid-write never leaves half a package.
+     */
+    public void writeBytes(String path, byte[] bytes, VfsQuota quota) throws VfsException {
+        if (path.equals("/")) throw new VfsException(VfsException.Code.IS_DIRECTORY, path);
+        Path f = resolve(path);
+        if (Files.isDirectory(f)) throw new VfsException(VfsException.Code.IS_DIRECTORY, path);
+        try {
+            boolean exists = Files.isRegularFile(f);
+            long old = exists ? Files.size(f) : 0;
+            Usage u = usage();
+            if (!exists && u.files() + 1 > quota.files()) throw new VfsException(VfsException.Code.QUOTA_FILES, u.files() + "/" + quota.files());
+            if (u.bytes() - old + bytes.length > quota.bytes()) throw new VfsException(VfsException.Code.QUOTA_BYTES, (u.bytes() - old + bytes.length) + "/" + quota.bytes());
+            Files.createDirectories(f.getParent());
+            Path tmp = f.resolveSibling(f.getFileName() + ".part");
+            Files.write(tmp, bytes);
+            try {
+                Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new VfsException(VfsException.Code.IO, e.getMessage());
+        }
+    }
+
+    /** Binary read for the App Manager; {@code maxBytes} guards memory. */
+    public byte[] readBytes(String path, int maxBytes) throws VfsException {
+        Path f = resolve(path);
+        if (Files.isDirectory(f)) throw new VfsException(VfsException.Code.IS_DIRECTORY, path);
+        if (!Files.isRegularFile(f)) throw new VfsException(VfsException.Code.NOT_FOUND, path);
+        try {
+            if (Files.size(f) > maxBytes) throw new VfsException(VfsException.Code.TOO_LARGE, path);
+            return Files.readAllBytes(f);
+        } catch (IOException e) {
+            throw new VfsException(VfsException.Code.IO, e.getMessage());
+        }
+    }
+
+    /** Last-modified millis + size of a file (cache key for parsed packages); {@code [-1, -1]} if missing. */
+    public long[] stamp(String path) throws VfsException {
+        Path f = resolve(path);
+        try {
+            if (!Files.isRegularFile(f)) return new long[] {-1, -1};
+            return new long[] {Files.getLastModifiedTime(f).toMillis(), Files.size(f)};
         } catch (IOException e) {
             throw new VfsException(VfsException.Code.IO, e.getMessage());
         }

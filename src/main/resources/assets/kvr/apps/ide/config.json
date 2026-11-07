@@ -1,0 +1,8 @@
+{
+  "id": "ide",
+  "name": "KVR Code Studio",
+  "version": "1.0.0",
+  "author": "Kasper Studios",
+  "window_opts": { "width": 320, "height": 300 },
+  "permissions": []
+}

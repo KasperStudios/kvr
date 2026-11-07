@@ -40,9 +40,11 @@ public final class KVRCommonBootstrap {
             if (server != null) server.execute(() -> PowerServerHandler.handle(player, p));
         });
         VfsServer.init();                      // kvr:vfs
+        com.kasperstudios.kvr.apps.AppsServer.init(); // 0025: kvr:apps (.vrapp install/uninstall/list)
         MessengerServer.init();                // kvr:msg_* (after VfsServer: attachments live in the VFS)
-        SpyRelay.init();                       // kvr:window_summary, kvr:spy_view
+        SpyRelay.init();                       // kvr:window_summary, kvr:spy_view, kvr:hack_*
         PublicWindowRelay.init();              // kvr:public_windows (reads SpyRelay's summaries)
+        com.kasperstudios.kvr.spatial.input.HandPoseRelay.init(); // kvr:hand_report / kvr:hand_view
         HostDesktopServer.init();              // kvr:desktop_query / kvr:desktop_policy
         KVR.logger().info("KVR common systems ready (power, VFS, messenger, spy/public relays, desktop policy)");
     }

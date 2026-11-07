@@ -67,10 +67,12 @@ public final class VfsServer {
             }
             String path = VfsPath.normalize(req.path());
             boolean write = req.op() == VfsProtocol.Op.WRITE || req.op() == VfsProtocol.Op.DELETE;
-            if (req.op() != VfsProtocol.Op.USAGE && !VfsPath.canAccess(path, req.appId(), write)) {
+            VfsStore store = new VfsStore(root(player.getServer(), glasses));
+            if (req.op() != VfsProtocol.Op.USAGE && !VfsPath.canAccess(path, req.appId(), write)
+                // 0025: an installed package that declared fs_read_all may READ every /data/<app>/ (never write)
+                && !(!write && path.startsWith("/data/") && com.kasperstudios.kvr.apps.AppsServer.grants(store, req.appId(), com.kasperstudios.kvr.apps.AppPermissions.FS_READ_ALL))) {
                 throw new VfsException(VfsException.Code.DENIED, path);
             }
-            VfsStore store = new VfsStore(root(player.getServer(), glasses));
             VfsQuota quota = VfsQuota.forStorageTier(build.get().storage());
             String data = switch (req.op()) {
                 case LIST -> {

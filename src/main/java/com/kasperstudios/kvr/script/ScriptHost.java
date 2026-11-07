@@ -291,6 +291,28 @@ public final class ScriptHost {
                 var o = JsonParser.parseString(payload).getAsJsonObject();
                 listener.windowOption(str(o, "key", ""), str(o, "value", ""));
             }
+            case "storage.get" -> {
+                String key = JsonParser.parseString(payload).getAsString();
+                String val = AppStorage.get(app.id(), key);
+                return val == null ? "null" : new JsonPrimitive(val).toString();
+            }
+            case "storage.set" -> {
+                var o = JsonParser.parseString(payload).getAsJsonObject();
+                String key = str(o, "key", "");
+                String val = str(o, "val", "");
+                if (!key.isEmpty()) AppStorage.set(app.id(), key, val);
+                return "null";
+            }
+            case "storage.remove" -> {
+                String key = JsonParser.parseString(payload).getAsString();
+                AppStorage.remove(app.id(), key);
+                return "null";
+            }
+            case "storage.keys" -> {
+                JsonArray arr = new JsonArray();
+                AppStorage.keys(app.id()).forEach(arr::add);
+                return arr.toString();
+            }
             case "sound.play" -> listener.sound(JsonParser.parseString(payload).getAsString());
             case "fs" -> fs(JsonParser.parseString(payload).getAsJsonObject());
             case "player.coords" -> {
@@ -313,8 +335,15 @@ public final class ScriptHost {
                 ClientInfo.get().online().forEach(arr::add);
                 return arr.toString();
             }
-            case "msg.send" -> msgSend(JsonParser.parseString(payload).getAsJsonObject());
+            case "msg.send" -> {
+                if (!com.kasperstudios.kvr.apps.AppPermissions.allowed(app.id(), com.kasperstudios.kvr.apps.AppPermissions.NETWORK)) {
+                    denied(JsonParser.parseString(payload).getAsJsonObject());
+                } else {
+                    msgSend(JsonParser.parseString(payload).getAsJsonObject());
+                }
+            }
             case "msg.pending" -> {
+                if (!com.kasperstudios.kvr.apps.AppPermissions.allowed(app.id(), com.kasperstudios.kvr.apps.AppPermissions.NETWORK)) return "[]";
                 return com.kasperstudios.kvr.messenger.client.MessengerClient.drainPending();
             }
             default -> KVR.logger().debug("[{}] unknown host op {}", app.id(), op);
@@ -359,6 +388,16 @@ public final class ScriptHost {
             e.addProperty("data", r.data());
             post(e.toString());
         });
+    }
+
+    private void denied(JsonObject o) {
+        int req = o.has("req") ? o.get("req").getAsInt() : 0;
+        JsonObject e = new JsonObject();
+        e.addProperty("type", "msg_ack");
+        e.addProperty("req", req);
+        e.addProperty("ok", false);
+        e.addProperty("error", "PERMISSION");
+        post(e.toString());
     }
 
     // --- watchdog monitor ----------------------------------------------------------------------

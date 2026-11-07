@@ -17,7 +17,9 @@ public final class AppIcons {
 
     /** @return false when {@code appId} has no built-in icon */
     public static boolean draw(GuiGraphics g, String appId, int x, int y) {
+        if (com.kasperstudios.kvr.apps.client.PackageIcons.draw(g, appId, x, y)) return true; // icon.png of a .vrapp (0025)
         switch (appId) {
+            case "market" -> market(g, x, y);
             case "notes" -> notes(g, x, y);
             case "calc" -> calc(g, x, y);
             case "messenger" -> messenger(g, x, y);
@@ -29,6 +31,20 @@ public final class AppIcons {
             }
         }
         return true;
+    }
+
+    /** App Market: violet shopping bag with handles and a down arrow (install). */
+    private static void market(GuiGraphics g, int x, int y) {
+        r(g, x, y, 5, 1, 6, 1, OUTLINE); // handle
+        r(g, x, y, 4, 2, 1, 3, OUTLINE);
+        r(g, x, y, 11, 2, 1, 3, OUTLINE);
+        r(g, x, y, 2, 4, 12, 11, OUTLINE);
+        r(g, x, y, 3, 5, 10, 9, 0xFF8B5CF6);
+        r(g, x, y, 3, 5, 10, 1, 0xFFA78BFA); // rim highlight
+        r(g, x, y, 7, 7, 2, 4, 0xFFFFFFFF); // arrow shaft
+        r(g, x, y, 5, 10, 6, 1, 0xFFFFFFFF);
+        r(g, x, y, 6, 11, 4, 1, 0xFFFFFFFF);
+        r(g, x, y, 7, 12, 2, 1, 0xFFFFFFFF);
     }
 
     /** Yellow sticky note with ruled lines and a folded corner. */

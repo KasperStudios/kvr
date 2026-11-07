@@ -182,7 +182,7 @@ class ChicoryJsEngineTest {
     @Test
     void bundledAppsBootAndCommitUi() throws Exception {
         String prelude = resource("/assets/kvr/kvr_os/prelude.js");
-        assertEquals(List.of("hello", "kav", "notes", "calc", "messenger"), BuiltinApps.SYSTEM_APPS);
+        assertEquals(List.of("hello", "kav", "notes", "calc", "messenger", "player", "ide"), BuiltinApps.SYSTEM_APPS);
         for (String app : BuiltinApps.SYSTEM_APPS) {
             onScriptThread(() -> {
                 List<String> commits = new ArrayList<>();
