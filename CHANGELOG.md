@@ -2,6 +2,168 @@
 
 Каждая запись — одно задание. В «Файлы» только то, что добавлено или изменено.
 
+## 0031 — Ввод в окнах ПК (раскладка, хоткеи, колесо, общий буфер) + лаунчер очков — ГОТОВО К ЗАБОРУ (не проверено сборкой)
+
+По живому тесту на Arch + niri (foot, Firefox).
+
+**Важно про границы.** Пункт 4 (лаунчер) и часть пунктов 1–2 исправлены прямо в коде дерева.
+Ввод в окнах ПК живёт в файлах, которых в дереве **нет**:
+- D1/D2: `DesktopBridge`, `DesktopStream`, `DesktopProtocol`, `DesktopClipboard`, `HostDesktopWindow` на потоках (здесь лежит TCP-версия 0013), миксин захвата клавиатуры;
+- весь Rust `kvr-desktopd`.
+Поэтому логика сделана **целиком, отдельными модулями**, а подключение к вашим файлам — точными строками ниже («Агенту: подключение»).
+Пришлите эти файлы и `native/kvr-desktopd/` — подключу сам в 0031a.
+
+### 1. Клавиатура: раскладка, хоткеи, «залипающий капс»
+**Причины** (на них указывает описание D1 в `DESKTOP_PLAN`: «шлёт GLFW key, scancode, модификаторы», «scancode GLFW = X keycode = evdev + 8»):
+| Что | Чем кончается |
+|---|---|
+| Биты `mods` из GLFW передаются как маска xkb. У GLFW Shift=1, **Ctrl=2**, Alt=4, Super=8; у xkb Shift=1, **Lock(Caps)=2**, Control=4, Mod1(Alt)=8 | **Ctrl включает Caps Lock** → «пишет капсом», Ctrl+C/V не работают, Alt становится Ctrl |
+| `evdev = scancode − 8` верно только для X11/XWayland. В GLFW 3.4 под нативным Wayland scancode **уже равен** evdev | все клавиши сдвинуты на 8: M → Left Shift, J → Enter, F8 → Caps Lock… |
+| События `GLFW_REPEAT` пересылаются | двойные буквы, повторно «нажатые» модификаторы (клиенты Wayland повторяют сами) |
+| Рука ушла с окна с зажатым Shift/Ctrl | отпускание не доходит → модификатор навсегда нажат в приложении |
+| Кеймап демона собран без имён и без `XKB_DEFAULT_*` | только `us`: русский в foot/Firefox невозможен |
+| Left Alt — тумблер KVR | Alt-комбинации до приложения не доходят |
+
+**Новая схема: как настоящая клавиатура у настоящего композитора.**
+- `DesktopKeys` (новый): GLFW key → evdev по таблице (буквы, цифры, пунктуация, F1–F24, навигация, цифровой блок, модификаторы, ISO-клавиша, Menu).
+  GLFW key — физическая позиция на любом бэкенде, поэтому не зависит ни от X11/Wayland, ни от раскладки. Scancode больше не используется.
+- `DesktopKeyboard` (новый) шлёт **только нажатие/отпускание evdev**:
+  - никаких модификаторов и повторов;
+  - модификаторы, Caps, группу раскладки и автоповтор считает xkb внутри демона (`KeyboardHandle::input`);
+  - помнит нажатое; `releaseAll()` при потере фокуса отпускает всё + `KEYS_UP` демону;
+  - **Left Alt: тап или аккорд.** Alt нажат и отпущен один → тумблер KVR, приложение его не видит. Во время Alt нажата другая клавиша → приложение получает Alt, затем клавишу (Alt+Tab, Alt+F, **Alt+Shift = смена раскладки**). Right Alt (AltGr) идёт всегда.
+- **Раскладки** (работает даже со старым демоном, если он создаёт клавиатуру с `XkbConfig::default()`): `DesktopDaemon.applyXkb` выставляет процессу демона `XKB_DEFAULT_LAYOUT/VARIANT/OPTIONS`. libxkbcommon читает их при пустых именах.
+  - Раскладка: `desktop_xkb_layout` в `kvr-client.toml` → иначе `XKB_DEFAULT_LAYOUT` сессии → иначе по языку игры (`ru` → `us,ru`, `uk` → `us,ua`, `be` → `us,by`) → иначе `us`.
+  - Переключение: `desktop_xkb_options`, по умолчанию `grp:alt_shift_toggle`. Другие: `grp:win_space_toggle`, `grp:ctrl_shift_toggle`, `grp:caps_toggle`.
+  - Новые ключи `kvr-client.toml`: `desktop_xkb_layout`, `desktop_xkb_variant`, `desktop_xkb_options`.
+  - Раскладка внутри KVR не зависит от раскладки niri — как у второй клавиатуры. Переключается комбинацией, когда рука на окне.
+  - Демон сообщает активную раскладку (`KEYMAP`) → `DesktopInputSession.layoutLabel()` («US» / «RU») для индикатора в заголовке окна.
+
+### 2. Колесо мыши в окнах ПК
+- **Исправлено в дереве: `MouseHandlerMixin`.** Колесо отбрасывалось при любом открытом экране (`screen != null`), включая невидимый экран захвата клавиатуры окна ПК — то есть именно тогда, когда игрок работает в окне.
+  Теперь экраны с маркером `SpatialCaptureScreen` (новый) колесо пропускают; `TextInputScreen` его уже реализует. Ванильные экраны — как раньше.
+- **Единицы (`DesktopScroll`, новый).** Minecraft даёт «щелчки» (+1 = вверх), Wayland ждёт обратный знак, пиксели и `value120`.
+  Шёл сырой щелчок = 1 px → страница едва двигалась. Теперь 15 px + 120 на щелчок, дроби тачпада накапливаются, есть горизонталь.
+- Демон (`input_0031.rs`): `AxisFrame` с `AxisSource::Wheel`, `value` + `v120`, затем `pointer.frame()`. Без `frame` часть клиентов (GTK, Firefox) событие не применяет.
+
+### 3. Общий буфер обмена
+Буфер Minecraft — это и есть системный буфер (GLFW на Wayland держит свой `wl_data_source`). Синхронизируем его с скрытым композитором (`HostClipboardSync`, новый):
+- **хост → приложение:**
+  - перед Ctrl+V / Ctrl+Shift+V (терминалы) / Shift+Insert мод шлёт системный текст (`CLIP_SET`), затем саму клавишу — по одному сокету, так что текст у демона раньше, чем приложение его запросит;
+  - плюс раз в секунду, пока у окна ПК клавиатура (вставка из меню приложения), и в момент начала печати;
+  - демон делает текст своим selection (`set_data_device_selection`) и отдаёт его в `send_selection`.
+- **приложение → хост:** клиент делает `set_selection` → демон читает текст через пару сокетов в фоновом потоке (тайм-аут 2 с) → `CLIP_CHANGED` → мод ставит его в системный буфер. Он сразу доступен в niri, в чате Minecraft и в других окнах KVR.
+- Только текст (`text/plain;charset=utf-8`, `text/plain`, `UTF8_STRING`, `STRING`), до 1 Мибисимволов. Без эха: пришедшее от демона не уходит обратно. Выключатель — прежний `desktop_clipboard_sync`.
+- Если ваш `DesktopClipboard` (D2) делал часть этого — его сообщения про буфер следует убрать, чтобы не было двух источников истины. `HostDesktopClient.reset()` теперь сбрасывает и `DesktopInputSession`.
+
+### 4. Лаунчер очков — только установленное (исправлено в дереве)
+- **Причина:** `AppLauncherWindow` строил список из `BuiltinApps.SYSTEM_APPS` — все JS-приложения джара (hello, kav, notes, calc, messenger), независимо от установки.
+  А `BuiltinApps.launch` запускал любой из них прямо из джара.
+- **Сейчас в лаунчере строго:**
+  1. App Market, Messenger (`PREINSTALLED`), Настройки;
+  2. «Приложения ПК» — только если включены (пункт ОС, как в доке);
+  3. пакеты, установленные в **надетые** очки (`AppsClient.installed()`), с иконками;
+  4. последняя карточка «+ Ещё программы» → App Market.
+- Пока сервер не прислал список — надпись «загрузка…», а не чужой список. Больше 10 строк — прокрутка колесом.
+- **Вторая линия защиты, `BuiltinApps.launch`:** из джара запускается только id из `ids` (`PREINSTALLED` + «Рабочий стол»). Установленные встроенные (notes, calc…) идут как пакеты через `AppCatalog`. Любой другой id → тост «… не установлено — установите в App Market» и открывается Market.
+  **Агенту:** проверьте, что `KVRClientBootstrap` создаёт `new BuiltinApps(BuiltinApps.PREINSTALLED)` (0027), а не `SYSTEM_APPS`. Иначе защита пропустит всё.
+  Ваши `ide` / `player`, если они должны быть в чистых очках, — только через `index.json` и установку (решение Создателя 0027: ровно три программы).
+
+### Агенту: подключение (ваши файлы — их в дереве нет)
+**Java** — всё через `DesktopInputSession` (один на окно ПК):
+```java
+// HostDesktopWindow (потоковая версия D1)
+private final DesktopInputSession input = new DesktopInputSession(stream.id(), stream.bridge()::sendFrame, KVRSpatial.cursor()::toggle);
+// захват клавиатуры (ваш миксин/экран) — ВМЕСТО старого сообщения с key/scancode/mods и ВМЕСТО charTyped:
+if (input.key(glfwKey, action)) cancel();
+// рука ушла с окна / окно закрыто / открыт ванильный экран / игра потеряла фокус (Minecraft#isWindowActive):
+input.blur();
+// tick() окна:
+input.tick(hasKeyboard);
+// mouseScrolled(x, y, amount) — ВМЕСТО старого scroll-сообщения:
+input.scroll(amount); return true;
+// onClosed(): input.blur();
+// заголовок окна (по желанию): текст + "  " + DesktopInputSession.layoutLabel()
+
+// DesktopBridge, чтение кадра от демона (payload — без 8-байтового заголовка):
+if (DesktopInputSession.fromDaemon(type, payload)) continue;
+// DesktopBridge: метод sendFrame(byte[]) — записать готовый кадр в сокет в порядке очереди (если есть свой writer — адаптер в одну строку)
+```
+- Экран захвата клавиатуры окна ПК (если это `Screen`): `implements SpatialCaptureScreen`, иначе колесо так и не дойдёт.
+- `KVRSpatial.cursor()::toggle` — ваш метод тумблера Alt (имя подставьте). Left Alt в захвате теперь решает `DesktopKeyboard`: обычная привязка Alt не должна срабатывать на нажатие, пока окно держит клавиатуру.
+- Удалить из вашего захвата: передачу `modifiers`, `scancode`, `charTyped` в демон (текст делает xkb демона, иначе буквы задвоятся).
+
+**Rust** — `native/kvr-desktopd/src/input_0031.rs` (новый, Smithay 0.6), четыре точки `INTEGRATE`:
+1. поле `input0031: Input0031` в `State` (`Input0031::new(&loop_handle)`);
+2. `State::send_to_mod(ty, payload)` — ваш IPC-писатель кадра моду;
+3. диспетчер сообщений: `if input_0031::handle(state, ty, payload) { continue }`;
+4. `impl SelectionHandler for State`: `type SelectionUserData = Arc<[u8]>`, `new_selection` / `send_selection` → функции модуля (+ `DataDeviceState` / `delegate_data_device!`, если D2 их ещё не завёл).
+И ещё две правки:
+- клавиатура сиденья — `seat.add_keyboard(XkbConfig::default(), 400, 30)`: пустые имена → берутся `XKB_DEFAULT_*` от мода; 400/30 — задержка и частота автоповтора для клиентов;
+- удалить старую обработку key с `scancode - 8` и ручными модификаторами.
+
+**VERIFY (написано по документации Smithay, не компилятором):**
+| Где | Что | Если не сошлось |
+|---|---|---|
+| `key()` | `KeyboardHandle::input` принимает xkb-keycode = evdev + 8 | если в 0.6 он ждёт evdev — убрать `+ 8` (одна строка). Признак: каждая буква на место правее/левее |
+| `report_group()` | `modifier_state().serialized.layout_effective` | удалить вызов — пропадёт только индикатор US/RU |
+| `axis()` | `AxisFrame::v120` | на старом API — `discrete(ax, v120 / 120)` |
+| `set_host_clipboard` | `set_data_device_selection(&DisplayHandle, &Seat, Vec<String>, UserData)` | сигнатура из ошибки |
+| `new_selection` | `SelectionSource::mime_types()`, `request_data_device_client_selection(&Seat, String, OwnedFd)` | сигнатура из ошибки |
+| `now_ms()` | `rustix::time::clock_gettime` (rustix уже есть в зависимостях Smithay) | любой монотонный таймер в мс |
+| `DesktopInputProtocol` | id 0x31–0x36 не заняты в вашем `DesktopProtocol` | поменять константы в обоих файлах |
+
+**Lang (слить):**
+```json
+"kvr.launcher.more": "Ещё программы" / "Get more apps",
+"kvr.launcher.more_hint": "App Market: установить в эти очки" / "App Market: install into these glasses",
+"kvr.launcher.loading": "загрузка…" / "loading…",
+"kvr.launcher.running": "● работает" / "● running",
+"kvr.launcher.start": "запустить" / "start",
+"kvr.launcher.not_installed": "«%s» не установлено — установите в App Market" / "\"%s\" is not installed — get it in App Market"
+```
+
+### Чек-лист (Arch + niri, после подключения)
+**Клавиатура (foot):**
+1. Напечатать `echo Hello` + Enter → регистр как набран; Enter выполняет, регистр не меняется.
+2. Alt+Shift → `привет` печатается кириллицей, в заголовке окна «RU»; Alt+Shift → снова латиница.
+   Alt, нажатый один, переключает режим руки KVR, как раньше.
+3. Ctrl+C прерывает `sleep 100`; Ctrl+L чистит экран; стрелки и Tab работают; Caps Lock включает и выключает заглавные.
+4. Зажать Shift, увести руку с окна, отпустить, вернуть руку → буквы строчные.
+5. Зажать `a` → автоповтор с нормальной скоростью, без двойных букв.
+6. Minecraft под нативным Wayland и под XWayland — пункты 1–5 одинаково (scancode больше не используется).
+7. `desktop_xkb_layout = "us,ru"`, `desktop_xkb_options = "grp:win_space_toggle"` → после перезапуска демона переключение по Super+Space.
+
+**Колесо:**
+8. Firefox: колесо листает страницу нормальным шагом, в правильную сторону (на себя = вниз). foot: история прокручивается. Списки GTK листаются.
+9. Во время печати (клавиатура захвачена) колесо тоже листает окно. В инвентаре (E) колесо ведёт себя как в ваниле.
+
+**Буфер:**
+10. В niri `wl-copy привет` → в foot внутри KVR Ctrl+Shift+V → `привет`. В Firefox внутри KVR Ctrl+V → то же.
+11. В Firefox внутри KVR выделить текст, Ctrl+C → в niri `wl-paste` печатает его; в чате Minecraft Ctrl+V вставляет его.
+12. Копирование из foot в другое окно KVR (Firefox) работает без участия хоста (один композитор).
+13. `desktop_clipboard_sync = false` → ни 10, ни 11 не работают; 12 работает.
+
+**Лаунчер очков (жест 1):**
+14. Чистые очки → в списке ровно App Market, Messenger, Настройки (+ «Приложения ПК», если включены) и «+ Ещё программы». Никаких Notes/Calc/KAV/Hello.
+15. Market → установить Calc → Calc появился в лаунчере и запускается. Удалить → исчез.
+16. Снять эти очки, надеть другие (без Calc) → Calc в лаунчере нет.
+17. Из dev-приложения вызвать запуск `notes` через док-id (или старый пункт дока) без установки → тост «не установлено» и открывается Market.
+
+### Файлы
+- **новые (Java):**
+  - `desktop/DesktopInputProtocol.java`;
+  - `desktop/client/input/{DesktopKeys,DesktopKeyboard,DesktopScroll,HostClipboardSync,DesktopInputSession}.java`;
+  - `spatial/input/SpatialCaptureScreen.java`.
+- **новый (Rust):** `native/kvr-desktopd/src/input_0031.rs`
+- **переписан:** `spatial/ui/AppLauncherWindow.java`
+- **изменены:**
+  - `script/BuiltinApps.java` (запуск только установленного);
+  - `mixin/client/MouseHandlerMixin.java` (колесо при экране захвата), `script/ui/TextInputScreen.java` (`implements SpatialCaptureScreen`, одна строка);
+  - `config/KvrConfig.java` (`desktop_xkb_*`, `desktopXkb()`), `desktop/client/DesktopDaemon.java` (`applyXkb`), `desktop/client/HostDesktopClient.java` (сброс ввода).
+- **ваши (подключение выше):** `HostDesktopWindow` (D1), `DesktopBridge`, миксин/экран захвата клавиатуры, `DesktopClipboard`, `kvr-desktopd` (`main.rs`/state, seat, диспетчер, `SelectionHandler`).
+- **lang:** ключи выше.
+
 ## 0030 — Расхождения 0028/0029 + устойчивость мультиплеера — ГОТОВО К ЗАБОРУ (не проверено сборкой)
 
 Исправлены пять расхождений кода с описанием 0028/0029 и сделана защита от крашей при входе и выходе игроков.
@@ -367,193 +529,4 @@
 - Закреплённая программа ПК хранится вместе с именем, argv и иконкой — в доке она сразу, до скана.
   Клик в доке → `HostDesktopClient.launchApp`: если всё готово (сервер разрешил, согласие, бинарник) — сразу запуск.
   Иначе обычная цепочка через лаунчер.
-- **Решения, которые я принял (поменять — одна строка):**
-  - `.vrapp`, установленный из Market, **закрепляется сразу**: игрок поставил его сам, убрать — ★;
-  - программы ПК (их сотни) **не закрепляются никогда сами**.
-  - Удаление пакета снимает закрепление. Dev-папки тоже только по ★ (раньше первые четыре шли в док сами).
-- **Миграция:** при первом запуске после 0028 всё, что уже установлено, закрепляется один раз.
-  Док не опустеет незаметно.
-- Предел: 12 закреплённых пакетов и 8 программ ПК. Остальные закрепления сохраняются, но док их не показывает.
-- Закрепления и история — на клиенте, как и настройки 0027.
-
-### 4. Посадка дока в Настройках
-Дистанция, высота и угол уже были в 0027 («Дисплей и док», шаг 5). Теперь:
-- **точная подгонка**: кнопки `« ‹ значение › »` = −10 / −1 / +1 / +10 (см для высоты и дистанции, градусы для угла);
-- **«Сбросить посадку»**: −50 см / 85 см / 40°;
-- док переезжает **сразу** при каждом нажатии (якорь пересоздаётся со следующего тика) — подгоняется прямо из 3D.
-
-### Агенту
-- Ваш `AppLauncherWindow` (если остался) строится из `dockItems()` и теперь видит только закреплённое.
-  Полные списки: Market → «Установленные» и «Рабочий стол». Если он должен показывать всё — берите
-  `AppsClient.installed()` + `DesktopApps.all()`, сортировка — `DockPrefs.lastLaunch(key)`.
-- Новых версионных вызовов Minecraft нет: NIO, Gson, GLFW-константы, уже известные `GlassStyle` / `PackageIcons`.
-
-### Чек-лист (Arch + niri)
-1. Док → «Рабочий стол» → «Все приложения»:
-   - тот же список, что в меню системы (fuzzel/wofi и т. п.), имена по-русски там, где есть `Name[ru]`;
-   - свои команды из конфига сверху;
-   - внизу «программ: N».
-2. Alt, рука на окне, напечатать `fire` → остаётся Firefox. Esc — список снова полный. WASD не двигает игрока, пока рука на окне.
-3. Клик по Firefox → запуск в KVR. Снова открыть лаунчер → вкладка «Недавние», Firefox первый.
-4. ★ у Firefox → Firefox в доке с иконкой. Перезайти в мир → он в доке сразу, клик запускает без лаунчера. ☆ — убран из дока.
-5. Программа с `Terminal=true` (htop, btop, ranger) открывается в foot внутри KVR.
-6. Market:
-   - установить Calc → он в доке (★), ☆ → убран, но запускается из «Установленных»;
-   - порядок там — по недавним.
-7. Старый мир с установленными Notes/Calc: после забора они остались в доке (миграция).
-8. Настройки → Дисплей и док:
-   - » у дистанции → док отъезжает на 10 см сразу;
-   - ‹ у высоты — опускается на 1 см;
-   - «Сбросить посадку» возвращает на место.
-
-### Файлы
-- **новые:** `config/DockPrefs.java`, `desktop/client/DesktopApps.java`, `desktop/client/DesktopDock.java`
-- **переписан:** `desktop/client/DesktopLauncherWindow.java`
-- **изменены:** `desktop/client/HostDesktopClient.java` (`launchApp`), `script/BuiltinApps.java` (закреплённые ПК в доке),
-  `apps/client/{AppCatalog,AppsClient,AppMarketWindow}.java` (★, недавние, миграция), `spatial/ui/SettingsWindow.java` (±1/±10, сброс),
-  `lang/ru_ru.json`, `en_us.json`
-
-## 0027a — СРОЧНО: мир не грузится, «Failed to parse kvr:worldgen/…/ore_up_*» — ГОТОВО К ЗАБОРУ
-
-Эти JSON пишет ваш Gradle-генератор (DevNotes, Блок 2c), в этом дереве их не было. Положил **эталонные** файлы.
-Формат `minecraft:ore` и placement-модификаторов одинаков на 1.20.1, 1.20.4, 1.21.1 и 1.21.11,
-папки `worldgen/configured_feature` и `worldgen/placed_feature` в единственном числе на всех нодах. **Версионной генерации для них не нужно.**
-
-### Что сделать агенту
-1. В Gradle-генераторе **убрать генерацию** этих четырёх файлов (и NeoForge biome modifiers, если он их тоже пишет).
-   Иначе генератор перетрёт статические файлы при сборке. Забрать файлы ниже как есть.
-2. Проверить, что в собранном jar лежит именно оно:
-   `unzip -p fabric/versions/1.21.1/build/libs/kvr-fabric-*.jar data/kvr/worldgen/configured_feature/ore_up_overworld.json`.
-3. Fabric: ваш `BiomeModifications.addFeature(..., GenerationStep.Decoration.UNDERGROUND_ORES, ResourceKey(PLACED_FEATURE, kvr:ore_up_overworld))`
-   должен ссылаться ровно на эти id: `kvr:ore_up_overworld` / `kvr:ore_up_nether`.
-4. В отчёт — **строку после `Failed to parse …`** из старого `latest.log`: там причина дословно
-   (`No key …`, `Unknown block …`, `Not a JSON object`). По ней понятно, что именно делал генератор.
-
-### Типичные причины именно такой ошибки (в эталоне исключены все)
-| Ошибка в JSON | Правильно |
-|---|---|
-| нет `discard_chance_on_air_exposure` (поле **обязательное** в кодеке `OreConfiguration`) | `"discard_chance_on_air_exposure": 0.0` |
-| `"tag": "#minecraft:stone_ore_replaceables"` | без `#`: `"minecraft:stone_ore_replaceables"` |
-| `"block_state"` / `"blockState"` вместо `"state"`, `"name"` вместо `"Name"` | `"state": { "Name": "kvr:up_ore" }` |
-| несуществующий блок (`kvr:nether_up_ore`, `kvr:deepslate_up_ore`) | зарегистрирован только `kvr:up_ore` (`KVRContent`) — он и в камне, и в глубинном сланце, и в незерраке |
-| `"size"` вне 0–64, `discard_chance` вне 0–1 | 9 / 10 и 0.0 |
-| в placed feature `"feature"` указывает на неразобранную configured feature | placed feature падает каскадом — поэтому в логе все четыре |
-| `height_range` с `"min"`/`"max"`, `"bottom"` и т. п. | `"min_inclusive": { "absolute": -48 }` / `{ "above_bottom": 10 }` / `{ "below_top": 10 }` |
-| модификаторы без неймспейса либо в старом формате 1.17 (`"decorator"`) | `"type": "minecraft:count"` и т. д. |
-
-### Параметры жил (ADR-003: «генерируется часто»)
-- **Верхний мир:**
-  - жила 9, 14 попыток на чанк, trapezoid Y −48…80 (чаще всего около Y 16);
-  - камень + глубинный сланец.
-  - Для сравнения: железо — жила 9, 10 попыток.
-- **Незер:**
-  - жила 10, 12 попыток, равномерно от дна+10 до потолка−10;
-  - только незеррак — как у кварца.
-- Поменять — числа `size` / `count` / `absolute` прямо в JSON. Код не нужен.
-
-### NeoForge biome modifiers (справочно)
-- `data/kvr/neoforge/biome_modifier/ore_up_{overworld,nether}.json`, тип `neoforge:add_features`, шаг `underground_ores`,
-  биомы `#minecraft:is_overworld` / `#minecraft:is_nether`.
-- Путь `neoforge/biome_modifier` действует на 20.4, 21.1 и 21.11.
-- Если у вас уже есть свои с теми же id — оставьте один комплект. Два модификатора с разными id добавят руду дважды.
-
-### Проверка
-1. Новый мир создаётся без экрана Safe Mode. В логе нет `Failed to parse kvr:`.
-2. Старый мир, упавший в Safe Mode, тоже открывается: датапак мода читается из jar заново.
-3. `/place feature kvr:ore_up_overworld` (op) — рядом появляется жила UpOre.
-   В новых чанках руда на Y около 0–30 встречается чаще железа. В незере — в незерраке.
-4. То же на 1.20.1 и 1.20.4 (файлы те же).
-
-### Файлы
-- `data/kvr/worldgen/configured_feature/ore_up_overworld.json`, `ore_up_nether.json`
-- `data/kvr/worldgen/placed_feature/ore_up_overworld.json`, `ore_up_nether.json`
-- `data/kvr/neoforge/biome_modifier/ore_up_overworld.json`, `ore_up_nether.json` (справочно)
-
-## 0027 — Ровно 3 предустановленные программы, встроенный каталог, полноценные Настройки — ГОТОВО К ЗАБОРУ (не проверено сборкой)
-
-Решение Создателя: в чистых очках ровно **три** программы — App Market, Связь (Messenger), Настройки.
-Всё остальное ставится из App Market. Закрывает вопрос из 0025 п. 5 в пользу CONCEPT §2.3.
-
-### 1. Док чистых очков: Market → Messenger → Settings
-- `BuiltinApps.PREINSTALLED = ["messenger"]`. Market и Settings — нативные окна, они добавляются в `dockItems()` сами.
-- Порядок в доке:
-  1. Market;
-  2. Messenger («Рабочий стол», если включены приложения ПК);
-  3. Settings;
-  дальше установленные пакеты и dev-приложения.
-- `KVRClientBootstrap`: `new BuiltinApps(BuiltinApps.PREINSTALLED)`.
-  `SYSTEM_APPS` остался списком всех JS-приложений в джаре — `ChicoryJsEngineTest` продолжает гонять все на настоящем prelude.
-- Иконка шестерёнки для `settings` в `AppIcons`.
-
-### 2. Встроенный каталог (Notes, Calc, KAV, Hello — из Market)
-- `assets/kvr/apps/index.json` — список приложений из джара, которые НЕ предустановлены, со всеми файлами.
-  **Агенту: добавьте свои `ide` и `player`** (все файлы каждого).
-- `BundledApps` (common) читает их из **classpath**, а не из менеджера ресурсов:
-  - у выделенного сервера нет клиентских ресурсов;
-  - ресурс-пак не должен подменять код, который ставит сервер.
-- Новый op `INSTALL_BUNDLED` (последним в enum): клиент шлёт только id, **сервер сам пакует** пакет из своего джара.
-  - Пакет пишется в `/apps/<id>.vrapp` и занимает квоту Storage. На T1 (256 КБ и 2 файла) влезают два приложения — или одно и заметка.
-  - Официальные id по-прежнему зарезервированы для заливки: чужой `notes.vrapp` не подменит настоящий.
-  - Политика `allow_app_install` / allowlist на встроенные приложения **не действует**: это часть мода, а не сторонний код.
-- App Market → «Каталог»:
-  - сверху раздел «Встроенные приложения KVR» (Установить / Обновить при более новой версии в моде / Установлено), ниже — «Онлайн-каталог»;
-  - удаление — как у любого пакета; `/data/<id>/` остаётся, заметки не пропадают.
-- `notes/config.json`: `"permissions": ["fs.home", "player.coords"]` → `[]`.
-  Эти имена не из `AppPermissions`, и формат `.vrapp` отклонил бы пакет. Файлы и координаты разрешениями не закрыты.
-  **Проверьте `config.json` своих ide/player** — только `network`, `fs_read_all`, `hardware_override`.
-  У пакетов добавлены `description` для каталога.
-- `VrAppPackage.packFiles(Map)` — та же детерминированная упаковка для файлов из памяти.
-
-### 3. Настройки как у настоящих очков (`spatial/ui/SettingsWindow`, системное окно)
-Слева список разделов, справа настройки. Всё применяется сразу, без кнопки «Сохранить».
-| Раздел | Что там | Где действует |
-|---|---|---|
-| **Персонализация** | 5 тем (Cyan Cyberpunk, Purple Neon, Amber Matrix, Emerald Hack, Monochrome OLED) — цветные образцы; плотность фона 0–100 % шагом 5; подложка Стекло / Градиент / Сплошная; живой предпросмотр окна | `GlassStyle.ACCENT` теперь не константа и обновляется в каждом `surface()` — тема сразу во всех окнах, ваших тоже. Градиент = `fillGradient` с оттенком акцента, Сплошная = непрозрачная подложка |
-| **Дисплей и док** | высота дока (−80…−20 см), дистанция (60…140 см), угол следования (20…90°); новые окна Публично / Лично; чужие публичные окна; часы и заряд в доке | `DockBar` перестраивает `LazyFollowAnchor` при изменении; с выключенными часами и зарядом блок статуса исчезает |
-| **Звук и отклик** | звук нажатий, уведомлений, звуки приложений; тряска окон | клик по окну → `UI_BUTTON_CLICK` (`SpatialInput`); тосты (`ToastPanel`); `sound.play` и `window.shake` из JS (`ScriptWindow`) |
-| **Система** | «Питание и батарея» → `PowerWindow`; «Расширенные» → `KvrSettingsScreen` (приложения ПК, согласие); «Об устройстве»: имя очков, серийный №, KVR OS 1.0.0, CPU/GPU/RAM/диск/аккумулятор с тиром и названием (Бомжатский…Фронтирный), окна RAM x/y, занятое место, заряд % | серийный № = начало UUID диска очков (`kvr_vfs.id`, выдаётся сервером при первом доступе) — у каждых очков свой |
-
-Хранение:
-- новое — `config/kvr-ui.toml` (`KvrUiConfig`, тот же TOML-парсер);
-- плотность и Публично/Лично — в прежнем `kvr-client.toml`, общие с экраном настроек мода.
-
-Настройки хранятся **на клиенте, а не в очках**: другие очки — та же тема. Хранение в очках
-(украл очки — украл тему, как с файлами) можно сделать отдельным заданием через VFS, если Создатель хочет.
-
-### 4. Агенту: слияние с вашим кодом
-- **Ваш `SettingsWindow`** (из DevNotes: opacity, visibility, desktop toggle, power) заменяется этим.
-  Всё его содержимое есть в новом, desktop toggle — через «Расширенные».
-  Если он в другом пакете — удалите его и переведите вызовы на `com.kasperstudios.kvr.spatial.ui.SettingsWindow.open()`.
-- **Ваш `BuiltinApps.SYSTEM_APPS`** (с player/ide): список оставьте для теста.
-  В док идёт `PREINSTALLED`, а player/ide — в `index.json`.
-- **Ваш `AppLauncherWindow`**, если остаётся, сам увидит новый порядок: он строится из `dockItems()`.
-- После забора у старых тестовых миров из дока пропадут Notes/Calc/KAV/Hello. Они в Market → Каталог → «Встроенные», заметки в `/home` и `/data/notes` целы.
-
-### 5. Версии
-Нового версионного API нет:
-- `fillGradient`, `drawString`, `forUI(Holder|SoundEvent, float)`, `getAbilities()`, `readNBytes` — на всех нодах;
-- цвета текста с альфой (1.21.6+).
-На 1.21.11 окно компилируется, но, как и всё пространственное, без рендера (`RenderCompat.SUPPORTED = false`).
-
-### Чек-лист (1.21.1 и 1.20.1)
-1. Новые очки → O → в доке ровно Market, Messenger, Settings (+ статус).
-2. Market → Каталог → «Встроенные» → Notes → Установить → Notes в доке, запускается, старые заметки на месте.
-   На сервере есть `<world>/kvr/vfs/<uuid>/apps/notes.vrapp`. То же на выделенном сервере (проверка classpath).
-3. T1: Notes + Calc → третье приложение или новая заметка → «Не хватает места…».
-4. Settings → Персонализация:
-   - Purple Neon → акценты всех окон (вкладки Market, заголовки) фиолетовые сразу;
-   - «Градиент» / «Сплошная» — видно в предпросмотре и в окнах;
-   - плотность −/+ меняет фон.
-5. Дисплей:
-   - высота дока −20 → док поднимается;
-   - дистанция 140 → отодвигается;
-   - часы и заряд ВЫКЛ → блок статуса исчез, док уже.
-6. Звук: нажатия кликают / молчат; KAV с выключенной тряской — окно не трясётся, с выключенными звуками приложений — без сирены.
-7. Система:
-   - тиры совпадают со сборкой очков;
-   - серийный № `KVR-XXXXXXXX` после первого открытия Market/Notes;
-   - «Питание» открывает PowerWindow, «Расширенные» — экран настроек мода.
-8. Перезапуск игры — все настройки сохранились (`config/kvr-ui.toml`).
-
-### Файлы
-- **новые:** `config/KvrUiConfig.java`, `apps
+- **Р

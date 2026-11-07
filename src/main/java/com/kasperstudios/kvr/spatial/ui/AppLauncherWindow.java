@@ -1,5 +1,10 @@
 package com.kasperstudios.kvr.spatial.ui;
 
+import com.kasperstudios.kvr.apps.client.AppCatalog;
+import com.kasperstudios.kvr.apps.client.AppsClient;
+import com.kasperstudios.kvr.apps.client.PackageIcons;
+import com.kasperstudios.kvr.desktop.client.HostDesktopClient;
+import com.kasperstudios.kvr.desktop.client.HostDesktopWindow;
 import com.kasperstudios.kvr.script.BuiltinApps;
 import com.kasperstudios.kvr.script.VrApp;
 import com.kasperstudios.kvr.spatial.KVRSpatial;
@@ -8,58 +13,81 @@ import com.kasperstudios.kvr.spatial.render.GlassStyle;
 import com.kasperstudios.kvr.spatial.window.SpatialWindow;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
 /**
- * Main application launcher menu (ADR-001 Gesture 1: Launcher).
- * System window (Kind.SYSTEM, does not take a RAM slot).
- * Displays all installed KVR apps with their icons, names, and running status.
- * Clicking an app card launches it or restores its window into view.
+ * Launcher of the glasses (ADR-001 gesture 1). System window, no RAM slot.
+ *
+ * <p>0031 — lists STRICTLY what these glasses can run:
+ * <ol>
+ *   <li>the three preinstalled programs (0027): App Market, Messenger ({@link BuiltinApps#PREINSTALLED}), Settings;</li>
+ *   <li>"PC apps", only while they are switched on (an OS entry, same as in the dock);</li>
+ *   <li>packages installed in the WORN glasses ({@link AppsClient#installed()} — the server's list for this stack).</li>
+ * </ol>
+ * Before 0031 it listed every JS app bundled in the mod jar ({@link BuiltinApps#SYSTEM_APPS}: hello, kav, notes, calc…)
+ * whether installed or not, and clicking one started it from the jar. Apps that are not installed are now absent here;
+ * the last card "Get more apps" opens App Market, where they are installed first. {@link BuiltinApps#launch} refuses
+ * non-installed ids too (second line of defence for any other caller).
  */
 public final class AppLauncherWindow extends SpatialWindow {
 
     private static final int W = 280;
     private static final int CARD_H = 26;
+    private static final int GAP = 4;
     private static final int TOP = 30;
+    private static final int MAX_ROWS = 10;
+    private static final int TILE = 0xFF334155;
 
-    public record Entry(String id, String name, String version, boolean running) {}
+    private enum Type { SYSTEM, DESKTOP, INSTALLED, MORE }
+
+    public record Entry(String id, Component name, String detail, boolean running, Type type) {}
 
     private final BuiltinApps appHost;
     private final List<Entry> entries = new ArrayList<>();
+    private int scroll;
 
     public AppLauncherWindow(BuiltinApps appHost, SpatialAnchor anchor) {
-        super("kvr:app_launcher", Kind.SYSTEM, W, Math.max(120, TOP + BuiltinApps.SYSTEM_APPS.size() * (CARD_H + 4) + 16), anchor);
+        super("kvr:app_launcher", Kind.SYSTEM, W, TOP + MAX_ROWS * (CARD_H + GAP) + 10, anchor);
         this.appHost = appHost;
         refresh();
     }
 
     private void refresh() {
         entries.clear();
-        // 1. Встроенные системные приложения (Settings, Messenger и т.д.)
-        for (String id : BuiltinApps.SYSTEM_APPS) {
-            String name = appHost.app(id).map(VrApp::name).orElse(id);
-            String version = appHost.app(id).map(VrApp::version).orElse("1.0.0");
-            boolean running = KVRSpatial.windows().all().stream().anyMatch(w -> w.id().equals("app:" + id) || w.id().equals(id));
-            entries.add(new Entry(id, name, version, running));
+        // 1. the three programs every pair of glasses has (0027)
+        entries.add(new Entry(AppCatalog.MARKET_ID, Component.translatable("kvr.apps.market"), "KVR OS",
+            KVRSpatial.windows().find(com.kasperstudios.kvr.apps.client.AppMarketWindow.class).isPresent(), Type.SYSTEM));
+        for (String id : BuiltinApps.PREINSTALLED) {
+            VrApp app = BuiltinApps.app(id).orElse(null);
+            entries.add(new Entry(id, Component.literal(app == null ? id : app.name()), app == null ? "KVR OS" : "v" + app.version(),
+                running(id), Type.SYSTEM));
         }
-        // 2. Все установленные в очки приложения (.vrapp, калькулятор, плеер, кав и т.д.)
-        for (com.kasperstudios.kvr.apps.client.AppsClient.Installed inst : com.kasperstudios.kvr.apps.client.AppsClient.installed()) {
+        entries.add(new Entry(SettingsWindow.DOCK_ID, Component.translatable("kvr.settings.app"), "KVR OS",
+            KVRSpatial.windows().find(SettingsWindow.class).isPresent(), Type.SYSTEM));
+        // 2. PC apps — an OS entry, only while enabled (exactly like the dock)
+        if (HostDesktopClient.enabledLocally()) {
+            boolean on = KVRSpatial.windows().all().stream().anyMatch(w -> w instanceof HostDesktopWindow);
+            entries.add(new Entry(HostDesktopClient.DOCK_ID, Component.translatable("kvr.desktop.title"), "KVR OS", on, Type.DESKTOP));
+        }
+        // 3. what is installed in THESE glasses (empty until the server answered — never the jar's list)
+        for (AppsClient.Installed inst : AppsClient.installed()) {
             String id = inst.manifest().id();
-            if (entries.stream().noneMatch(e -> e.id().equals(id))) {
-                boolean running = KVRSpatial.windows().all().stream().anyMatch(w -> w.id().equals("app:" + id) || w.id().equals(id));
-                entries.add(new Entry(id, inst.manifest().name(), inst.manifest().version(), running));
-            }
+            if (entries.stream().anyMatch(e -> e.id().equals(id))) continue;
+            entries.add(new Entry(id, Component.literal(inst.manifest().name()), "v" + inst.manifest().version(), running(id), Type.INSTALLED));
         }
-        // 3. Десктопные хост-приложения хоста (если включены)
-        if (com.kasperstudios.kvr.desktop.client.HostDesktopClient.enabledLocally()) {
-            String deskId = com.kasperstudios.kvr.desktop.client.HostDesktopClient.DOCK_ID;
-            if (entries.stream().noneMatch(e -> e.id().equals(deskId))) {
-                boolean running = KVRSpatial.windows().all().stream().anyMatch(w -> w instanceof com.kasperstudios.kvr.desktop.client.HostDesktopWindow);
-                entries.add(new Entry(deskId, "Desktop (PC)", "1.0", running));
-            }
-        }
+        // 4. the way to everything else
+        entries.add(new Entry(AppCatalog.MARKET_ID, Component.translatable("kvr.launcher.more"),
+            Component.translatable("kvr.launcher.more_hint").getString(), false, Type.MORE));
+        scroll = Math.max(0, Math.min(scroll, entries.size() - MAX_ROWS));
+    }
+
+    private static boolean running(String id) {
+        return KVRSpatial.windows().all().stream().anyMatch(w -> w.id().equals("app:" + id));
     }
 
     @Override
@@ -77,38 +105,67 @@ public final class AppLauncherWindow extends SpatialWindow {
     protected void renderContent(GuiGraphics g, int mx, int my, float partialTick) {
         GlassStyle.surface(g, 0, 0, width, height, false);
         GlassStyle.text(g, title().copy().withStyle(ChatFormatting.BOLD), 10, 9, GlassStyle.TEXT);
-        GlassStyle.text(g, Component.literal("KVR OS Apps"), width - 75, 9, GlassStyle.ACCENT);
-
+        if (!AppsClient.loaded()) {
+            // installed list not here yet: say so instead of showing nothing / the wrong thing
+            fitted(g, Component.translatable("kvr.launcher.loading").getString(), width - 110, 9, 100, GlassStyle.MUTED);
+        }
         g.fill(10, TOP - 4, width - 10, TOP - 3, 0x30FFFFFF);
 
-        for (int i = 0; i < entries.size(); i++) {
+        int end = Math.min(entries.size(), scroll + MAX_ROWS);
+        for (int i = scroll; i < end; i++) {
             Entry e = entries.get(i);
-            int y = TOP + i * (CARD_H + 4);
+            int y = rowY(i);
             boolean hot = GlassStyle.inside(mx, my, 10, y, width - 20, CARD_H);
             GlassStyle.panel(g, 10, y, width - 20, CARD_H, hot);
-
-            // Icon indicator
-            g.fill(14, y + 5, 20, y + CARD_H - 5, e.running() ? GlassStyle.OK : GlassStyle.ACCENT);
-
-            GlassStyle.text(g, Component.literal(e.name()).withStyle(ChatFormatting.BOLD), 26, y + 5, GlassStyle.TEXT);
-            GlassStyle.text(g, Component.literal("v" + e.version()), 26, y + 15, GlassStyle.MUTED);
-
-            String status = e.running() ? "● RUN" : "START";
-            int statusColor = e.running() ? GlassStyle.OK : (hot ? GlassStyle.TEXT : GlassStyle.MUTED);
-            GlassStyle.text(g, Component.literal(status), width - 58, y + 9, statusColor);
+            icon(g, e, 14, y + 5);
+            int textColor = e.type() == Type.MORE ? GlassStyle.ACCENT : GlassStyle.TEXT;
+            fitted(g, e.name().getString(), 36, y + 4, width - 110, textColor);
+            fitted(g, e.detail(), 36, y + 14, width - 110, GlassStyle.MUTED);
+            if (e.type() != Type.MORE) {
+                Component status = Component.translatable(e.running() ? "kvr.launcher.running" : "kvr.launcher.start");
+                int sc = e.running() ? GlassStyle.OK : hot ? GlassStyle.TEXT : GlassStyle.MUTED;
+                GlassStyle.text(g, status, width - 16 - Minecraft.getInstance().font.width(status), y + 9, sc);
+            }
         }
+    }
+
+    private static void icon(GuiGraphics g, Entry e, int x, int y) {
+        if (e.type() == Type.INSTALLED && PackageIcons.draw(g, e.id(), x, y)) return;
+        g.fill(x, y, x + 16, y + 16, e.running() ? GlassStyle.OK : e.type() == Type.MORE ? GlassStyle.ACCENT : TILE);
+        String letter = e.type() == Type.MORE ? "+" : e.name().getString().isEmpty() ? "?"
+            : e.name().getString().substring(0, 1).toUpperCase(Locale.ROOT);
+        GlassStyle.centered(g, Component.literal(letter), x + 9, y + 4, GlassStyle.TEXT);
+    }
+
+    private int rowY(int index) {
+        return TOP + (index - scroll) * (CARD_H + GAP);
+    }
+
+    private static void fitted(GuiGraphics g, String text, int x, int y, int maxW, int color) {
+        Font font = Minecraft.getInstance().font;
+        String s = text;
+        if (font.width(s) > maxW) s = font.plainSubstrByWidth(s, Math.max(0, maxW - font.width("\u2026"))) + "\u2026";
+        GlassStyle.text(g, Component.literal(s), x, y, color);
     }
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        for (int i = 0; i < entries.size(); i++) {
-            int y = TOP + i * (CARD_H + 4);
-            if (GlassStyle.inside(mx, my, 10, y, width - 20, CARD_H)) {
-                appHost.launch(entries.get(i).id());
-                requestClose();
-                return true;
-            }
+        int end = Math.min(entries.size(), scroll + MAX_ROWS);
+        for (int i = scroll; i < end; i++) {
+            if (!GlassStyle.inside(mx, my, 10, rowY(i), width - 20, CARD_H)) continue;
+            Entry e = entries.get(i);
+            if (e.type() == Type.MORE) AppCatalog.openMarket();
+            else appHost.launch(e.id());
+            requestClose();
+            return true;
         }
         return false;
+    }
+
+    @Override
+    public boolean mouseScrolled(double x, double y, double amount) {
+        if (entries.size() <= MAX_ROWS || amount == 0) return false;
+        scroll = Math.max(0, Math.min(entries.size() - MAX_ROWS, scroll - (int) Math.signum(amount)));
+        return true;
     }
 }

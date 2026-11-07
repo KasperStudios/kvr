@@ -59,6 +59,13 @@ public final class KvrConfig {
         show_public_windows = true
         # Dark backdrop under window glass, percent (0 = pure glass, 100 = opaque). Higher = easier to read.
         window_opacity = 75
+        # Keyboard layouts inside PC apps (xkb names, like in your compositor config), e.g. "us,ru".
+        # Empty = XKB_DEFAULT_LAYOUT of your session, else "us,ru" when the game language is Russian, else "us".
+        desktop_xkb_layout = ""
+        desktop_xkb_variant = ""
+        # Layout switch inside PC apps (xkb options). Left Alt ALONE is the KVR pointer toggle; Alt+Shift still reaches the app.
+        # Other combos: grp:win_space_toggle, grp:ctrl_shift_toggle, grp:caps_toggle
+        desktop_xkb_options = "grp:alt_shift_toggle"
         """;
 
     private static Path dir = Path.of("config");
@@ -112,6 +119,17 @@ public final class KvrConfig {
                 clampInt(m, "public_window_range", 48, 0, 128), clampInt(m, "battery_life", 100, 1, 10_000));
         }
         return server;
+    }
+
+    /**
+     * 0031: keyboard layout of the hidden compositor (kvr-desktopd). Read when the daemon starts; values may be empty
+     * (= decide from the session / game language, see {@code DesktopDaemon.applyXkb}).
+     */
+    public record Xkb(String layout, String variant, String options) {}
+
+    public static synchronized Xkb desktopXkb() {
+        Map<String, String> m = load(CLIENT_FILE, CLIENT_DEFAULTS);
+        return new Xkb(str(m, "desktop_xkb_layout"), str(m, "desktop_xkb_variant"), str(m, "desktop_xkb_options"));
     }
 
     /**

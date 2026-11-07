@@ -31,9 +31,16 @@ public abstract class MouseHandlerMixin {
         }
     }
 
+    /**
+     * 0031: the wheel used to be dropped whenever ANY screen was open — including KVR's invisible keyboard capture of
+     * a PC window (D1), i.e. exactly while the player works in that window: "scrolling in host windows is impossible".
+     * KVR capture screens ({@link com.kasperstudios.kvr.spatial.input.SpatialCaptureScreen}) now let it through.
+     */
     @Inject(method = "onScroll", at = @At("HEAD"), cancellable = true)
     private void kvr$scroll(long window, double xOffset, double yOffset, CallbackInfo ci) {
-        if (!KVRSpatial.ready() || Minecraft.getInstance().screen != null) return;
-        if (KVRSpatial.input().scroll(yOffset)) ci.cancel();
+        if (!KVRSpatial.ready()) return;
+        var screen = Minecraft.getInstance().screen;
+        if (screen != null && !(screen instanceof com.kasperstudios.kvr.spatial.input.SpatialCaptureScreen)) return;
+        if (yOffset != 0 && KVRSpatial.input().scroll(yOffset)) ci.cancel();
     }
 }

@@ -94,6 +94,16 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
             com.kasperstudios.kvr.desktop.client.HostDesktopClient.open();
             return;
         }
+        // 0031: only the preinstalled JS app(s) start from the jar. Anything else (notes, calc, kav, hello, ide, player…)
+        // must be INSTALLED in the worn glasses — then AppCatalog.handles() above already launched it as a package.
+        // Before 0031 every bundled id started from here, so the launcher could run apps that were never installed.
+        if (!ids.contains(appId)) {
+            KVRSpatial.toasts().push(new ToastPanel.Toast(Component.translatable("kvr.apps.market"),
+                Component.translatable("kvr.launcher.not_installed", app(appId).map(VrApp::name).orElse(appId)),
+                GlassStyle.id("gesture/launcher"), GlassStyle.ACCENT, 3500));
+            com.kasperstudios.kvr.apps.client.AppCatalog.openMarket();
+            return;
+        }
         var open = KVRSpatial.windows().all().stream().filter(w -> w.id().equals("app:" + appId)).findFirst();
         if (open.isPresent()) {
             KVRSpatial.windows().restore(open.get());

@@ -195,6 +195,7 @@ public final class DesktopDaemon {
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.environment().put("KVR_DESKTOPD_TOKEN", token);
             pb.environment().putIfAbsent("RUST_LOG", "info");
+            applyXkb(pb.environment(), KvrConfig.desktopXkb(), gameLanguage());
             Path log = Path.of("logs", "kvr-desktopd.log");
             Files.createDirectories(log.toAbsolutePath().getParent());
             pb.redirectErrorStream(true);
@@ -257,6 +258,43 @@ public final class DesktopDaemon {
     public static String token() { return token; }
     public static State state() { return state; }
     public static String error() { return error; }
+
+    /**
+     * 0031 — layouts inside PC apps. The hidden compositor builds its xkb keymap with empty names, and libxkbcommon
+     * then takes {@code XKB_DEFAULT_LAYOUT / _VARIANT / _OPTIONS} from the environment. Setting them for the daemon
+     * process gives its keymap our layouts + switch combo with no daemon flag (an older kvr-desktopd keeps working).
+     * Before: no variables → libxkbcommon's built-in "us" only → Russian was impossible in foot/Firefox.
+     * <ul>
+     *   <li>layout: config {@code desktop_xkb_layout}; else the session's {@code XKB_DEFAULT_LAYOUT}; else from the game
+     *       language ({@code ru_*} → "us,ru", {@code uk_*} → "us,ua", {@code be_*} → "us,by"); else "us";</li>
+     *   <li>variant / options: config if set (options default {@code grp:alt_shift_toggle}).</li>
+     * </ul>
+     * Pure apart from the map, unit-testable.
+     */
+    static void applyXkb(Map<String, String> env, KvrConfig.Xkb xkb, String gameLanguage) {
+        String layout = xkb.layout();
+        String session = env.getOrDefault("XKB_DEFAULT_LAYOUT", "");
+        if (layout.isEmpty()) {
+            String lang = gameLanguage.toLowerCase(Locale.ROOT);
+            layout = !session.isBlank() ? session
+                : lang.startsWith("ru") ? "us,ru"
+                : lang.startsWith("uk") ? "us,ua"
+                : lang.startsWith("be") ? "us,by"
+                : "us";
+        }
+        env.put("XKB_DEFAULT_LAYOUT", layout);
+        if (!xkb.variant().isEmpty()) env.put("XKB_DEFAULT_VARIANT", xkb.variant());
+        else if (!layout.equals(session)) env.remove("XKB_DEFAULT_VARIANT"); // a session variant list would not match our layout list
+        if (!xkb.options().isEmpty()) env.put("XKB_DEFAULT_OPTIONS", xkb.options());
+    }
+
+    private static String gameLanguage() {
+        try {
+            return net.minecraft.client.Minecraft.getInstance().options.languageCode;
+        } catch (RuntimeException e) {
+            return "";
+        }
+    }
 
     /** {@code host_desktop_apps}: "foot;firefox --new-instance" → [[foot], [firefox, --new-instance]]. Pure. */
     public static List<List<String>> apps(String config) {
