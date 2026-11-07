@@ -36,8 +36,6 @@ public final class SpatialInput {
     private final GrabController grab = new GrabController();
 
     @Nullable private SpatialRaycast.RayHit hover;
-    @Nullable private com.kasperstudios.kvr.hack.client.GhostRaycast.GhostHit ghostHover;
-    @Nullable private com.kasperstudios.kvr.hack.client.GhostRaycast.GhostHit ghostDown;
     @Nullable private SpatialRaycast.Ray lastRay;
     @Nullable private GestureWheel wheel;
     @Nullable private SpatialWindow keyboard;
@@ -63,8 +61,6 @@ public final class SpatialInput {
             grab.end(view);
             closeWheel(false);
             hover = null;
-            ghostHover = null;
-            ghostDown = null;
             lastRay = null;
             if (rightDown != null) {
                 rightDown.release(-1, -1, 1);
@@ -76,12 +72,7 @@ public final class SpatialInput {
 
         SpatialRaycast.Ray ray = cursor.ray(view);
         lastRay = ray;
-        if (!grab.holding()) {
-            hover = windows.pick(ray).orElse(null);
-            ghostHover = (hover == null && com.kasperstudios.kvr.hack.HackGlasses.isWearing(mc.player))
-                ? com.kasperstudios.kvr.hack.client.GhostRaycast.pick(ray).orElse(null)
-                : null;
-        }
+        if (!grab.holding()) hover = windows.pick(ray).orElse(null);
         updateKeyboard(true);
         if (hover != null && hover.region() == SpatialRaycast.Region.CONTENT && !hover.window().isLocked()) {
             hover.window().mouseMoved(hover.px(), hover.py());
@@ -113,16 +104,23 @@ public final class SpatialInput {
     /** From {@code KeyboardHandlerMixin}: true = the key went to a window and vanilla must ignore it. */
     public boolean keyboardKey(int key, int scancode, int action, int mods) {
         SpatialWindow w = keyboard;
-        if (w == null || cursor.toggleKey().matches(key, scancode)) return false;
+        if (w == null || isToggleKey(key, scancode)) return false;
         w.keyEvent(key, scancode, action, mods);
         return true;
     }
 
+    /** The Alt toggle always reaches Minecraft, so the player can leave the capture. */
+    private boolean isToggleKey(int key, int scancode) {
+        //? if <1.21.9 {
+        return cursor.toggleKey().matches(key, scancode);
+        //?} else {
+        /*// 1.21.9+: KeyMapping#matches takes a KeyEvent. The keyboard capture is inert on this node (no render
+        // backend, KeyboardHandlerMixin skipped), so the default binding is enough here.
+        return key == org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_ALT;
+        *///?}
+    }
+
     public boolean keyboardChar(int codepoint, int mods) {
-        if (ghostHover != null) {
-            com.kasperstudios.kvr.hack.client.GhostRaycast.inject(ghostHover, com.kasperstudios.kvr.hack.HackProtocol.Action.CHAR, codepoint);
-            return true;
-        }
         SpatialWindow w = keyboard;
         if (w == null) return false;
         w.charTyped(codepoint, mods);
@@ -155,15 +153,6 @@ public final class SpatialInput {
                 }
             }
             if (attackWasDown && !down && hover.region() == SpatialRaycast.Region.CONTENT) w.release(hover.px(), hover.py(), 0);
-        } else if (ghostHover != null) {
-            while (attack.consumeClick()) {
-                ghostDown = ghostHover;
-                com.kasperstudios.kvr.hack.client.GhostRaycast.inject(ghostHover, com.kasperstudios.kvr.hack.HackProtocol.Action.CLICK, 0);
-            }
-            if (attackWasDown && !down && ghostDown != null) {
-                com.kasperstudios.kvr.hack.client.GhostRaycast.inject(ghostDown, com.kasperstudios.kvr.hack.HackProtocol.Action.RELEASE, 0);
-                ghostDown = null;
-            }
         }
         attackWasDown = down;
     }
@@ -221,7 +210,7 @@ public final class SpatialInput {
 
     /** While true, vanilla must not keep mining or using items "through" the panel. */
     public boolean capturesMouse() {
-        return cursor.active() && (hover != null || ghostHover != null || grab.holding() || wheel != null || rightDown != null);
+        return cursor.active() && (hover != null || grab.holding() || wheel != null || rightDown != null);
     }
 
     public Optional<SpatialRaycast.RayHit> hover() {

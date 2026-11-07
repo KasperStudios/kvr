@@ -43,7 +43,7 @@ public final class HandPoseRelay {
             boolean active = buf.readBoolean();
             float yaw = buf.readFloat();
             float pitch = buf.readFloat();
-            MinecraftServer server = player.getServer();
+            MinecraftServer server = com.kasperstudios.kvr.compat.VersionCompat.server(player);
             if (server != null) {
                 server.execute(() -> LATEST.put(player.getUUID(), new Stored(yaw, pitch, active, server.getTickCount())));
             }

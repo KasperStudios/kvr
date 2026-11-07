@@ -13,10 +13,11 @@ public record PlayerView(Vec3 eye, float yaw, float pitch, Vec3 feet) {
 
     public static PlayerView capture(Camera camera, float partialTick) {
         // no camera entity right after joining a world / changing dimension (Creator's NPE fix)
-        net.minecraft.world.entity.Entity entity = camera.getEntity();
+        net.minecraft.world.entity.Entity entity = com.kasperstudios.kvr.compat.client.ClientCompat.cameraEntity(camera);
         Vec3 eye = com.kasperstudios.kvr.compat.client.ClientCompat.cameraPos(camera);
         Vec3 feet = entity != null ? entity.getPosition(partialTick) : eye;
-        return new PlayerView(eye, camera.getYRot(), camera.getXRot(), feet);
+        return new PlayerView(eye, com.kasperstudios.kvr.compat.client.ClientCompat.cameraYaw(camera),
+            com.kasperstudios.kvr.compat.client.ClientCompat.cameraPitch(camera), feet);
     }
 
     /** Test / tooling factory: a standing player looking along yaw/pitch. */

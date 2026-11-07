@@ -2,8 +2,10 @@ package com.kasperstudios.kvr.mixin.client;
 
 import com.kasperstudios.kvr.spatial.KVRSpatial;
 import com.kasperstudios.kvr.spatial.input.SpatialCursor;
+//? if <1.21.5 {
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
+//?}
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphics;
@@ -63,14 +65,6 @@ public abstract class GuiMixin {
 
         int cx = (int) (screenW / 2.0f + normX * (screenW / 2.0f));
         int cy = (int) (screenH / 2.0f + normY * (screenH / 2.0f));
-
-        RenderSystem.enableBlend();
-        RenderSystem.blendFuncSeparate(
-                GlStateManager.SourceFactor.ONE_MINUS_DST_COLOR,
-                GlStateManager.DestFactor.ONE_MINUS_SRC_COLOR,
-                GlStateManager.SourceFactor.ONE,
-                GlStateManager.DestFactor.ZERO
-        );
 
         com.kasperstudios.kvr.spatial.render.RenderCompat.crosshair(graphics, cx, cy);
     }

@@ -1,25 +1,115 @@
 package com.kasperstudios.kvr.compat.client;
 
 import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Client-only version seams (0026). Kept apart from {@code VersionCompat} so a dedicated server never
  * loads a class whose signatures mention client types.
+ *
+ * <p>Camera (0026b, 1.21.11 report): {@code Camera}'s getters are private/renamed there. Up to 1.21.4 we read
+ * the camera itself. From 1.21.5 the spatial UI has no render backend ({@code RenderCompat.SUPPORTED = false}),
+ * so nothing that needs a precise camera runs; the accessors still return meaningful values, derived from the
+ * camera ENTITY ({@code Entity} eye position / yaw / pitch exist on every node) — no guessed Camera names.
  */
 public final class ClientCompat {
 
     private ClientCompat() {}
 
-    /**
-     * Camera position in the world. VERIFY on 1.21.11: if {@code getPosition()} was renamed
-     * (e.g. to {@code position()}), only this line changes — four renderers call it.
-     */
+    /** Camera position in the world. */
     public static Vec3 cameraPos(Camera camera) {
+        //? if <1.21.5 {
         return camera.getPosition();
+        //?} else {
+        /*Entity e = viewEntity();
+        return e == null ? Vec3.ZERO : e.getEyePosition();
+        *///?}
+    }
+
+    /** Entity the camera follows; null right after joining a world. */
+    @Nullable
+    public static Entity cameraEntity(Camera camera) {
+        //? if <1.21.5 {
+        return camera.getEntity();
+        //?} else {
+        /*return viewEntity();
+        *///?}
+    }
+
+    /** Yaw in degrees (Minecraft convention: 0 = south). */
+    public static float cameraYaw(Camera camera) {
+        //? if <1.21.5 {
+        return camera.getYRot();
+        //?} else {
+        /*Entity e = viewEntity();
+        return e == null ? 0f : e.getYRot();
+        *///?}
+    }
+
+    /** Pitch in degrees (positive = looking down). */
+    public static float cameraPitch(Camera camera) {
+        //? if <1.21.5 {
+        return camera.getXRot();
+        //?} else {
+        /*Entity e = viewEntity();
+        return e == null ? 0f : e.getXRot();
+        *///?}
+    }
+
+    /** Unit vector the camera looks along. */
+    public static Vec3 cameraLook(Camera camera) {
+        //? if <1.21.5 {
+        return new Vec3(camera.getLookVector());
+        //?} else {
+        /*return Vec3.directionFromRotation(cameraPitch(camera), cameraYaw(camera));
+        *///?}
+    }
+
+    /** Unit vector to the camera's left (same as vanilla {@code getLeftVector}). */
+    public static Vec3 cameraLeft(Camera camera) {
+        //? if <1.21.5 {
+        return new Vec3(camera.getLeftVector());
+        //?} else {
+        /*return Vec3.directionFromRotation(0f, cameraYaw(camera) - 90f); // pitch never tilts vanilla's left vector
+        *///?}
+    }
+
+    /** Unit vector up from the camera's point of view (same as vanilla {@code getUpVector}). */
+    public static Vec3 cameraUp(Camera camera) {
+        //? if <1.21.5 {
+        return new Vec3(camera.getUpVector());
+        //?} else {
+        /*Vec3 look = cameraLook(camera);
+        return cameraUpFrom(look, Vec3.directionFromRotation(0f, cameraYaw(camera) - 90f));
+        *///?}
+    }
+
+    //? if >=1.21.5 {
+    /*// look × horizontal-left = up (level look: (0,0,1) × (1,0,0) = (0,1,0))
+    private static Vec3 cameraUpFrom(Vec3 look, Vec3 horizontalLeft) {
+        return look.cross(horizontalLeft).normalize();
+    }
+
+    @Nullable
+    private static Entity viewEntity() {
+        Minecraft mc = Minecraft.getInstance();
+        return mc.getCameraEntity() != null ? mc.getCameraEntity() : mc.player;
+    }
+    *///?}
+
+    /**
+     * Creative-like inventory (vanilla {@code MultiPlayerGameMode#hasInfiniteItems}, renamed on 1.21.11):
+     * the player's {@code instabuild} ability is the same flag and exists on every node.
+     */
+    public static boolean hasInfiniteItems() {
+        Minecraft mc = Minecraft.getInstance();
+        return mc.player != null && mc.player.getAbilities().instabuild;
     }
 
     /**

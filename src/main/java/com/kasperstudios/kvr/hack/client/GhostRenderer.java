@@ -72,9 +72,9 @@ public final class GhostRenderer {
 
     private static void battery(PoseStack pose, MultiBufferSource buffers, Camera camera, Vec3 cam, Player victim, int pct) {
         Vec3 at = victim.getEyePosition().add(0, 0.75, 0).subtract(cam);
-        Vec3 right = new Vec3(camera.getLeftVector()).reverse();
-        Vec3 down = new Vec3(camera.getUpVector()).reverse();
-        Vec3 normal = new Vec3(camera.getLookVector()).reverse();
+        Vec3 right = com.kasperstudios.kvr.compat.client.ClientCompat.cameraLeft(camera).reverse();
+        Vec3 down = com.kasperstudios.kvr.compat.client.ClientCompat.cameraUp(camera).reverse();
+        Vec3 normal = com.kasperstudios.kvr.compat.client.ClientCompat.cameraLook(camera).reverse();
         String label = "\u26a1 " + pct + "%";
         Matrix4f m = plane(pose, at, right, down, normal, 0.025);
         RenderCompat.text(buffers, m, label, -RenderCompat.textWidth(label) / 2f, 0, pct <= 20 ? 0xFFF43F5E : GREEN);

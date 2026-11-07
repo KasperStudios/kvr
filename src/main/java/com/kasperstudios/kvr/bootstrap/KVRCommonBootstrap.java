@@ -36,7 +36,7 @@ public final class KVRCommonBootstrap {
         KVRPower.init();                       // /kvr power + Block 3 commands
         KVRNetwork.registerServerReceiver(SetPowerStatePayload.CHANNEL, (player, buf) -> {
             SetPowerStatePayload p = SetPowerStatePayload.read(buf); // decode now: the buffer lives only for this call
-            var server = player.getServer();
+            var server = com.kasperstudios.kvr.compat.VersionCompat.server(player);
             if (server != null) server.execute(() -> PowerServerHandler.handle(player, p));
         });
         VfsServer.init();                      // kvr:vfs

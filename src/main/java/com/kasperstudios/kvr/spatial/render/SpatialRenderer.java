@@ -36,7 +36,7 @@ public final class SpatialRenderer {
     private SpatialRenderer() {}
 
     public static void render(PoseStack pose, Camera camera, float partialTick) {
-        if (!KVRSpatial.ready() || camera.getEntity() == null) return;
+        if (!KVRSpatial.ready() || com.kasperstudios.kvr.compat.client.ClientCompat.cameraEntity(camera) == null) return;
         long now = System.nanoTime();
         float dt = lastFrame == 0 ? 0f : Math.min(0.1f, (now - lastFrame) / 1e9f);
         lastFrame = now;
@@ -116,8 +116,8 @@ public final class SpatialRenderer {
         if (ray.isEmpty()) return;
         double dist = hover.map(SpatialRaycast.RayHit::distance).orElse(2.0) - 0.004;
         Vec3 at = ray.get().origin().add(ray.get().dir().scale(dist)).subtract(cam);
-        Vec3 left = new Vec3(camera.getLeftVector()).scale(POINTER);
-        Vec3 up = new Vec3(camera.getUpVector()).scale(POINTER);
+        Vec3 left = com.kasperstudios.kvr.compat.client.ClientCompat.cameraLeft(camera).scale(POINTER);
+        Vec3 up = com.kasperstudios.kvr.compat.client.ClientCompat.cameraUp(camera).scale(POINTER);
         int color = hover.isPresent() ? WHITE : 0xAAFFFFFF;
         RenderCompat.quad(pose, buffers, GlassStyle.GRAB_HANDLE_TEXTURE, at.add(left).add(up), at.add(left).subtract(up), at.subtract(left).subtract(up), at.subtract(left).add(up), 0f, 0f, 1f, 1f, color);
     }

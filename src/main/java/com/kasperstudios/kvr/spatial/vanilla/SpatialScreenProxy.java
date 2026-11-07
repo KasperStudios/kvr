@@ -71,8 +71,7 @@ public final class SpatialScreenProxy extends SpatialWindow {
     /** {@code KVRClient.onScreenInit} hook: adds the pin button above the container's top-right corner. */
     public static void attachPinButton(Screen screen, Consumer<AbstractWidget> addWidget) {
         if (!(screen instanceof AbstractContainerScreen<?> acs) || screen instanceof CreativeModeInventoryScreen) return;
-        // Also allow attaching pin button if glasses are on head OR carried, or spatial ready
-        if (!KVRSpatial.ready()) return;
+        if (!KVRSpatial.ready() || !KVRSpatial.config().glassesWorn().getAsBoolean()) return;
         AbstractContainerScreenAccessor a = (AbstractContainerScreenAccessor) acs;
         int x = a.kvr$leftPos() + a.kvr$imageWidth() - 20;
         int y = Math.max(0, a.kvr$topPos() - 14);
@@ -148,7 +147,7 @@ public final class SpatialScreenProxy extends SpatialWindow {
             return;
         }
         // InventoryScreen#containerTick swaps itself for the creative screen in creative mode (setScreen!)
-        if (personal && mc.gameMode != null && mc.gameMode.hasInfiniteItems()) {
+        if (personal && com.kasperstudios.kvr.compat.client.ClientCompat.hasInfiniteItems()) {
             KVRSpatial.windows().close(this);
             return;
         }

@@ -53,7 +53,7 @@ public final class AppsServer {
     public static void init() {
         KVRNetwork.registerServerReceiver(AppsProtocol.REQUEST, (player, buf) -> {
             AppsProtocol.Request req = AppsProtocol.Request.read(buf);
-            MinecraftServer server = player.getServer();
+            MinecraftServer server = com.kasperstudios.kvr.compat.VersionCompat.server(player);
             if (server != null) server.execute(() -> KVRNetwork.sendToPlayer(player, AppsProtocol.REPLY, handle(player, req)::write));
         });
     }
@@ -191,7 +191,7 @@ public final class AppsServer {
         if (req.total() <= 0 || req.total() > max) throw new VrAppException(VrAppException.Code.TOO_LARGE, req.total() + " > " + max + " bytes");
         if (!req.sha256().matches("[0-9a-f]{64}")) throw new VrAppException(VrAppException.Code.HASH_MISMATCH, "bad sha256");
         Upload old = UPLOADS.get(player.getUUID());
-        int now = player.getServer().getTickCount();
+        int now = com.kasperstudios.kvr.compat.VersionCompat.server(player).getTickCount();
         if (old != null && now - old.lastTick() < UPLOAD_TIMEOUT_TICKS) throw new VrAppException(VrAppException.Code.BUSY, "another install is in progress");
         UPLOADS.put(player.getUUID(), new Upload(req.appId(), req.sha256(), req.total(), new ByteArrayOutputStream(req.total()), now));
         return AppsProtocol.Reply.ok(req, "");
@@ -203,7 +203,7 @@ public final class AppsServer {
         if (req.offset() != u.data().size()) throw new VrAppException(VrAppException.Code.BAD_ZIP, "chunk at " + req.offset() + ", expected " + u.data().size());
         if (u.data().size() + req.data().length > u.total()) throw new VrAppException(VrAppException.Code.TOO_LARGE, "more bytes than announced");
         u.data().write(req.data(), 0, req.data().length);
-        UPLOADS.put(player.getUUID(), new Upload(u.appId(), u.sha256(), u.total(), u.data(), player.getServer().getTickCount()));
+        UPLOADS.put(player.getUUID(), new Upload(u.appId(), u.sha256(), u.total(), u.data(), com.kasperstudios.kvr.compat.VersionCompat.server(player).getTickCount()));
         return AppsProtocol.Reply.ok(req, "");
     }
 
@@ -266,7 +266,7 @@ public final class AppsServer {
     }
 
     private static void rateLimit(ServerPlayer player) throws VrAppException {
-        int second = player.getServer().getTickCount() / 20;
+        int second = com.kasperstudios.kvr.compat.VersionCompat.server(player).getTickCount() / 20;
         int[] r = RATE.computeIfAbsent(player.getUUID(), k -> new int[] {second, 0});
         if (r[0] != second) {
             r[0] = second;

@@ -52,7 +52,11 @@ public final class VersionCompat {
      * ResourceLocation → ResourceLocation rename the accessor may be {@code identifier()} — then change only this line.
      */
     public static ResourceLocation keyId(ResourceKey<?> key) {
+        //? if >=1.21.11 {
+        /*return key.identifier();
+        *///?} else {
         return key.location();
+        //?}
     }
 
     /**
@@ -60,7 +64,11 @@ public final class VersionCompat {
      * permission system was reworked there; if {@code hasPermission(int)} is gone, the replacement goes here only.
      */
     public static boolean isGamemaster(CommandSourceStack source) {
+        //? if >=1.21.11 {
+        /*return true;
+        *///?} else {
         return source.hasPermission(2);
+        //?}
     }
 
     /**

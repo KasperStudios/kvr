@@ -100,7 +100,7 @@ public final class OverloadEffects {
 
     /** Tells the player their Power Off worked. */
     public static void saved(Player player) {
-        player.sendSystemMessage(Component.translatable("kvr.overload.saved").withStyle(ChatFormatting.GREEN));
+        player.displayClientMessage(Component.translatable("kvr.overload.saved").withStyle(ChatFormatting.GREEN), false); // 0026b: sendSystemMessage is not on Player in 1.21.11
     }
 
     private static void contuse(LivingEntity e) {

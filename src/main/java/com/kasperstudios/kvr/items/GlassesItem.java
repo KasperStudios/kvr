@@ -26,12 +26,6 @@ public class GlassesItem extends com.kasperstudios.kvr.glasses.WearableGlassesIt
         super(properties);
     }
 
-    @Override
-    public void inventoryTick(ItemStack stack, Level level, net.minecraft.world.entity.Entity entity, int slot, boolean selected) {
-        super.inventoryTick(stack, level, entity, slot, selected);
-        com.kasperstudios.kvr.power.GlassesPowerTicker.tickCarried(stack, level, entity);
-    }
-
     /** Item stack carrying the given build. */
     public static ItemStack of(GlassesBuild build) {
         ItemStack stack = new ItemStack(KVRContent.glasses());

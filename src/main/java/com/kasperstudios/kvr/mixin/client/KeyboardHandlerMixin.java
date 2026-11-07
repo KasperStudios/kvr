@@ -18,17 +18,19 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(KeyboardHandler.class)
 public abstract class KeyboardHandlerMixin {
 
+    // 0026: no `window != mc.getWindow().getWindow()` test any more — Window#getWindow() was renamed on 1.21.9+
+    // and vanilla itself ignores events of other windows right after our HEAD inject (there is only one).
     @Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
     private void kvr$keyToWindow(long window, int key, int scancode, int action, int modifiers, CallbackInfo ci) {
         Minecraft mc = Minecraft.getInstance();
-        if (!KVRSpatial.ready() || mc.screen != null || window != mc.getWindow().getWindow()) return;
+        if (!KVRSpatial.ready() || mc.screen != null) return;
         if (KVRSpatial.input().keyboardKey(key, scancode, action, modifiers)) ci.cancel();
     }
 
     @Inject(method = "charTyped", at = @At("HEAD"), cancellable = true)
     private void kvr$charToWindow(long window, int codepoint, int modifiers, CallbackInfo ci) {
         Minecraft mc = Minecraft.getInstance();
-        if (!KVRSpatial.ready() || mc.screen != null || window != mc.getWindow().getWindow()) return;
+        if (!KVRSpatial.ready() || mc.screen != null) return;
         if (KVRSpatial.input().keyboardChar(codepoint, modifiers)) ci.cancel();
     }
 }
