@@ -21,7 +21,7 @@ import java.util.Map;
  */
 public final class AppsConfig {
 
-    public static final String DEFAULT_INDEX = "https://raw.githubusercontent.com/kasper-studios/kvr-apps-index/main/index.json";
+    public static final String DEFAULT_INDEX = "https://raw.githubusercontent.com/KasperStudios/kvr-apps-index/main/index.json";
 
     /**
      * @param storeIndexUrl online KVR Store index (empty = online catalog off)

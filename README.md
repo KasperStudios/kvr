@@ -1,59 +1,64 @@
-# KVR Spatial UI — пример реализации на Java
+# KVR — Kasper Virtual Reality / Spatial OS for Minecraft
 
-Интерфейс KVR OS без HUD. Всё, что видит игрок, — окна в мире, как в Quest / visionOS:
-приложения, док, уведомления, колесо жестов, откреплённые ванильные экраны.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/KasperStudios/kvr/main/src/main/resources/assets/kvr/textures/item/glasses.png" width="128" alt="KVR Visor" />
+</p>
 
-Написано под архитектуру из DevNotes: ядро в `src/` (`:common`) без импортов загрузчиков,
-загрузчики дают тонкий фасад, mojmap. Активная ветка Stonecutter — **1.21.1**. Места,
-которые меняются в 1.21.2+, помечены `//? if`.
+<p align="center">
+  <b>Пространственная операционная система нового поколения внутри Minecraft.</b><br />
+  Без плоских HUD-оверлеев. Настоящие 3D-окна в мире, жестовое управление, беспроводные сети и нативные десктопные приложения хоста (Linux & Windows).
+</p>
 
-## Слои
+---
 
-| Пакет | Что делает |
-|---|---|
-| `spatial` | `SpatialPose` (где окно и куда смотрит), `PlayerView` (снимок головы/тела), `SpatialConfig` (точки интеграции), `KVRSpatial` (загрузка) |
-| `spatial.anchor` | `WorldAnchor` — висит в мире. `BodyAnchor` — идёт с игроком, не следует за головой. `LazyFollowAnchor` — системные панели в стиле Quest: стоят на месте и подтягиваются, когда игрок отвернулся |
-| `spatial.window` | `SpatialWindow` — база окна (рисует себя через обычный `GuiGraphics`). `WindowSurface` — offscreen FBO 2×. `WindowManager` — лимит RAM по тиру (ванильные экраны и системные панели не считаются) |
-| `spatial.input` | `SpatialCursor` — Alt-тумблер, deadzone и доворот камеры у края. `SpatialRaycast` — луч руки против плоскости окна. `GrabController` — окно «в руке» за планку. `SpatialInput` — маршрутизация кликов за тик |
-| `spatial.render` | `SpatialRenderer` — квады окон, планки захвата и указатель на поверхности (без версионных веток). `RenderCompat` — единственное место с версионным рендер-API. `GlassStyle` — стекло из nine-slice спрайтов |
-| `spatial.ui` | `DockBar` (низко перед игроком), `ToastPanel` (чуть выше линии взгляда), `GestureWheel` (появляется у руки) |
-| `spatial.vanilla` | `SpatialScreenProxy` — кнопка «3D» на любом контейнере, экран становится парящим окном, меню не закрывается |
-| `platform` | `KVRClient` + `KVRClientProvider` — 4 хука: клавиша, начало тика, рендер мира, init экрана |
-| `mixin.client` | мышь, колесо, скрытие центрального прицела, «не копать сквозь панель», фон откреплённого экрана |
+## ⚡ Ключевые возможности
 
-## Подключение
+### 🕶️ Очки виртуальной реальности и модульное железо
+- **Модульная сборка:** кастомизация компонентов очков (CPU, GPU, RAM, Storage, Battery) от Т1 (бомж-тир) до Т5 (хай-тек).
+- **Питание и зарядка:** честный расход энергии, зарядные док-станции (`DockPlate`), солнечные модули и перегрев.
+- **Внешний вид:** 3D-модели очков и хакерских очков (`HackGlasses`) на голове игрока, покраска оправ в верстаке и анимации линз.
 
-1. Скопировать `src/`, `fabric/`, `neoforge/` поверх репозитория.
-2. Добавить `kvr-spatial.mixins.json` в `fabric.mod.json` (`"mixins"`) и в `[[mixins]]` у
-   `neoforge.mods.toml`.
-3. Слить lang-ключи в существующие `ru_ru.json` / `en_us.json`.
-4. GUI-спрайты (`textures/gui/sprites/*.png` + `.mcmeta`) скачать со страницы текстур KVR,
-   категория «GUI-спрайты».
-5. В клиентском entrypoint каждого загрузчика:
+### 🌐 Пространственный интерфейс (Spatial OS)
+- **Парящие 3D-окна:** окна висят в мире Minecraft, закрепляются в пространстве или следуют за телом игрока (`LazyFollow`).
+- **Открепление ванильных GUI:** кнопка «3D» на сундуках, верстаках и печах позволяет открепить их прямо в воздух и пользоваться ими без паузы игры.
+- **Жестовое колесо (Alt + ПКМ):** мгновенный запуск лаунчера, сворачивание окон и управление пространствами.
+- **Настраиваемый док-бар:** гибкая регулировка расстояния от глаз, закрепление избранных приложений и тем оформления (Cyberpunk, Neon, Matrix, OLED).
 
-```java
-KVRClient.install(new FabricKVRClientProvider());          // или new NeoForgeKVRClientProvider(modBus)
-KVRSpatial.initClient(new SpatialConfig(ramWindows, glassesWorn, batteryPercent, appHost));
-```
+### 🖥️ Нативные десктопные приложения хоста (kvr-desktopd)
+- **Изолированный headless-композитор:** запуск реальных программ вашего ПК (Google Chrome, Firefox, foot, Thunar, Spotify) прямо внутри Minecraft!
+- **Приватность:** окна хоста **никогда не появляются на реальном мониторе** — они рендерятся исключительно в виртуальном пространстве ваших очков через демона `kvr-desktopd` (Smithay / Wayland).
+- **Управление:** бесшовный перехват мыши, колесика и клавиатуры в Alt-режиме, синхронизация буфера обмена (Shared Clipboard).
 
-`SpatialConfig` специально принимает лямбды: UI не угадывает, как хранится сборка очков, —
-её отдаёт код из Блока 2 (`GlassesCodec` / `HardwareTable`), а приложения — рантайм QuickJS (Блок 5).
+### 📦 Магазин приложений (App Market) и QuickJS рантайм
+- **Чистый старт:** из коробки доступны App Market, Messenger и Настройки.
+- **Официальный каталог:** установка любых сторонних приложений (`.vrapp`) в один клик из репозитория [kvr-apps-index](https://github.com/KasperStudios/kvr-apps-index).
+- **Chicory WASM:** исполнение JavaScript-приложений в безопасной песочнице с собственным виртуальным диском (VFS).
 
-## Как это работает за кадр
+### 📡 Rednet & Simple Voice Chat звонки
+- **Слот модема CC: Tweaked:** вставка беспроводных и эндер-модемов прямо в слот очков. Очки становятся мобильной нодой Rednet с уникальным ID (50000–64999) и поддержкой шины событий `kvr_events`.
+- **Голосовые вызовы:** защищенные приватные звонки между игроками через Simple Voice Chat с отображением аватарок и индикацией говорящего.
 
-1. `ClientTick START` → `SpatialInput`: Alt, луч, клики по окнам съедаются до ванильного `handleKeybinds`.
-2. `AFTER_TRANSLUCENT` → `SpatialRenderer`: якоря считают позы, каждое окно рисует GUI в свой FBO,
-   затем квады рисуются в мире от дальнего к ближнему, сверху планки и указатель.
+---
 
-## Стыки версий (Stonecutter)
+## 🛠️ Стек технологий
 
-Весь версионный рендер собран в `spatial/render/RenderCompat.java`, остальные классы от версии
-не зависят. Исключения: `SpatialCursor` (категория клавиш 1.21.9+), `SpatialScreenProxy`
-(`MouseButtonEvent` 1.21.9+), `GlassStyle.id` (`ResourceLocation`) и провайдеры загрузчиков.
-На 1.21.5+ (нода 1.21.11) пространственный UI пока выключен (`RenderCompat.SUPPORTED = false`).
-Подробности — `CHANGELOG.md`, запись 0002.
+- **Архитектура:** Architectury Loom + Stonecutter (мультиверсионность 1.20.1, 1.20.4, 1.21.1 Fabric & NeoForge).
+- **WASM Engine:** Chicory WASM + QuickJS-ng.
+- **Desktop Daemon:** Rust, Smithay Wayland compositor (`native/kvr-desktopd`).
+- **Сетевой стек:** KVR Network протокол с защитой от рассинхронизации сессий.
 
-## Тесты
+---
 
-`SpatialRaycastTest`, `LazyFollowAnchorTest` — чистая математика на `Vec3`, без клиента.
-Запускаются обычным `./gradlew test` на всех нодах.
+## 🚀 Установка и запуск
+
+1. Установите **Fabric Loader** (0.20.1+) или **NeoForge** на Minecraft 1.21.1.
+2. Скачайте `kvr-fabric-0.1.0+1.21.1.jar` из раздела [Releases](https://github.com/KasperStudios/kvr/releases).
+3. Поместите мод в папку `.minecraft/mods`.
+4. *(Опционально для запуска окон ПК)*: поместите скомпилированный демон `kvr-desktopd` в `.minecraft/config/kvr/bin/kvr-desktopd`.
+
+---
+
+## 📜 Лицензия
+
+Разработано **KasperStudios**. Все права защищены.
+Подробный лог разработки и история версий доступны в [CHANGELOG.md](CHANGELOG.md).
