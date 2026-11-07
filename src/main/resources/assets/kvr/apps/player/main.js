@@ -6,15 +6,18 @@ const TRACKS = [
   { name: 'Creator (Lena Raine)', sound: 'minecraft:music_disc.creator' },
   { name: 'Relic (Aaron Cherof)', sound: 'minecraft:music_disc.relic' },
   { name: 'Cat (C418)', sound: 'minecraft:music_disc.cat' },
-  { name: 'Stal (C418)', sound: 'minecraft:music_disc.stal' }
+  { name: 'Stal (C418)', sound: 'minecraft:music_disc.stal' },
+  { name: 'Chirp (C418)', sound: 'minecraft:music_disc.chirp' },
+  { name: 'Mall (C418)', sound: 'minecraft:music_disc.mall' },
+  { name: 'Wait (C418)', sound: 'minecraft:music_disc.wait' }
 ];
 
 let currentIndex = Number(kvr.storage.get('track_index', 0));
 if (isNaN(currentIndex) || currentIndex < 0 || currentIndex >= TRACKS.length) currentIndex = 0;
 let isPlaying = false;
 
-const win = new Window({ title: 'KVR Player', width: 260, height: 260 });
-const titleText = new Text('Cyber Audio Player', { weight: 700 });
+const win = new Window({ title: 'KVR Music Player', width: 280, height: 280 });
+const titleText = new Text('KVR Spatial Audio', { weight: 700 });
 const nowPlaying = new Text(`Track: ${TRACKS[currentIndex].name}`, { color: '#67e8f9' });
 const statusText = new Text(isPlaying ? '● PLAYING' : '○ STOPPED', { color: isPlaying ? '#4ade80' : '#94a3b8' });
 
@@ -36,8 +39,7 @@ function playTrack(idx) {
 function stopTrack() {
   isPlaying = false;
   updateStatus();
-  // Play UI click to acknowledge stop
-  kvr.sound.play('minecraft:ui.button.click');
+  kvr.sound.play('stop');
 }
 
 const controls = new Stack({ dir: 'row' })

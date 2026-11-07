@@ -392,12 +392,31 @@ public final class ScriptWindow extends SpatialWindow implements ScriptHost.List
         });
     }
 
+    private static net.minecraft.client.resources.sounds.SoundInstance currentSound;
+
     @Override
     public void sound(String id) {
+        if ("stop".equalsIgnoreCase(id)) {
+            Minecraft.getInstance().execute(() -> {
+                if (currentSound != null) {
+                    Minecraft.getInstance().getSoundManager().stop(currentSound);
+                    currentSound = null;
+                }
+            });
+            return;
+        }
         ResourceLocation loc = ResourceLocation.tryParse(id);
         if (loc == null) return;
-        Minecraft.getInstance().execute(() ->
-            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvent.createVariableRangeEvent(loc), 1f)));
+        Minecraft.getInstance().execute(() -> {
+            if (currentSound != null) {
+                Minecraft.getInstance().getSoundManager().stop(currentSound);
+                currentSound = null;
+            }
+            SoundEvent se = net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.get(loc);
+            if (se == null) se = SoundEvent.createVariableRangeEvent(loc);
+            currentSound = SimpleSoundInstance.forUI(se, 1f);
+            Minecraft.getInstance().getSoundManager().play(currentSound);
+        });
     }
 
     /** kvr.window.lock / setPublic / anchor: the same switches as the gear menu. */
