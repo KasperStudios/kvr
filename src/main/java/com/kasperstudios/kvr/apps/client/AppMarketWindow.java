@@ -186,6 +186,12 @@ public final class AppMarketWindow extends SpatialWindow {
 
     private List<Row> storeRows() {
         List<Row> rows = new ArrayList<>();
+        // 0027: built-in catalog — apps shipped with KVR, installed into these glasses on demand
+        rows.add(header(Component.translatable("kvr.apps.section.builtin")));
+        for (com.kasperstudios.kvr.apps.BundledApps.Entry b : com.kasperstudios.kvr.apps.BundledApps.entries()) {
+            com.kasperstudios.kvr.apps.BundledApps.manifest(b.id()).ifPresent(m -> rows.add(bundledRow(m)));
+        }
+        rows.add(header(Component.translatable("kvr.apps.section.online")));
         AppsClient.Policy policy = AppsClient.policy();
         if (AppsClient.loaded() && !policy.allowInstall()) rows.add(note(Component.translatable("kvr.apps.server_denied"), GlassStyle.DANGER));
         switch (StoreClient.state()) {
@@ -201,6 +207,33 @@ public final class AppMarketWindow extends SpatialWindow {
             }
         }
         return rows;
+    }
+
+    private Row bundledRow(VrAppManifest m) {
+        return new Row(ROW, (g, y, mx, my) -> {
+            icon(g, m.id(), 10, y + 6);
+            int textW = width - 32 - BTN_W - 18;
+            fitted(g, m.name() + "  " + m.version(), 32, y + 4, textW, GlassStyle.TEXT);
+            fitted(g, m.description().isEmpty() ? Component.translatable("kvr.apps.builtin_badge").getString() : m.description(), 32, y + 15, textW, GlassStyle.MUTED);
+            var inst = AppsClient.installed(m.id());
+            int bx = width - 12 - BTN_W;
+            boolean update = inst.isPresent() && StoreIndex.compareVersions(m.version(), inst.get().manifest().version()) > 0;
+            if (inst.isPresent() && !update) {
+                GlassStyle.centered(g, Component.translatable("kvr.apps.installed_badge"), bx + BTN_W / 2, y + 10, GlassStyle.OK);
+                return;
+            }
+            button(g, mx, my, bx, y + 7, BTN_W, Component.translatable(update ? "kvr.apps.update" : "kvr.apps.install"), !AppsClient.busy(), () -> {
+                int size;
+                try {
+                    size = com.kasperstudios.kvr.apps.BundledApps.pack(m.id()).length; // only for the dialog; the server packs its own copy
+                } catch (VrAppException e) {
+                    say(errorText(e.code().name(), e.getMessage()), GlassStyle.DANGER);
+                    return;
+                }
+                confirmInstall(m.name(), m.version(), m.author(), size, m.permissions(), m.requires(), () ->
+                    AppsClient.installBundled(m.id(), m.name(), f -> result(f, Component.translatable("kvr.apps.installed_ok", m.name()))));
+            });
+        });
     }
 
     private Row storeRow(StoreIndex.Entry e, AppsClient.Policy policy) {

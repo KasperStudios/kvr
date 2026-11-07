@@ -149,7 +149,13 @@ public final class SpatialInput {
                 windows.focus(w);
                 switch (hover.region()) {
                     case GRAB_BAR -> { if (!w.isLocked()) grab.begin(hover); }
-                    case CONTENT -> w.click(hover.px(), hover.py(), 0, view);
+                    case CONTENT -> {
+                        // 0027: click sound (Settings → Sound); the gesture wheel / grab bar stay silent
+                        if (w.click(hover.px(), hover.py(), 0, view) && com.kasperstudios.kvr.config.KvrUiConfig.get().soundClicks()) {
+                            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                                net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0f));
+                        }
+                    }
                 }
             }
             if (attackWasDown && !down && hover.region() == SpatialRaycast.Region.CONTENT) w.release(hover.px(), hover.py(), 0);

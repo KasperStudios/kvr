@@ -20,6 +20,7 @@ public final class AppIcons {
         if (com.kasperstudios.kvr.apps.client.PackageIcons.draw(g, appId, x, y)) return true; // icon.png of a .vrapp (0025)
         switch (appId) {
             case "market" -> market(g, x, y);
+            case "settings" -> settings(g, x, y);
             case "notes" -> notes(g, x, y);
             case "calc" -> calc(g, x, y);
             case "messenger" -> messenger(g, x, y);
@@ -31,6 +32,23 @@ public final class AppIcons {
             }
         }
         return true;
+    }
+
+    /** Settings: slate gear with an accent-free light rim and a dark hub. */
+    private static void settings(GuiGraphics g, int x, int y) {
+        r(g, x, y, 6, 1, 4, 2, OUTLINE); // teeth: top, bottom, left, right
+        r(g, x, y, 6, 13, 4, 2, OUTLINE);
+        r(g, x, y, 1, 6, 2, 4, OUTLINE);
+        r(g, x, y, 13, 6, 2, 4, OUTLINE);
+        r(g, x, y, 2, 2, 3, 3, OUTLINE); // diagonal teeth
+        r(g, x, y, 11, 2, 3, 3, OUTLINE);
+        r(g, x, y, 2, 11, 3, 3, OUTLINE);
+        r(g, x, y, 11, 11, 3, 3, OUTLINE);
+        r(g, x, y, 3, 3, 10, 10, OUTLINE);
+        r(g, x, y, 4, 4, 8, 8, 0xFF94A3B8);
+        r(g, x, y, 4, 4, 8, 1, 0xFFCBD5E1); // highlight
+        r(g, x, y, 6, 6, 4, 4, 0xFF1E293B); // hub
+        r(g, x, y, 7, 7, 2, 2, 0xFF0F172A);
     }
 
     /** App Market: violet shopping bag with handles and a down arrow (install). */

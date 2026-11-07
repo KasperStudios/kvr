@@ -63,8 +63,20 @@ public final class AppCatalog {
     /** App Market first, then installed packages, then developer folders. Called every frame: cheap. */
     public static List<SpatialConfig.DockItem> dockItems() {
         List<SpatialConfig.DockItem> out = new ArrayList<>();
-        out.add(new SpatialConfig.DockItem(MARKET_ID, GlassStyle.id("gesture/launcher"), Component.translatable("kvr.apps.market"),
-            KVRSpatial.windows().find(AppMarketWindow.class).isPresent()));
+        out.add(marketItem());
+        out.addAll(packageItems());
+        return out;
+    }
+
+    /** 0027: the App Market dock entry (first of the three preinstalled programs). */
+    public static SpatialConfig.DockItem marketItem() {
+        return new SpatialConfig.DockItem(MARKET_ID, GlassStyle.id("gesture/launcher"), Component.translatable("kvr.apps.market"),
+            KVRSpatial.windows().find(AppMarketWindow.class).isPresent());
+    }
+
+    /** Installed packages (incl. built-in catalog apps once installed), then developer folders. */
+    public static List<SpatialConfig.DockItem> packageItems() {
+        List<SpatialConfig.DockItem> out = new ArrayList<>();
         int n = 0;
         for (AppsClient.Installed i : AppsClient.installed()) {
             if (n++ >= DOCK_MAX_INSTALLED) break;

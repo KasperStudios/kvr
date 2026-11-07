@@ -35,7 +35,11 @@ public final class GlassStyle {
     public static final int TEXT = 0xFFF1F5F9;
     /** Opaque since 0018: translucent text over translucent glass was the hardest to read. */
     public static final int MUTED = 0xFFB4C0CE;
-    public static final int ACCENT = 0xFF67E8F9;
+    /**
+     * Theme accent (0027: Settings → Personalisation). Deliberately NOT a compile-time constant any more, so every
+     * use reads the current theme; refreshed by {@link #syncTheme()} at the start of each window's {@link #surface}.
+     */
+    public static int ACCENT = 0xFF67E8F9;
     public static final int OK = 0xFF4ADE80;
     public static final int DANGER = 0xFFF43F5E;
     public static final int PADDING = 8;
@@ -75,13 +79,34 @@ public final class GlassStyle {
      * inside the sprite's rounded corners), then the glass on top of it.
      */
     public static void surface(GuiGraphics g, int x, int y, int w, int h, boolean hovered) {
-        int a = backdropAlpha();
+        com.kasperstudios.kvr.config.KvrUiConfig.Prefs p = syncTheme();
+        int a = p.backdrop() == com.kasperstudios.kvr.config.KvrUiConfig.Backdrop.OPAQUE ? 0xFF : backdropAlpha();
         if (a > 0 && w > 4 && h > 4) {
-            g.fill(x + 2, y + 1, x + w - 2, y + h - 1, a << 24 | BACKDROP_RGB);
-            g.fill(x + 1, y + 2, x + 2, y + h - 2, a << 24 | BACKDROP_RGB);
-            g.fill(x + w - 2, y + 2, x + w - 1, y + h - 2, a << 24 | BACKDROP_RGB);
+            if (p.backdrop() == com.kasperstudios.kvr.config.KvrUiConfig.Backdrop.GRADIENT) {
+                // accent-tinted top fading into the deep slate backdrop
+                int top = a << 24 | mix(BACKDROP_RGB, ACCENT & 0xFFFFFF, 0.28f);
+                g.fillGradient(x + 1, y + 1, x + w - 1, y + h - 1, top, a << 24 | BACKDROP_RGB);
+            } else {
+                g.fill(x + 2, y + 1, x + w - 2, y + h - 1, a << 24 | BACKDROP_RGB);
+                g.fill(x + 1, y + 2, x + 2, y + h - 2, a << 24 | BACKDROP_RGB);
+                g.fill(x + w - 2, y + 2, x + w - 1, y + h - 2, a << 24 | BACKDROP_RGB);
+            }
         }
         panel(g, x, y, w, h, hovered);
+    }
+
+    /** Applies the theme accent from {@code kvr-ui.toml}; returns the prefs (cached record, cheap per frame). */
+    public static com.kasperstudios.kvr.config.KvrUiConfig.Prefs syncTheme() {
+        com.kasperstudios.kvr.config.KvrUiConfig.Prefs p = com.kasperstudios.kvr.config.KvrUiConfig.get();
+        ACCENT = p.theme().accent;
+        return p;
+    }
+
+    private static int mix(int rgbA, int rgbB, float t) {
+        int r = Math.round(((rgbA >> 16) & 0xFF) * (1 - t) + ((rgbB >> 16) & 0xFF) * t);
+        int gg = Math.round(((rgbA >> 8) & 0xFF) * (1 - t) + ((rgbB >> 8) & 0xFF) * t);
+        int b = Math.round((rgbA & 0xFF) * (1 - t) + (rgbB & 0xFF) * t);
+        return r << 16 | gg << 8 | b;
     }
 
     /** 0..255 from {@code window_opacity} (percent). */

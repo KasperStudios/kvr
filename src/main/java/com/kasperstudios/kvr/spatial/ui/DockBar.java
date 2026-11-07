@@ -27,6 +27,8 @@ public final class DockBar extends SpatialWindow {
 
     private final SpatialConfig config;
     private final WindowManager windows;
+    /** Dock placement the current anchor was built for (0027: Settings → Display); 0 = not applied yet. */
+    private int placement;
 
     public DockBar(SpatialConfig config, WindowManager windows) {
         super("kvr:dock", Kind.SYSTEM, 240, H, new LazyFollowAnchor(0.85, -0.5, 40));
@@ -46,8 +48,20 @@ public final class DockBar extends SpatialWindow {
 
     @Override
     public void tick() {
+        com.kasperstudios.kvr.config.KvrUiConfig.Prefs p = com.kasperstudios.kvr.config.KvrUiConfig.get();
+        int key = java.util.Objects.hash(p.dockHeightCm(), p.dockDistanceCm(), p.dockFollowDeg());
+        if (key != placement) {
+            placement = key;
+            setAnchor(new LazyFollowAnchor(p.dockDistanceCm() / 100.0, p.dockHeightCm() / 100.0, p.dockFollowDeg()));
+        }
         int slots = config.apps().dockItems().size() + windows.minimized().size();
-        width = GlassStyle.PADDING * 2 + Math.max(1, slots) * (ICON + GAP) + STATUS_W;
+        width = GlassStyle.PADDING * 2 + Math.max(1, slots) * (ICON + GAP) + statusWidth();
+    }
+
+    /** Clock and battery can be switched off in Settings; with both off the status block disappears. */
+    private static int statusWidth() {
+        com.kasperstudios.kvr.config.KvrUiConfig.Prefs p = com.kasperstudios.kvr.config.KvrUiConfig.get();
+        return p.showClock() || p.showBattery() ? STATUS_W : 0;
     }
 
     @Override
@@ -71,19 +85,28 @@ public final class DockBar extends SpatialWindow {
             x += ICON + GAP;
         }
 
+        if (statusWidth() == 0) return;
+        com.kasperstudios.kvr.config.KvrUiConfig.Prefs prefs = com.kasperstudios.kvr.config.KvrUiConfig.get();
         int sx = width - STATUS_W - GlassStyle.PADDING + 4;
         g.fill(sx - 6, 10, sx - 5, height - 10, 0x40FFFFFF);
-        int pct = config.batteryPercent().getAsInt();
-        GlassStyle.sprite(g, GlassStyle.BATTERY, sx, height / 2 - 8, 16, 16);
-        int fill = Math.round(10 * pct / 100f);
-        g.fill(sx + 2, height / 2 - 3, sx + 2 + fill, height / 2 + 3, pct <= 20 ? GlassStyle.DANGER : GlassStyle.OK);
-        GlassStyle.text(g, Component.literal(pct + "%"), sx + 20, height / 2 - 8, GlassStyle.TEXT);
-        GlassStyle.text(g, Component.literal(LocalTime.now().format(CLOCK)), sx + 20, height / 2 + 2, GlassStyle.MUTED);
+        boolean both = prefs.showClock() && prefs.showBattery();
+        if (prefs.showBattery()) {
+            int pct = config.batteryPercent().getAsInt();
+            int by = both ? height / 2 - 8 : height / 2 - 4;
+            GlassStyle.sprite(g, GlassStyle.BATTERY, sx, height / 2 - 8, 16, 16);
+            int fill = Math.round(10 * pct / 100f);
+            g.fill(sx + 2, height / 2 - 3, sx + 2 + fill, height / 2 + 3, pct <= 20 ? GlassStyle.DANGER : GlassStyle.OK);
+            GlassStyle.text(g, Component.literal(pct + "%"), sx + 20, by, GlassStyle.TEXT);
+        }
+        if (prefs.showClock()) {
+            int cy = both ? height / 2 + 2 : height / 2 - 4;
+            GlassStyle.text(g, Component.literal(LocalTime.now().format(CLOCK)), prefs.showBattery() ? sx + 20 : sx, cy, both ? GlassStyle.MUTED : GlassStyle.TEXT);
+        }
     }
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        if (mx >= width - STATUS_W - GlassStyle.PADDING) {
+        if (statusWidth() > 0 && mx >= width - STATUS_W - GlassStyle.PADDING) {
             com.kasperstudios.kvr.spatial.KVRSpatial.openPowerWindow();
             return true;
         }

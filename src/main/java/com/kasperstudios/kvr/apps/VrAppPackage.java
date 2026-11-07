@@ -108,7 +108,13 @@ public final class VrAppPackage {
 
     /** {@code kvr pack}: the folder as a deterministic {@code .vrapp} (same files → same bytes → same SHA-256). */
     public static byte[] pack(Path dir) throws VrAppException {
-        Map<String, byte[]> files = collect(dir);
+        return packFiles(collect(dir));
+    }
+
+    /** 0027: same packing for an in-memory file map (bundled apps read from the mod jar). */
+    public static byte[] packFiles(Map<String, byte[]> input) throws VrAppException {
+        Map<String, byte[]> files = new TreeMap<>(input);
+        for (String name : files.keySet()) checkPath(name);
         build(files, null, 0); // validate before packing
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try (ZipOutputStream out = new ZipOutputStream(bos, StandardCharsets.UTF_8)) {

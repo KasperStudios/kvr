@@ -226,6 +226,22 @@ public final class AppsClient {
 
     // --- fetch -----------------------------------------------------------------------------------
 
+    /** 0027: built-in catalog app — the server packs it from the mod jar; only the id travels. */
+    public static void installBundled(String appId, String name, Consumer<Failure> done) {
+        if (!task.isEmpty()) {
+            done.accept(new Failure("BUSY", task));
+            return;
+        }
+        task = name;
+        progress = 0.5f;
+        send(req(AppsProtocol.Op.INSTALL_BUNDLED, appId, "", 0, 0, new byte[0]), r -> {
+            task = "";
+            progress = -1f;
+            if (r.ok()) refresh();
+            done.accept(r.ok() ? null : failure(r));
+        });
+    }
+
     /** The package bytes of an installed app: from the cache, or downloaded in chunks and cached. */
     public static void fetch(Installed app, Consumer<byte[]> ok, Consumer<Failure> err) {
         Optional<byte[]> cached = AppCache.get(app.sha256());

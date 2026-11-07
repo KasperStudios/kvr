@@ -44,7 +44,9 @@ public final class ToastPanel extends SpatialWindow {
     public void push(Toast toast) {
         shown.addFirst(new Shown(toast, nowMs()));
         while (shown.size() > MAX) shown.removeLast();
-        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_TOAST_IN, 1.2f));
+        if (com.kasperstudios.kvr.config.KvrUiConfig.get().soundToasts()) { // 0027: Settings → Sound
+            Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_TOAST_IN, 1.2f));
+        }
     }
 
     @Override

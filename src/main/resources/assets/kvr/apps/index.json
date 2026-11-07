@@ -1,0 +1,9 @@
+{
+  "_comment": "KVR built-in catalog (0027): apps shipped in the mod jar that are NOT preinstalled. App Market installs them into the glasses' VFS (counted against Storage). Every file of each app must be listed. Agent: add your ide / player here.",
+  "apps": [
+    { "id": "notes", "files": ["config.json", "main.js"] },
+    { "id": "calc", "files": ["config.json", "main.js"] },
+    { "id": "kav", "files": ["config.json", "main.js"] },
+    { "id": "hello", "files": ["config.json", "main.js"] }
+  ]
+}

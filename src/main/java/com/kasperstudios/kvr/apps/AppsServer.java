@@ -75,6 +75,7 @@ public final class AppsServer {
                 }
                 case UNINSTALL -> uninstall(req, store);
                 case FETCH -> fetch(req, store);
+                case INSTALL_BUNDLED -> installBundled(player, req, ctx.get());
             };
         } catch (VrAppException e) {
             if (req.op() == AppsProtocol.Op.INSTALL_CHUNK || req.op() == AppsProtocol.Op.INSTALL_COMMIT) UPLOADS.remove(player.getUUID());
@@ -242,6 +243,33 @@ public final class AppsServer {
             throw e;
         }
         return AppsProtocol.Reply.ok(req, "");
+    }
+
+    // --- INSTALL_BUNDLED (0027) ---------------------------------------------------------------------
+
+    /**
+     * Built-in catalog app: the server packs it from its own jar, so the client sends only the id. Not subject to
+     * {@code allow_app_install} / allowlist — it is part of the mod, not third-party code — but it takes disk space
+     * like any package (Creator: everything except Market, Messenger and Settings is installed and occupies Storage).
+     */
+    private static AppsProtocol.Reply installBundled(ServerPlayer player, AppsProtocol.Request req, VfsServer.Context ctx) throws VrAppException, VfsException {
+        if (!BundledApps.isBundled(req.appId())) throw new VrAppException(VrAppException.Code.NOT_FOUND, "not in the built-in catalog: " + req.appId());
+        byte[] bytes = BundledApps.pack(req.appId());
+        VrAppPackage pkg = VrAppPackage.read(bytes);
+        try {
+            ctx.store().writeBytes("/apps/" + req.appId() + ".vrapp", bytes, ctx.quota());
+        } catch (VfsException e) {
+            if (e.code() == VfsException.Code.QUOTA_BYTES || e.code() == VfsException.Code.QUOTA_FILES) {
+                throw new VrAppException(VrAppException.Code.QUOTA, e.getMessage());
+            }
+            throw e;
+        }
+        KVR.logger().info("KVR apps: {} installed built-in {} {} ({} bytes)", player.getName().getString(), req.appId(), pkg.manifest().version(), bytes.length);
+        JsonObject a = new JsonObject();
+        a.add("manifest", pkg.manifest().toJson());
+        a.addProperty("sha256", pkg.sha256());
+        a.addProperty("size", bytes.length);
+        return AppsProtocol.Reply.ok(req, a.toString());
     }
 
     // --- FETCH -----------------------------------------------------------------------------------

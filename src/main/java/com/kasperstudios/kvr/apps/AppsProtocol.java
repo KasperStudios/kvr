@@ -16,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
  * INSTALL_ABORT
  * UNINSTALL      id                  → ok
  * FETCH          id, sha256, offset  → data, offset, total   (client cache miss)
+ * INSTALL_BUNDLED id                 → json app    (0027: built-in catalog — the SERVER packs it from the mod jar)
  * </pre>
  */
 public final class AppsProtocol {
@@ -28,7 +29,7 @@ public final class AppsProtocol {
     public static final int CHUNK_DOWN = 256 * 1024;
     private static final int MAX_JSON = 256 * 1024;
 
-    public enum Op { LIST, INSTALL_BEGIN, INSTALL_CHUNK, INSTALL_COMMIT, INSTALL_ABORT, UNINSTALL, FETCH }
+    public enum Op { LIST, INSTALL_BEGIN, INSTALL_CHUNK, INSTALL_COMMIT, INSTALL_ABORT, UNINSTALL, FETCH, INSTALL_BUNDLED }
 
     private AppsProtocol() {}
 

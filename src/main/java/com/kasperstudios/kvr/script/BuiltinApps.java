@@ -35,8 +35,14 @@ import net.minecraft.world.phys.Vec3;
 public final class BuiltinApps implements SpatialConfig.AppHost {
 
     /** The apps shipped in the jar; ChicoryJsEngineTest boots exactly these on the real prelude. */
-    public static final List<String> SYSTEM_APPS = List.of("hello", "kav", "notes", "calc", "messenger", "player", "ide");
-    public static final String SETTINGS_ID = "settings";
+    public static final List<String> SYSTEM_APPS = List.of("hello", "kav", "notes", "calc", "messenger");
+
+    /**
+     * 0027, Creator: clean glasses ship with exactly THREE programs — App Market, Messenger (comms) and Settings.
+     * Market and Settings are native windows, so only the JS one is listed here. Everything else in
+     * {@link #SYSTEM_APPS} is installed from App Market (built-in catalog, {@code assets/kvr/apps/index.json}).
+     */
+    public static final List<String> PREINSTALLED = List.of("messenger");
 
     private static final double SPAWN_DISTANCE = 0.9;
 
@@ -46,7 +52,6 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
 
     public BuiltinApps(List<String> ids) {
         List<String> all = new ArrayList<>(ids);
-        all.add(SETTINGS_ID);
         if (com.kasperstudios.kvr.desktop.client.HostDesktopClient.enabledLocally()) all.add(com.kasperstudios.kvr.desktop.client.HostDesktopClient.DOCK_ID);
         this.ids = List.copyOf(all);
     }
@@ -54,44 +59,34 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
     @Override
     public List<SpatialConfig.DockItem> dockItems() {
         List<SpatialConfig.DockItem> out = new ArrayList<>();
-        for (String id : ids) {
+        out.add(com.kasperstudios.kvr.apps.client.AppCatalog.marketItem()); // 0027: 1) App Market
+        for (String id : ids) {                                             //       2) Messenger (+ PC apps if enabled)
             if (id.equals(com.kasperstudios.kvr.desktop.client.HostDesktopClient.DOCK_ID)) {
                 boolean on = KVRSpatial.windows().all().stream().anyMatch(w -> w instanceof com.kasperstudios.kvr.desktop.client.HostDesktopWindow);
                 out.add(new SpatialConfig.DockItem(id, GlassStyle.id("gesture/launcher"), Component.translatable("kvr.desktop.title"), on));
                 continue;
             }
-            if (id.equals("settings")) {
-                boolean on = KVRSpatial.windows().find(com.kasperstudios.kvr.spatial.ui.SettingsWindow.class).isPresent();
-                out.add(new SpatialConfig.DockItem(id, GlassStyle.id("gesture/launcher"), Component.translatable("kvr.settings.title"), on));
-                continue;
-            }
             boolean running = KVRSpatial.windows().all().stream().anyMatch(w -> w.id().equals("app:" + id));
             out.add(new SpatialConfig.DockItem(id, GlassStyle.id("gesture/launcher"), Component.literal(app(id).map(VrApp::name).orElse(id)), running));
         }
-        out.addAll(com.kasperstudios.kvr.apps.client.AppCatalog.dockItems()); // 0025: market, installed packages and dev apps
+        out.add(new SpatialConfig.DockItem(com.kasperstudios.kvr.spatial.ui.SettingsWindow.DOCK_ID, GlassStyle.id("gesture/launcher"), //   3) Settings
+            Component.translatable("kvr.settings.app"), KVRSpatial.windows().find(com.kasperstudios.kvr.spatial.ui.SettingsWindow.class).isPresent()));
+        out.addAll(com.kasperstudios.kvr.apps.client.AppCatalog.packageItems()); // installed .vrapp (incl. built-in catalog), dev apps
         return out;
     }
 
     @Override
     public void launch(String appId) {
-        if (com.kasperstudios.kvr.apps.client.AppCatalog.handles(appId)) { // 0025: packages & dev apps
+        if (appId.equals(com.kasperstudios.kvr.spatial.ui.SettingsWindow.DOCK_ID)) { // 0027
+            com.kasperstudios.kvr.spatial.ui.SettingsWindow.open();
+            return;
+        }
+        if (com.kasperstudios.kvr.apps.client.AppCatalog.handles(appId)) { // 0025
             com.kasperstudios.kvr.apps.client.AppCatalog.launch(appId);
             return;
         }
         if (appId.equals(com.kasperstudios.kvr.desktop.client.HostDesktopClient.DOCK_ID)) {
             com.kasperstudios.kvr.desktop.client.HostDesktopClient.open();
-            return;
-        }
-        if (appId.equals("settings")) {
-            var open = KVRSpatial.windows().find(com.kasperstudios.kvr.spatial.ui.SettingsWindow.class);
-            if (open.isPresent()) {
-                KVRSpatial.windows().restore(open.get());
-                return;
-            }
-            Minecraft mc = Minecraft.getInstance();
-            PlayerView view = PlayerView.capture(mc.gameRenderer.getMainCamera(), 1f);
-            Vec3 center = view.eye().add(view.look().scale(SPAWN_DISTANCE));
-            KVRSpatial.windows().open(new com.kasperstudios.kvr.spatial.ui.SettingsWindow(new WorldAnchor(SpatialPose.facing(center, view.eye()))));
             return;
         }
         var open = KVRSpatial.windows().all().stream().filter(w -> w.id().equals("app:" + appId)).findFirst();
@@ -110,38 +105,17 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
 
     @Override
     public void openLauncher() {
-        var open = KVRSpatial.windows().find(com.kasperstudios.kvr.spatial.ui.AppLauncherWindow.class);
-        if (open.isPresent()) {
-            KVRSpatial.windows().restore(open.get());
-            return;
-        }
-        Minecraft mc = Minecraft.getInstance();
-        PlayerView view = PlayerView.capture(mc.gameRenderer.getMainCamera(), 1f);
-        Vec3 center = view.eye().add(view.look().scale(SPAWN_DISTANCE));
-        KVRSpatial.windows().open(new com.kasperstudios.kvr.spatial.ui.AppLauncherWindow(this, new WorldAnchor(SpatialPose.facing(center, view.eye()))));
+        com.kasperstudios.kvr.apps.client.AppCatalog.openMarket(); // 0025: gesture 1 = App Market (all installed apps)
     }
 
     @Override
     public void enterVirtualSpace() {
-        var open = KVRSpatial.windows().find(com.kasperstudios.kvr.spatial.ui.VirtualMirrorWindow.class);
-        if (open.isPresent()) {
-            KVRSpatial.windows().restore(open.get());
-            return;
-        }
-        Minecraft mc = Minecraft.getInstance();
-        PlayerView view = PlayerView.capture(mc.gameRenderer.getMainCamera(), 1f);
-        // Spawn behind or slightly to the side of the player
-        Vec3 side = view.look().cross(new Vec3(0, 1, 0)).normalize();
-        Vec3 center = view.eye().add(view.look().scale(0.8)).add(side.scale(0.7));
-        KVRSpatial.windows().open(new com.kasperstudios.kvr.spatial.ui.VirtualMirrorWindow(new WorldAnchor(SpatialPose.facing(center, view.eye()))));
+        soon();
     }
 
     @Override
     public void createSpace() {
-        Minecraft mc = Minecraft.getInstance();
-        PlayerView view = PlayerView.capture(mc.gameRenderer.getMainCamera(), 1f);
-        Vec3 center = view.eye().add(view.look().scale(SPAWN_DISTANCE));
-        KVRSpatial.windows().open(new com.kasperstudios.kvr.spatial.ui.WorkspaceWindow(new WorldAnchor(SpatialPose.facing(center, view.eye()))));
+        soon();
     }
 
     private void soon() {
