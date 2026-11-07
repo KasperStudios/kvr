@@ -215,5 +215,8 @@
   "kvr.settings.tier.2": "Budget",
   "kvr.settings.tier.3": "Mid-range",
   "kvr.settings.tier.4": "Normal",
-  "kvr.settings.tier.5": "Frontier"
+  "kvr.settings.tier.5": "Frontier",
+  "kvr.mirror.title": "Virtual Mirror",
+  "kvr.space.hint": "Empty spatial workspace anchor",
+  "kvr.space.pick_app": "Open App Launcher"
 }

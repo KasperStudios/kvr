@@ -262,5 +262,8 @@
   "kvr.desktop.scanning": "Ищу программы на ПК…",
   "kvr.desktop.no_recent": "Здесь появятся запущенные программы — см. «Все приложения»",
   "kvr.desktop.nothing_found": "Ничего не найдено",
-  "kvr.desktop.found": "программ: %s"
+  "kvr.desktop.found": "программ: %s",
+  "kvr.mirror.title": "Виртуальное зеркало",
+  "kvr.space.hint": "Пустое пространственное рабочее место",
+  "kvr.space.pick_app": "Выбрать приложение"
 }
