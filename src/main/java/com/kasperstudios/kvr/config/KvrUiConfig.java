@@ -121,6 +121,81 @@ public final class KvrUiConfig {
         prefs = null;
     }
 
+    // --- Pinned & Recent Desktop Apps (pre-0030, DEPRECATED) --------------------------------------
+    // 0030: pins and history of PC apps live ONLY in DockPrefs (config/kvr/dock.json) — the dock reads them there.
+    // These methods stay so old callers still compile; nothing in KVR uses them any more.
+
+    private static final String PINNED_KEY = "desktop_pinned_apps";
+    private static final String RECENTS_KEY = "desktop_recent_apps";
+
+    /**
+     * One-time migration (0030): command lines the player pinned with the pre-0030 launcher, if the file has the key.
+     * Clears the key, so it runs once. The built-in default list is NOT migrated: PC apps are never pinned by themselves.
+     */
+    public static synchronized java.util.List<String> takeLegacyPinnedDesktopApps() {
+        String raw = load().get(PINNED_KEY);
+        if (raw == null || raw.isBlank()) return java.util.List.of();
+        java.util.List<String> list = new java.util.ArrayList<>();
+        for (String s : raw.split(";")) {
+            String t = s.trim();
+            if (!t.isEmpty() && !list.contains(t)) list.add(t);
+        }
+        update(PINNED_KEY, "");
+        return list;
+    }
+
+    /** @deprecated 0030: use {@link DockPrefs#pins()}. */
+    @Deprecated
+    public static synchronized java.util.List<String> getPinnedDesktopApps() {
+        Map<String, String> m = load();
+        String raw = m.getOrDefault(PINNED_KEY, "firefox --new-instance;foot;thunar");
+        java.util.List<String> list = new java.util.ArrayList<>();
+        for (String s : raw.split(";")) {
+            String t = s.trim();
+            if (!t.isEmpty() && !list.contains(t)) list.add(t);
+        }
+        return list;
+    }
+
+    /** @deprecated 0030: use {@link DockPrefs#pinDesktop} / {@link DockPrefs#unpin}. */
+    @Deprecated
+    public static synchronized boolean togglePinnedDesktopApp(String exec) {
+        java.util.List<String> list = new java.util.ArrayList<>(getPinnedDesktopApps());
+        boolean pinned;
+        if (list.contains(exec)) {
+            list.remove(exec);
+            pinned = false;
+        } else {
+            list.add(exec);
+            pinned = true;
+        }
+        update(PINNED_KEY, String.join(";", list));
+        return pinned;
+    }
+
+    /** @deprecated 0030: use {@link DockPrefs#recent}. */
+    @Deprecated
+    public static synchronized java.util.List<String> getRecentApps() {
+        Map<String, String> m = load();
+        String raw = m.getOrDefault(RECENTS_KEY, "");
+        java.util.List<String> list = new java.util.ArrayList<>();
+        for (String s : raw.split(";")) {
+            String t = s.trim();
+            if (!t.isEmpty() && !list.contains(t)) list.add(t);
+        }
+        return list;
+    }
+
+    /** @deprecated 0030: use {@link DockPrefs#recordLaunch}. */
+    @Deprecated
+    public static synchronized void recordRecentApp(String exec) {
+        java.util.List<String> list = new java.util.ArrayList<>(getRecentApps());
+        list.remove(exec);
+        list.add(0, exec);
+        while (list.size() > 6) list.remove(list.size() - 1);
+        update(RECENTS_KEY, String.join(";", list));
+    }
+
     private static Map<String, String> load() {
         Path p = dir.resolve(FILE);
         try {

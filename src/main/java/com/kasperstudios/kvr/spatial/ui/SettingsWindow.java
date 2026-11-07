@@ -164,18 +164,26 @@ public final class SettingsWindow extends SpatialWindow {
         KvrUiConfig.Prefs p = KvrUiConfig.get();
         KvrConfig.Client c = KvrConfig.client();
         int y = TOP;
-        stepper(g, mx, my, x, y, cw, Component.translatable("kvr.settings.dock_height"), p.dockHeightCm() + " cm",
-            () -> KvrUiConfig.update("dock_height_cm", Math.max(KvrUiConfig.DOCK_HEIGHT_MIN, p.dockHeightCm() - 5)),
-            () -> KvrUiConfig.update("dock_height_cm", Math.min(KvrUiConfig.DOCK_HEIGHT_MAX, p.dockHeightCm() + 5)));
+        // 0028: fine fit of the dock (±1 / ±10), the dock moves live while you click
+        fine(g, mx, my, x, y, cw, Component.translatable("kvr.settings.dock_height"), p.dockHeightCm() + " cm",
+            d -> KvrUiConfig.update("dock_height_cm", clamp(p.dockHeightCm() + d, KvrUiConfig.DOCK_HEIGHT_MIN, KvrUiConfig.DOCK_HEIGHT_MAX)));
         y += ROW;
-        stepper(g, mx, my, x, y, cw, Component.translatable("kvr.settings.dock_distance"), p.dockDistanceCm() + " cm",
-            () -> KvrUiConfig.update("dock_distance_cm", Math.max(KvrUiConfig.DOCK_DISTANCE_MIN, p.dockDistanceCm() - 5)),
-            () -> KvrUiConfig.update("dock_distance_cm", Math.min(KvrUiConfig.DOCK_DISTANCE_MAX, p.dockDistanceCm() + 5)));
+        fine(g, mx, my, x, y, cw, Component.translatable("kvr.settings.dock_distance"), p.dockDistanceCm() + " cm",
+            d -> KvrUiConfig.update("dock_distance_cm", clamp(p.dockDistanceCm() + d, KvrUiConfig.DOCK_DISTANCE_MIN, KvrUiConfig.DOCK_DISTANCE_MAX)));
         y += ROW;
-        stepper(g, mx, my, x, y, cw, Component.translatable("kvr.settings.dock_follow"), p.dockFollowDeg() + "\u00b0",
-            () -> KvrUiConfig.update("dock_follow_deg", Math.max(KvrUiConfig.DOCK_FOLLOW_MIN, p.dockFollowDeg() - 5)),
-            () -> KvrUiConfig.update("dock_follow_deg", Math.min(KvrUiConfig.DOCK_FOLLOW_MAX, p.dockFollowDeg() + 5)));
-        y += ROW + 6;
+        fine(g, mx, my, x, y, cw, Component.translatable("kvr.settings.dock_follow"), p.dockFollowDeg() + "\u00b0",
+            d -> KvrUiConfig.update("dock_follow_deg", clamp(p.dockFollowDeg() + d, KvrUiConfig.DOCK_FOLLOW_MIN, KvrUiConfig.DOCK_FOLLOW_MAX)));
+        y += ROW;
+        int rw = 90;
+        boolean hotReset = GlassStyle.inside(mx, my, x + cw - rw, y + 2, rw, BTN_H);
+        GlassStyle.panel(g, x + cw - rw, y + 2, rw, BTN_H, hotReset);
+        GlassStyle.centered(g, Component.translatable("kvr.settings.dock_reset"), x + cw - rw / 2, y + 5, hotReset ? GlassStyle.TEXT : GlassStyle.MUTED);
+        hits.add(new Hit(x + cw - rw, y + 2, rw, BTN_H, () -> {
+            KvrUiConfig.update("dock_height_cm", -50);
+            KvrUiConfig.update("dock_distance_cm", 85);
+            KvrUiConfig.update("dock_follow_deg", 40);
+        }));
+        y += ROW;
         choice(g, mx, my, x, y, cw, Component.translatable("kvr.settings.new_windows"),
             List.of(Component.translatable("kvr.window.menu.public"), Component.translatable("kvr.window.menu.private")),
             c.defaultWindowPublic() ? 0 : 1, i -> KvrConfig.updateClient("default_window_public", i == 0));
@@ -208,6 +216,8 @@ public final class SettingsWindow extends SpatialWindow {
         y += ROW;
         action(g, mx, my, x, y, cw, Component.translatable("kvr.settings.advanced"),
             () -> Minecraft.getInstance().setScreen(new KvrSettingsScreen(null)));
+        y += ROW;
+        action(g, mx, my, x, y, cw, Component.translatable("kvr.settings.calls"), com.kasperstudios.kvr.voice.client.CallWindow::openDialer);
         y += ROW + 4;
 
         GlassStyle.text(g, Component.translatable("kvr.settings.about").withStyle(ChatFormatting.BOLD), x, y, GlassStyle.ACCENT);
@@ -218,6 +228,8 @@ public final class SettingsWindow extends SpatialWindow {
         info(g, x, y, cw, "kvr.settings.serial", serial(worn));
         y += LINE;
         info(g, x, y, cw, "kvr.settings.os", "KVR OS " + KVR_OS_VERSION);
+        y += LINE;
+        info(g, x, y, cw, "kvr.settings.rednet", rednet());
         y += LINE;
         Optional<PowerBuild> b = GlassesPower.build(worn);
         if (b.isPresent()) {
@@ -234,6 +246,17 @@ public final class SettingsWindow extends SpatialWindow {
         } else {
             fitted(g, Component.translatable("kvr.settings.hw.none").getString(), x, y, cw, GlassStyle.MUTED);
         }
+    }
+
+    /** 0029: CC modem in the expansion slot — "#51234 · Ender", "no modem", "no CC: Tweaked". */
+    private static String rednet() {
+        var s = com.kasperstudios.kvr.rednet.client.RednetClient.state();
+        if (!s.available()) return Component.translatable("kvr.settings.rednet.no_cc").getString();
+        if (!s.modem()) {
+            String none = Component.translatable("kvr.settings.rednet.no_modem").getString();
+            return s.id() >= 0 ? none + " (ID " + s.id() + ")" : none;
+        }
+        return "ID " + s.id() + " \u00b7 " + Component.translatable(s.ender() ? "kvr.settings.rednet.ender" : "kvr.settings.rednet.wireless").getString();
     }
 
     private static String serial(ItemStack worn) {
@@ -275,6 +298,21 @@ public final class SettingsWindow extends SpatialWindow {
         small(g, mx, my, right - 88, y + 3, "\u2212", dec);
         GlassStyle.centered(g, Component.literal(value), right - 44, y + 6, GlassStyle.ACCENT);
         small(g, mx, my, right - 16, y + 3, "+", inc);
+    }
+
+    /** Label, then « ‹ value › » = −10, −1, +1, +10. */
+    private void fine(GuiGraphics g, int mx, int my, int x, int y, int cw, Component text, String value, IntConsumer delta) {
+        label(g, text, x, y);
+        int right = x + cw;
+        small(g, mx, my, right - 118, y + 3, "\u00ab", () -> delta.accept(-10));
+        small(g, mx, my, right - 100, y + 3, "\u2039", () -> delta.accept(-1));
+        GlassStyle.centered(g, Component.literal(value), right - 59, y + 6, GlassStyle.ACCENT);
+        small(g, mx, my, right - 34, y + 3, "\u203a", () -> delta.accept(1));
+        small(g, mx, my, right - 16, y + 3, "\u00bb", () -> delta.accept(10));
+    }
+
+    private static int clamp(int v, int lo, int hi) {
+        return Math.max(lo, Math.min(hi, v));
     }
 
     private void small(GuiGraphics g, int mx, int my, int x, int y, String sign, Runnable action) {

@@ -47,7 +47,7 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
     private static final double SPAWN_DISTANCE = 0.9;
 
     private final List<String> ids;
-    private final Map<String, VrApp> cache = new LinkedHashMap<>();
+    private static final Map<String, VrApp> cache = new LinkedHashMap<>();
     private String prelude;
 
     public BuiltinApps(List<String> ids) {
@@ -71,7 +71,8 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
         }
         out.add(new SpatialConfig.DockItem(com.kasperstudios.kvr.spatial.ui.SettingsWindow.DOCK_ID, GlassStyle.id("gesture/launcher"), //   3) Settings
             Component.translatable("kvr.settings.app"), KVRSpatial.windows().find(com.kasperstudios.kvr.spatial.ui.SettingsWindow.class).isPresent()));
-        out.addAll(com.kasperstudios.kvr.apps.client.AppCatalog.packageItems()); // installed .vrapp (incl. built-in catalog), dev apps
+        out.addAll(com.kasperstudios.kvr.apps.client.AppCatalog.packageItems()); // pinned .vrapp / dev apps (0028)
+        out.addAll(com.kasperstudios.kvr.desktop.client.DesktopDock.items());     // pinned PC apps (0028)
         return out;
     }
 
@@ -79,6 +80,10 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
     public void launch(String appId) {
         if (appId.equals(com.kasperstudios.kvr.spatial.ui.SettingsWindow.DOCK_ID)) { // 0027
             com.kasperstudios.kvr.spatial.ui.SettingsWindow.open();
+            return;
+        }
+        if (com.kasperstudios.kvr.desktop.client.DesktopDock.handles(appId)) { // 0028: pinned PC app
+            com.kasperstudios.kvr.desktop.client.DesktopDock.launch(appId);
             return;
         }
         if (com.kasperstudios.kvr.apps.client.AppCatalog.handles(appId)) { // 0025
@@ -105,7 +110,15 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
 
     @Override
     public void openLauncher() {
-        com.kasperstudios.kvr.apps.client.AppCatalog.openMarket(); // 0025: gesture 1 = App Market (all installed apps)
+        KVRSpatial.windows().find(com.kasperstudios.kvr.spatial.ui.AppLauncherWindow.class).ifPresentOrElse(
+            KVRSpatial.windows()::restore,
+            () -> {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                com.kasperstudios.kvr.spatial.PlayerView view = com.kasperstudios.kvr.spatial.PlayerView.capture(mc.gameRenderer.getMainCamera(), 1f);
+                net.minecraft.world.phys.Vec3 center = view.eye().add(view.look().scale(0.95));
+                KVRSpatial.windows().open(new com.kasperstudios.kvr.spatial.ui.AppLauncherWindow(this, new com.kasperstudios.kvr.spatial.anchor.WorldAnchor(com.kasperstudios.kvr.spatial.SpatialPose.facing(center, view.eye()))));
+            }
+        );
     }
 
     @Override
@@ -123,7 +136,7 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
             GlassStyle.id("gesture/launcher"), GlassStyle.ACCENT, 3000));
     }
 
-    public Optional<VrApp> app(String id) {
+    public static Optional<VrApp> app(String id) {
         if (cache.containsKey(id)) return Optional.of(cache.get(id));
         try {
             VrApp app = VrApp.parse(read("apps/" + id + "/config.json"), read("apps/" + id + "/main.js"));

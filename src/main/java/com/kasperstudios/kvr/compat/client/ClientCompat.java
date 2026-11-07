@@ -9,6 +9,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.UUID;
+
 /**
  * Client-only version seams (0026). Kept apart from {@code VersionCompat} so a dedicated server never
  * loads a class whose signatures mention client types.
@@ -127,8 +129,34 @@ public final class ClientCompat {
         //?} else {
         /*int cx = (x1 + x2) / 2;
         int cy = (y1 + y2) / 2;
-        int feet = cy + Math.round((entity.getBbHeight() / 2f + yOffset) * scale);
-        InventoryScreen.renderEntityInInventoryFollowsMouse(g, cx, feet, scale, cx - mouseX, cy - mouseY, entity);
+        int bottom = cy + (int) ((entity.getBbHeight() / 2f + yOffset) * scale);
+        InventoryScreen.renderEntityInInventoryFollowsMouse(g, cx, bottom, scale, cx - mouseX, cy - mouseY, entity);
+        *///?}
+    }
+
+    /**
+     * A player's face (skin face + hat layer) in GUI pixels (0030: was one unbranched body that only compiled on
+     * 1.20.2–1.21.1). Unknown / offline player → the default skin for that UUID.
+     * <ul>
+     *   <li>1.20.1: {@code PlayerInfo#getSkinLocation()} + {@code PlayerFaceRenderer.draw(g, ResourceLocation, …)};</li>
+     *   <li>1.20.2 … 1.21.4: {@code PlayerInfo#getSkin()} ({@code PlayerSkin}) + {@code PlayerFaceRenderer.draw(g, PlayerSkin, …)};</li>
+     *   <li>1.21.5+ (our 1.21.11 node): the spatial UI has no render backend there ({@code RenderCompat.SUPPORTED = false})
+     *       and PlayerSkin moved packages in 1.21.9 — a neutral tile, no guessed skin API.</li>
+     * </ul>
+     */
+    public static void drawFace(GuiGraphics g, UUID uuid, int x, int y, int size) {
+        //? if >=1.21.5 {
+        /*g.fill(x, y, x + size, y + size, 0xFF475569);
+        *///?} else if >=1.20.2 {
+        net.minecraft.client.multiplayer.ClientPacketListener conn = Minecraft.getInstance().getConnection();
+        net.minecraft.client.multiplayer.PlayerInfo info = conn == null ? null : conn.getPlayerInfo(uuid);
+        net.minecraft.client.resources.PlayerSkin skin = info != null ? info.getSkin() : net.minecraft.client.resources.DefaultPlayerSkin.get(uuid);
+        net.minecraft.client.gui.components.PlayerFaceRenderer.draw(g, skin, x, y, size);
+        //?} else {
+        /*net.minecraft.client.multiplayer.ClientPacketListener conn = Minecraft.getInstance().getConnection();
+        net.minecraft.client.multiplayer.PlayerInfo info = conn == null ? null : conn.getPlayerInfo(uuid);
+        net.minecraft.resources.ResourceLocation skin = info != null ? info.getSkinLocation() : net.minecraft.client.resources.DefaultPlayerSkin.getDefaultSkin(uuid);
+        net.minecraft.client.gui.components.PlayerFaceRenderer.draw(g, skin, x, y, size);
         *///?}
     }
 }

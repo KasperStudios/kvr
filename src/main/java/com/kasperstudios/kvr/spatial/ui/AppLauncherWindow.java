@@ -37,11 +37,28 @@ public final class AppLauncherWindow extends SpatialWindow {
 
     private void refresh() {
         entries.clear();
+        // 1. Встроенные системные приложения (Settings, Messenger и т.д.)
         for (String id : BuiltinApps.SYSTEM_APPS) {
             String name = appHost.app(id).map(VrApp::name).orElse(id);
             String version = appHost.app(id).map(VrApp::version).orElse("1.0.0");
-            boolean running = KVRSpatial.windows().all().stream().anyMatch(w -> w.id().equals("app:" + id));
+            boolean running = KVRSpatial.windows().all().stream().anyMatch(w -> w.id().equals("app:" + id) || w.id().equals(id));
             entries.add(new Entry(id, name, version, running));
+        }
+        // 2. Все установленные в очки приложения (.vrapp, калькулятор, плеер, кав и т.д.)
+        for (com.kasperstudios.kvr.apps.client.AppsClient.Installed inst : com.kasperstudios.kvr.apps.client.AppsClient.installed()) {
+            String id = inst.manifest().id();
+            if (entries.stream().noneMatch(e -> e.id().equals(id))) {
+                boolean running = KVRSpatial.windows().all().stream().anyMatch(w -> w.id().equals("app:" + id) || w.id().equals(id));
+                entries.add(new Entry(id, inst.manifest().name(), inst.manifest().version(), running));
+            }
+        }
+        // 3. Десктопные хост-приложения хоста (если включены)
+        if (com.kasperstudios.kvr.desktop.client.HostDesktopClient.enabledLocally()) {
+            String deskId = com.kasperstudios.kvr.desktop.client.HostDesktopClient.DOCK_ID;
+            if (entries.stream().noneMatch(e -> e.id().equals(deskId))) {
+                boolean running = KVRSpatial.windows().all().stream().anyMatch(w -> w instanceof com.kasperstudios.kvr.desktop.client.HostDesktopWindow);
+                entries.add(new Entry(deskId, "Desktop (PC)", "1.0", running));
+            }
         }
     }
 

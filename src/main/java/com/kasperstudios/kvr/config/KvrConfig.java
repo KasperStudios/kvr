@@ -100,15 +100,15 @@ public final class KvrConfig {
             Map<String, String> m = load("kvr-server.toml", """
                 # KVR Spatial OS - server
                 # Allow players to run desktop apps inside KVR (rendered only on their own client, never sent anywhere).
-                enable_host_desktop_windows = false
+                enable_host_desktop_windows = true
                 # Max desktop windows per player
-                host_desktop_max_windows = 2
+                host_desktop_max_windows = 8
                 # Public windows are relayed to players within this many blocks (0 = feature off)
                 public_window_range = 48
                 # Glasses battery life: real drain = nominal module draw / this (100: T1 kit ~9 min, T5 kit ~2 h on a full cell)
                 battery_life = 100
                 """);
-            server = new Server(bool(m, "enable_host_desktop_windows", false), clampInt(m, "host_desktop_max_windows", 2, 0, 8),
+            server = new Server(bool(m, "enable_host_desktop_windows", true), clampInt(m, "host_desktop_max_windows", 8, 0, 8),
                 clampInt(m, "public_window_range", 48, 0, 128), clampInt(m, "battery_life", 100, 1, 10_000));
         }
         return server;

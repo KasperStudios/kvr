@@ -3,6 +3,7 @@ package com.kasperstudios.kvr.desktop.client;
 import com.kasperstudios.kvr.config.KvrConfig;
 import com.kasperstudios.kvr.desktop.HostDesktopServer;
 import com.kasperstudios.kvr.platform.KVRNetwork;
+import com.kasperstudios.kvr.session.ClientSession;
 import com.kasperstudios.kvr.spatial.KVRSpatial;
 import com.kasperstudios.kvr.spatial.PlayerView;
 import com.kasperstudios.kvr.spatial.SpatialPose;
@@ -30,14 +31,18 @@ import org.jetbrains.annotations.Nullable;
  * {@link DesktopLauncherWindow}. Every toplevel the daemon reports becomes a {@link HostDesktopWindow}.
  *
  * <p>Client init: {@code HostDesktopClient.initClient()} (after {@code KVRNetwork}).
- * On disconnect: {@code HostDesktopClient.reset()} — closes the app windows and stops the daemon.
+ * On disconnect {@link #reset()} runs by itself ({@link ClientSession}, 0030): closes the app windows, stops the daemon.
+ *
+ * <p>0030: {@link #launchApp} (dock pins, launcher rows) goes through the SAME checks as the dock item before
+ * anything starts; whatever needs an answer first (server policy, consent, download) re-runs the launch afterwards.
  */
 public final class HostDesktopClient implements DesktopBridge.Listener {
 
     public static final String DOCK_ID = "desktop";
     private static final HostDesktopClient INSTANCE = new HostDesktopClient();
     @Nullable private static HostDesktopServer.Policy policy;
-    private static boolean openWhenAnswered;
+    /** What to do once the server answered the policy query (open the launcher / start an app). */
+    @Nullable private static Runnable whenAnswered;
     @Nullable private static DesktopBridge bridge;
     private static boolean downloading;
 
@@ -48,12 +53,12 @@ public final class HostDesktopClient implements DesktopBridge.Listener {
             HostDesktopServer.Policy p = HostDesktopServer.Policy.read(buf);
             Minecraft.getInstance().execute(() -> {
                 policy = p;
-                if (openWhenAnswered) {
-                    openWhenAnswered = false;
-                    open();
-                }
+                Runnable r = whenAnswered;
+                whenAnswered = null;
+                if (r != null) r.run();
             });
         });
+        ClientSession.onLeave(HostDesktopClient::reset);
     }
 
     public static boolean enabledLocally() {
@@ -63,7 +68,7 @@ public final class HostDesktopClient implements DesktopBridge.Listener {
     /** Disconnect: forget the server answer, close app windows, stop the daemon (apps exit with it). */
     public static void reset() {
         policy = null;
-        openWhenAnswered = false;
+        whenAnswered = null;
         DesktopBridge b = bridge;
         bridge = null;
         if (b != null) b.close();
@@ -73,43 +78,66 @@ public final class HostDesktopClient implements DesktopBridge.Listener {
 
     /** Dock item. */
     public static void open() {
+        if (!ready(HostDesktopClient::open)) return;
+        KVRSpatial.windows().find(DesktopLauncherWindow.class).ifPresentOrElse(KVRSpatial.windows()::restore,
+            () -> KVRSpatial.windows().open(new DesktopLauncherWindow(new WorldAnchor(spawnPose(0.95, 0.0)))));
+    }
+
+    /**
+     * Start a PC app (launcher row, pinned dock entry). Same chain as {@link #open()}: local switch → server policy
+     * → consent for this binary → binary present / verified download → daemon + bridge → window limit.
+     */
+    public static void launchApp(List<String> argv) {
+        if (argv.isEmpty()) return;
+        List<String> copy = List.copyOf(argv);
+        if (ready(() -> launchApp(copy))) launch(copy);
+    }
+
+    /**
+     * True when PC apps can run right now. Otherwise shows why, or asks (policy query, consent screen, download)
+     * and runs {@code retry} once the answer is positive.
+     */
+    private static boolean ready(Runnable retry) {
         if (!enabledLocally()) {
             toast("kvr.desktop.disabled_client");
-            return;
+            return false;
         }
+        if (Minecraft.getInstance().getConnection() == null) return false;
         if (policy == null) {
-            openWhenAnswered = true;
+            if (!KVRNetwork.canSendToServer(HostDesktopServer.QUERY)) {
+                toast("kvr.desktop.disabled_server"); // server without KVR: no PC apps
+                return false;
+            }
+            whenAnswered = retry;
             KVRNetwork.sendToServer(HostDesktopServer.QUERY, buf -> {});
-            return;
+            return false;
         }
         if (!policy.enabled()) {
             toast("kvr.desktop.disabled_server");
-            return;
+            return false;
         }
         DesktopDaemon.Info info = DesktopDaemon.inspect();
         Minecraft mc = Minecraft.getInstance();
         if (!info.consented()) {
-            mc.setScreen(new DesktopConsentScreen(null, HostDesktopClient::open));
-            return;
+            mc.setScreen(new DesktopConsentScreen(null, retry));
+            return false;
         }
         if (!info.exists()) {
             if (!info.canDownload()) {
                 toast("kvr.desktop.no_binary");
-                return;
+                return false;
             }
-            if (downloading) return;
+            if (downloading) return false;
             downloading = true;
             toast("kvr.desktop.downloading");
             DesktopDaemon.download(info).whenComplete((path, err) -> mc.execute(() -> {
                 downloading = false;
                 if (err != null) toastText("kvr.desktop.download_failed", rootMessage(err));
-                else open();
+                else retry.run();
             }));
-            return;
+            return false;
         }
-        if (!ensureBridge()) return;
-        KVRSpatial.windows().find(DesktopLauncherWindow.class).ifPresentOrElse(KVRSpatial.windows()::restore,
-            () -> KVRSpatial.windows().open(new DesktopLauncherWindow(new WorldAnchor(spawnPose(0.95, 0.0)))));
+        return ensureBridge();
     }
 
     /** Daemon running and bridge connected (or connecting). False = error already shown. */
@@ -129,8 +157,8 @@ public final class HostDesktopClient implements DesktopBridge.Listener {
         }
     }
 
-    /** Launcher entry clicked. */
-    static void launch(List<String> argv) {
+    /** After {@link #ready}: the server's window limit, then the bridge. */
+    private static void launch(List<String> argv) {
         if (policy != null && desktopWindows() >= policy.maxWindows()) {
             toast("kvr.desktop.limit");
             return;

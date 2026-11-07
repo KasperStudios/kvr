@@ -66,6 +66,45 @@ public class WearableGlassesItem extends Item implements net.minecraft.world.ite
     }
     //?}
 
+    /**
+     * 0030 — the expansion slot of 0029 ({@link com.kasperstudios.kvr.rednet.GlassesModem}), handled like a bundle:
+     * <ul>
+     *   <li>RMB with a CC wireless / ender modem on the cursor over the glasses in any inventory → the modem goes in
+     *       (one from the cursor stack). A slot that already holds a modem refuses (take it out first).</li>
+     *   <li>RMB with an empty cursor over glasses that hold a modem → the modem lands on the cursor; the Rednet id stays
+     *       on the glasses for the next modem.</li>
+     *   <li>Anything else (or CC removed from the pack: the modem cannot be re-created) → vanilla behaviour.</li>
+     * </ul>
+     * Runs on both sides like the bundle: the client predicts, the server's result reaches it with the normal slot
+     * sync (a fresh Rednet id is random, so the client briefly may show another id — the server's wins).
+     * Signature is the same on 1.20.1 … 1.21.4; VERIFY on 1.21.11 (CHANGELOG 0029). Fully-qualified names: the
+     * imports above are version-branched. Subclasses (GlassesItem, HackGlasses) with their own override: call
+     * {@code super} first.
+     */
+    @Override
+    public boolean overrideOtherStackedOnMe(net.minecraft.world.item.ItemStack glasses, net.minecraft.world.item.ItemStack cursor,
+                                            net.minecraft.world.inventory.Slot slot, net.minecraft.world.inventory.ClickAction action,
+                                            net.minecraft.world.entity.player.Player player, net.minecraft.world.entity.SlotAccess access) {
+        if (action != net.minecraft.world.inventory.ClickAction.SECONDARY || !slot.allowModification(player)) return false;
+        java.util.Optional<com.kasperstudios.kvr.rednet.GlassesModem.Kind> kind = com.kasperstudios.kvr.rednet.GlassesModem.kindOf(cursor);
+        boolean hasModem = com.kasperstudios.kvr.rednet.GlassesModem.read(glasses).isPresent();
+        if (kind.isPresent()) {
+            if (hasModem) return true; // consumed, nothing changes: no accidental swap of glasses and modem
+            com.kasperstudios.kvr.rednet.GlassesModem.install(glasses, kind.get());
+            cursor.shrink(1);
+            slot.setChanged();
+            return true;
+        }
+        if (cursor.isEmpty() && hasModem) {
+            net.minecraft.world.item.ItemStack modem = com.kasperstudios.kvr.rednet.GlassesModem.remove(glasses);
+            if (modem.isEmpty()) return false; // CC not installed any more: the modem stays, RMB picks the glasses up
+            access.set(modem);
+            slot.setChanged();
+            return true;
+        }
+        return false;
+    }
+
     // 0021 — THE "battery dies the moment I press O" bug: nothing ever called GlassesPowerTicker, so the
     // server never simulated the glasses while worn. ON time piled up unaccounted and the next O press
     // (GlassesPower.setState settles consumption first) charged all of it at once → 0 %. The base class

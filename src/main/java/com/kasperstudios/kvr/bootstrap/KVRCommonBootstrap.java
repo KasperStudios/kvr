@@ -40,12 +40,26 @@ public final class KVRCommonBootstrap {
             if (server != null) server.execute(() -> PowerServerHandler.handle(player, p));
         });
         VfsServer.init();                      // kvr:vfs
-        com.kasperstudios.kvr.apps.AppsServer.init(); // 0025: kvr:apps (.vrapp install/uninstall/list)
+        com.kasperstudios.kvr.apps.AppsServer.init(); // kvr:apps (0025: .vrapp packages live in the VFS)
         MessengerServer.init();                // kvr:msg_* (after VfsServer: attachments live in the VFS)
-        SpyRelay.init();                       // kvr:window_summary, kvr:spy_view, kvr:hack_*
+        SpyRelay.init();                       // kvr:window_summary, kvr:spy_view
         PublicWindowRelay.init();              // kvr:public_windows (reads SpyRelay's summaries)
-        com.kasperstudios.kvr.spatial.input.HandPoseRelay.init(); // kvr:hand_report / kvr:hand_view
         HostDesktopServer.init();              // kvr:desktop_query / kvr:desktop_policy
-        KVR.logger().info("KVR common systems ready (power, VFS, messenger, spy/public relays, desktop policy)");
+        com.kasperstudios.kvr.rednet.RednetServer.init(); // kvr:rednet_* (0029; inert without CC: Tweaked)
+        com.kasperstudios.kvr.voice.CallServer.init();    // kvr:call_* (0029; answers NO_VOICE without Simple Voice Chat)
+        // 0026: every S2C channel known on both sides before the first packet (dedicated server!).
+        // Agent: add your HackProtocol / HandPoseRelay S2C channels (inject_input, hack_targets, hand_view) here too.
+        KVRNetwork.declareS2C(
+            com.kasperstudios.kvr.vfs.VfsProtocol.REPLY,
+            com.kasperstudios.kvr.apps.AppsProtocol.REPLY,
+            com.kasperstudios.kvr.messenger.MessengerProtocol.ACK,
+            com.kasperstudios.kvr.messenger.MessengerProtocol.RECEIVE,
+            com.kasperstudios.kvr.hack.SpyRelay.SPY_VIEW,
+            com.kasperstudios.kvr.share.PublicWindowRelay.VIEW,
+            HostDesktopServer.POLICY,
+            com.kasperstudios.kvr.rednet.RednetProtocol.RECEIVE,
+            com.kasperstudios.kvr.rednet.RednetProtocol.STATE,
+            com.kasperstudios.kvr.voice.CallProtocol.STATE);
+        KVR.logger().info("KVR common systems ready (power, VFS, apps, messenger, spy/public relays, desktop policy, rednet, calls)");
     }
 }

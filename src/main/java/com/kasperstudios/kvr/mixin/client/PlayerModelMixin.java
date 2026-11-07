@@ -38,14 +38,22 @@ public abstract class PlayerModelMixin<T extends LivingEntity> extends HumanoidM
     private void kvr$aimArmAtCursor(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch, CallbackInfo ci) {
         if (!KVRSpatial.ready()) return;
         Minecraft mc = Minecraft.getInstance();
-        if (entity != mc.player) return;
 
-        SpatialCursor cursor = KVRSpatial.cursor();
-        if (!cursor.active()) return;
+        float targetPitch;
+        float targetYaw;
 
-        // When Alt mode is active, the right arm aims towards the cursor ray
-        float targetPitch = (float) Math.toRadians(headPitch + cursor.pitchOffset() - 90.0f);
-        float targetYaw = (float) Math.toRadians(netHeadYaw + cursor.yawOffset());
+        if (entity == mc.player) {
+            SpatialCursor cursor = KVRSpatial.cursor();
+            if (!cursor.active()) return;
+            targetPitch = (float) Math.toRadians(headPitch + cursor.pitchOffset() - 90.0f);
+            targetYaw = (float) Math.toRadians(netHeadYaw + cursor.yawOffset());
+        } else {
+            // Remote player sync over network (ADR-001)
+            var pose = com.kasperstudios.kvr.spatial.input.HandPose.get(entity.getId());
+            if (pose == null || !pose.active()) return;
+            targetPitch = (float) Math.toRadians(headPitch + pose.pitch() - 90.0f);
+            targetYaw = (float) Math.toRadians(netHeadYaw + pose.yaw());
+        }
 
         this.rightArm.xRot = targetPitch;
         this.rightArm.yRot = targetYaw;

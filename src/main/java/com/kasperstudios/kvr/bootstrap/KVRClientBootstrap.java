@@ -65,6 +65,8 @@ public final class KVRClientBootstrap {
         if (KVRSpatial.ready()) provider.onClientTickStart(com.kasperstudios.kvr.apps.client.AppCatalog::tick);
         MessengerClient.initClient();
         HostDesktopClient.initClient();
+        com.kasperstudios.kvr.rednet.client.RednetClient.initClient(); // kvr:rednet_recv / rednet_state (0029)
+        com.kasperstudios.kvr.voice.client.CallClient.initClient();    // kvr:call_state (0029)
         KVR.logger().info("KVR client ready: spatial UI {}, keys: Left Alt = pointer, O = power (hold 1 s = Power Off)",
             KVRSpatial.ready() ? "on" : "OFF (no render backend for this Minecraft version yet)");
     }
