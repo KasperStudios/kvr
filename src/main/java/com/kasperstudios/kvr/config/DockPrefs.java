@@ -61,6 +61,16 @@ public final class DockPrefs {
         return PINS.contains(key);
     }
 
+    public static synchronized boolean togglePin(String key) {
+        if (isPinned(key)) {
+            unpin(key);
+            return false;
+        } else {
+            pin(key);
+            return true;
+        }
+    }
+
     public static synchronized void pin(String key) {
         load();
         if (!PINS.contains(key)) {

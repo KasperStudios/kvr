@@ -3,6 +3,7 @@ package com.kasperstudios.kvr.spatial;
 import com.kasperstudios.kvr.KVR;
 import com.kasperstudios.kvr.platform.KVRClient;
 import com.kasperstudios.kvr.platform.KVRClientProvider;
+import com.kasperstudios.kvr.power.client.PowerKey;
 import com.kasperstudios.kvr.spatial.input.SpatialCursor;
 import com.kasperstudios.kvr.spatial.input.SpatialInput;
 import com.kasperstudios.kvr.spatial.render.GlassStyle;
@@ -61,6 +62,7 @@ public final class KVRSpatial {
         input = new SpatialInput(windows, cursor, cfg.glassesWorn(), KVRSpatial::runGesture);
 
         client.onClientTickStart(KVRSpatial::tickStart);
+        com.kasperstudios.kvr.spatial.space.SpaceClient.init(client); // 0033: cocoon + AR vision, BEFORE the windows pass
         client.onWorldRender(SpatialRenderer::render);
         client.onScreenInit(SpatialScreenProxy::attachPinButton);
         client.onHudRender(com.kasperstudios.kvr.spatial.render.AlarmOverlay::render);
@@ -129,9 +131,7 @@ public final class KVRSpatial {
     public static SpatialConfig config() { return config; }
     public static WindowManager windows() { return windows; }
     public static SpatialCursor cursor() { return cursor; }
-    public static com.kasperstudios.kvr.power.client.PowerKey powerKey() {
-        return POWER_KEY;
-    }
     public static SpatialInput input() { return input; }
     public static ToastPanel toasts() { return toasts; }
+    public static PowerKey powerKey() { return POWER_KEY; }
 }

@@ -2,6 +2,343 @@
 
 Каждая запись — одно задание. В «Файлы» только то, что добавлено или изменено.
 
+## 0034a — Уточнение к 0034: [X] реально закрывает, сетка пола удалена, AR-инспектор блоков — ГОТОВО К ЗАБОРУ (не проверено сборкой)
+
+Пункты 4–6 уточнения (непрозрачный кокон, закрытие окон при выходе в Мир, ключи App Market) **уже сделаны в 0034** ниже — если в игре всё ещё старое поведение, значит 0034 не слит. Проверить: `CocoonRenderType.java` есть в репо и `CocoonRenderer` вызывает его (а не `ArDraw.quad`); `VirtualSpaces.switchTo` вызывает `endSession()`; в lang есть `kvr.apps.tab.installed`.
+
+### 1. [X] не закрывал окно
+**Причина:** клик по крестику обрабатывался глубоко в пути окна (`SpatialWindow.click` / в репо `WindowChrome`) и давал только флаг `closeRequested`. В репо этот путь для угла не достигается (хром пропускается при `hasSettings() == false`, клик съедают модалка/контент раньше), либо флаг ставится, но никто его не обрабатывает.
+
+**Исправление (не зависит от хрома и окна):**
+- Новый `spatial/window/CloseButton` — единственное место с геометрией (`x/y`, `SIZE = 16`, `MARGIN = 3`), хитбоксом (`hit`, +4 px запаса на неточность луча) и отрисовкой (`render`). Рисунок и хитбокс теперь гарантированно совпадают.
+- `SpatialInput.handleAttack`: **до** любой обработки клика окном проверяется `CloseButton.hit(w, px, py)` → `windows.close(w)` сразу (без флага и без ожидания тика), клик поглощается, `hover` сбрасывается. Ни хром, ни модалка, ни `mouseClicked` приложения не могут перехватить.
+- `SpatialWindow.click` и `renderChrome` теперь только делегируют в `CloseButton` (запасной путь для других вызывающих).
+
+**Агенту (важно, в репо другой хром):**
+1. В `SpatialInput.handleAttack` (репо) вставить блок с `CloseButton.hit` перед циклом `while (attack.consumeClick())`. Если в репо есть отдельный регион для хрома/заголовка (не `CONTENT`) — убрать условие `region() == CONTENT`, проверять `CloseButton.hit` по `px/py` любого региона внутри окна.
+2. `WindowChrome`: свой `CLOSE_WINDOW` / `close(w, h)` удалить или перевести на `CloseButton.render(g, w, mx, my)` / `CloseButton.hit(...)` — чтобы был один крестик с одним хитбоксом. Отрисовка [X] не должна стоять под `if (hasSettings())`.
+3. `hasCloseButton()` по умолчанию = `hasGrabBar()`. Если в репо `AppMarketWindow` (или другое окно) переопределяет `hasGrabBar() = false`, добавить ему `hasCloseButton() { return true; }`.
+
+### 2. Сетка пола — УДАЛЕНА
+`ArRenderer.grid/segment` и кольцо горизонта удалены, `ArScanner.groundY` удалён, ключ `ar_grid` и тумблер «Сетка пола» удалены. Старый `ar_grid` в `kvr-space.toml` просто игнорируется.
+
+### 3. AR-инспектор блоков (`spatial/ar/ArInspector` + `inspect/InspectServer`)
+- Блок под взглядом (луч до 8 блоков, `player.pick`) получает неоновые уголки по его форме (`getShape`, не всегда куб) цветом акцента темы, с лёгким «дыханием»; при смене блока контур сжимается на место, плашка плавно проявляется и всплывает (220 мс).
+- Плашка: название (`Block.getName()`), id реестра (`kvr:up_ore`, `minecraft:chest`), прочность / «Неразрушимый», инструмент (теги `mineable/*`) + уровень (`needs_*_tool`), «Добывается ✔ / Нужен инструмент лучше» по предмету в руке, сигнал редстоуна (выход / входной), рост растений (`age` → %), занятость слотов контейнера.
+- Слоты: содержимое сундуков клиенту не приходит, поэтому очки спрашивают сервер (`kvr:inspect_query` → `kvr:inspect_reply`) раз в секунду, пока смотришь на контейнер. Сервер отвечает только на загруженный блок до 10 блоков от глаз с ванильным `Container`, не чаще 1 раза в 150 мс на игрока, и шлёт только числа (занято/всего), не предметы. До ответа — «Слоты: …». Двойной сундук показывает половину (27).
+- Позиция (Настройки → Дисплей и док → «Плашка»): **Сверху** (над блоком, высота 0–100 см шагом 5, «Высота плашки»), **Центр** (на центре блока, сдвинута к игроку на 0.6), **HUD** (виджет в левом верхнем углу экрана с иконкой блока, выезжает слева). В мире плашка — голограмма, повёрнутая к камере: тёмная подложка 80 %, акцентная полоса слева и линия под заголовком.
+- Выключен: когда под лучом руки окно, открыт экран, активно пространство (мир скрыт коконом), F1, HUD_OFF. Тумблер «Инспектор» стоит на месте бывшей «Сетки пола». Окно настроек 288 → 328 px высотой.
+- Конфиг `kvr-space.toml`: `ar_inspector`, `inspector_position = top|center|hud`, `inspector_offset_cm`.
+
+**Агенту:**
+- `InspectServer.init()` — добавить в общий bootstrap рядом с `RednetServer.init()`. Каналы `kvr:inspect_query` (C2S) и `kvr:inspect_reply` (S2C) зарегистрировать в провайдерах так же, как остальные (если список каналов ведётся вручную).
+- `ArInspector.initClient()` вызывается из `SpaceClient.init` (идемпотентно). Если NeoForge требует регистрации клиентских приёмников раньше — вызвать из клиентского bootstrap рядом с `RednetClient.initClient()`.
+
+### VERIFY
+| # | Проверка | Ожидание |
+|---|---|---|
+| 1 | [X] на App Market, Настройках, ПК-окне, приложении, пикере | Окно исчезает сразу по клику |
+| 2 | [X] при открытой модалке установки в Маркете | Закрывает Маркет |
+| 3 | [X] на заблокированном окне | Закрывает |
+| 4 | Попасть лучом чуть мимо крестика (≤ 4 px) | Тоже закрывает; крестик краснеет в той же зоне |
+| 5 | Холмы, очки надеты | Никакой сетки на земле |
+| 6 | Взгляд на камень / обсидиан / пшеницу / провод / руду KVR | Контур + плашка: имя, id, прочность, инструмент/уровень, рост %, сигнал |
+| 7 | Взгляд на сундук (в одиночной игре и на сервере) | «Слоты: …» → «Слоты: 5/27», обновляется каждую секунду |
+| 8 | Позиции Сверху / Центр / HUD, высота 0 и 100 см | Плашка там, где выбрано; HUD — с иконкой в углу |
+| 9 | Быстро вести взглядом по блокам | Каждая новая плашка проявляется плавно, без мерцания |
+| 10 | Луч руки на окне / внутри пространства | Инспектора нет |
+
+### Файлы
+Новые:
+- `src/main/java/com/kasperstudios/kvr/spatial/window/CloseButton.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ar/ArInspector.java`
+- `src/main/java/com/kasperstudios/kvr/inspect/InspectServer.java`
+
+Изменены:
+- `src/main/java/com/kasperstudios/kvr/spatial/input/SpatialInput.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/window/SpatialWindow.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ar/ArRenderer.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ar/ArScanner.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/space/SpaceClient.java`
+- `src/main/java/com/kasperstudios/kvr/config/KvrSpaceConfig.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ui/SettingsWindow.java`
+- `src/main/resources/assets/kvr/lang/ru_ru.json`
+- `src/main/resources/assets/kvr/lang/en_us.json`
+
+## 0034 — Пространства как сессия, непрозрачный кокон, [X] на всех окнах, ключи App Market — ГОТОВО К ЗАБОРУ (не проверено сборкой)
+
+По тесту Каспера в игре.
+
+### 1. Жизненный цикл окон: пространство = сессия
+**Было (0033):** при выходе в реальный мир окна пространства только скрывались и висели в памяти (и в RAM-слотах) бесконечно.
+
+**Стало:** `VirtualSpaces.switchTo(REAL)` → `endSession()` закрывает (`WindowManager.close` → `onClosed`) **все** APP/VANILLA-окна, открытые внутри любого пространства: скрипты останавливаются, RAM освобождается. Тост: «Сессия завершена · закрыто окон: N».
+- Окна, открытые в реальном мире, не трогаются (пока игрок в пространстве, они скрыты; вернулся — на месте).
+- Переход между пространствами (1 ↔ 2) — сессия продолжается: окна другого пространства скрыты, но живы. Закрывает только выход в Мир (или снятие очков). *Если Создатель хочет, чтобы и 1 → 2 закрывало окна 1 — это одна строка в `switchTo`, скажите.*
+- Подсказка в пикере: «выход в Мир закрывает окна пространств».
+
+### 2. Непрозрачный кокон (полное погружение)
+**Было:** полупрозрачная дымка + сетка в render type окон (`entityTranslucentEmissive`, тест глубины без записи) → сквозь стенки видно мир, а блоки внутри кокона его заслоняли.
+
+**Стало:**
+- Новый `spatial/render/CocoonRenderType`: POSITION_COLOR, без текстуры, без отсечения граней, **тест глубины ALWAYS + запись глубины**. Оболочка закрывает всё, что уже нарисовано (блоки, пол, мобов, небо), и записывает свою глубину (~2 блока). Всё, что рисуется позже с обычным тестом глубины (окна, AR, частицы, дождь, вода), видно только **внутри** кокона.
+- Ванильный `NO_DEPTH_TEST` не подходит: он выключает тест, а с выключенным тестом OpenGL не пишет глубину. Поэтому свой шард `AlwaysDepth`: тест включён, функция `GL_ALWAYS`; сброс как у ванили (выкл, `GL_LEQUAL`).
+- `CocoonRenderer` переписан: сплошная тёмная оболочка («глубокий космос» `#070B14` на экваторе → `#010205` у полюсов, 10 % оттенка цвета кокона), поверх — неоновая сетка 16×32, скан-полоса с ореолом, светящиеся кончики. Альфа оболочки < 1 только на разворачивании (350 мс) и затухании (250 мс).
+- Камера всегда внутри выпуклой оболочки → каждый луч взгляда встречает ровно одну стенку, сортировка не нужна (порядок отправки: оболочка → сетка).
+- Настройка `cocoon_opacity` теперь управляет **яркостью неона** (подпись «Яркость неона»), оболочка всегда плотная; превью в Настройках — тёмная полоса с неоном.
+- Последствия (ожидаемые): пол под ногами скрыт (вместо него AR-сетка пола внутри кокона); в виде от 3-го лица скрыта и модель игрока; рука в 1-м лице видна (рисуется отдельным проходом). Окно, унесённое дальше стенки (~2 блока), скрывается — рабочая зона = кокон. Редстоун/мобы снаружи в AR не видны (отсекает глубина), моб вплотную (внутри кокона) — виден контуром.
+
+### 3. Крестик [X] на всех окнах
+- `SpatialWindow`: новые `hasCloseButton()` (по умолчанию = `hasGrabBar()`), `requestClose()`, `isCloseRequested()`, константы `CLOSE = 16`, `CLOSE_MARGIN = 3`.
+- [X] рисуется в `renderChrome` **поверх** содержимого, в правом верхнем углу каждого окна: непрозрачная тёмная плитка 16×16 со светлой рамкой и белым крестом 2 px; при наведении — красная. Читается на любом фоне (стекло/градиент/непрозрачный).
+- Клик по [X] проверяется **первым** в `click()` (раньше шестерёнки, меню, блокировки и приложения) → `requestClose()`; `WindowManager.tick()` в том же тике закрывает окна с `isCloseRequested()`. Работает и на заблокированном окне (цель маленькая и явная).
+- Есть у: приложений (ScriptWindow), App Market, Настроек, ПК-окон, лаунчеров, звонков, питания, заметки, пикера пространств (у него `hasCloseButton() = true` без ручки). Нет у: дока, тостов, колеса жестов.
+- Старые тусклые «×» в `PowerWindow` и `PinnedNote` убраны (иначе два крестика). В `AppLauncherWindow` подпись «Загрузка…» сдвинута влево, чтобы не лезла под [X].
+
+### 4. Ключи App Market
+Добавлены точные ключи со скриншота: `kvr.apps.tab.installed` (Установленные / Installed), `kvr.apps.tab.store` (Магазин / Store), `kvr.apps.tab.dev` (Разработка / Developer), `kvr.apps.open` (Открыть / Open), `kvr.apps.system_badge` (Системное / System). Плюс вероятные соседи: `kvr.apps.running`, `.empty`, `.loading`, `.dev_badge`, `.refresh`, `.close`, а также `kvr.window.close`.
+
+**Агенту:** в песочнице нет `AppMarketWindow`, поэтому проверить его целиком не могу. Прогнать `grep -oE '"kvr\.apps\.[a-z0-9_.]+"' AppMarketWindow.java | sort -u` и прислать ключи, которых нет в lang. Также проверить, что у Маркета в правом верхнем углу (x ≥ width−20, y ≤ 20) нет своих кнопок — [X] их перекроет; если есть свой крестик — убрать.
+
+### Агенту: слияние
+- `SpatialWindow` в песочнице **устаревший** — не копировать целиком. Перенести: константы `CLOSE/CLOSE_MARGIN`, `hasCloseButton()`, `closeX()/closeY()`, проверку [X] первой в `click()`, вызов `renderClose` первой строкой `renderChrome()` (до `if (!hasSettings()) return;`), метод `renderClose`. Если в репо уже есть `requestClose()`/`closeRequested` — оставить реповские, мои не дублировать; то же для обработки в `WindowManager.tick()`.
+- Если в репо `renderChrome` вызывается не из `WindowSurface`, а иначе — главное, чтобы [X] рисовался после `renderContent`.
+- `CocoonRenderType` — новый файл с ветками Stonecutter (`<1.21.5`, `>=1.21`). Использует защищённые члены `RenderType`/`RenderStateShard` через абстрактный подкласс (`create`, `POSITION_COLOR_SHADER`, `TRANSLUCENT_TRANSPARENCY`, `NO_CULL`, `COLOR_DEPTH_WRITE`, `DepthTestStateShard`). Если на какой-то ноде `RenderType.create` недоступен — добавить в access widener / AT (`net/minecraft/client/renderer/RenderType create`) и прислать ошибку компиляции.
+- Порядок из 0033 критичен: `SpaceClient.init` (кокон) до `SpatialRenderer` (окна), иначе оболочка закроет окна.
+- `HostDesktopWindow`: убедиться, что `onClosed()` шлёт демону `Close` — иначе при выходе из пространства программы ПК останутся жить на хосте.
+
+### VERIFY
+| # | Проверка | Ожидание |
+|---|---|---|
+| 1 | Пространство 1, открыть 2 приложения → Мир | Тост «закрыто окон: 2», RAM освобождена, в доке не «запущены» |
+| 2 | Окно в Мире → пространство → Мир | Окно Мира на месте |
+| 3 | Пространство 1 → 2 → 1 | Окна 1 живы |
+| 4 | Войти в пространство в саванне / пещере / под водой | Мира не видно совсем: тёмная оболочка + неон, пол скрыт |
+| 5 | Окна внутри кокона, стена пещеры в 1 блоке | Окна целиком видны, стена нет |
+| 6 | Дождь / частицы снаружи | Не просвечивают |
+| 7 | Выход в Мир | Кокон гаснет за ~0.25 с, мир виден, депт в порядке (блоки и окна не мерцают) |
+| 8 | Яркость неона 5 % / 100 % | Сетка едва видна / яркая; оболочка всегда плотная |
+| 9 | [X] на приложении, Маркете, Настройках, ПК-окне, пикере | Виден, краснеет при наведении, клик закрывает сразу |
+| 10 | [X] на заблокированном окне | Закрывает |
+| 11 | Док, тосты, колесо жестов | Без [X] |
+| 12 | App Market, ru и en | Вкладки, «Открыть», бейдж «Системное» — без сырых ключей |
+
+### Чек-лист
+- [ ] Правки `SpatialWindow` перенесены точечно (файл устаревший)
+- [ ] `CocoonRenderType` собирается на 1.20.1 / 1.20.4 / 1.21.1 (на 1.21.11 — no-op)
+- [ ] grep ключей `AppMarketWindow` прислан
+- [ ] Проверено, что закрытие ПК-окна закрывает программу на хосте
+
+### Файлы
+Новые:
+- `src/main/java/com/kasperstudios/kvr/spatial/render/CocoonRenderType.java`
+
+Изменены:
+- `src/main/java/com/kasperstudios/kvr/spatial/space/VirtualSpaces.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/space/CocoonRenderer.java` (переписан)
+- `src/main/java/com/kasperstudios/kvr/spatial/space/SpacePickerWindow.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/window/SpatialWindow.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/window/WindowManager.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ui/SettingsWindow.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ui/PowerWindow.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ui/PinnedNote.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ui/AppLauncherWindow.java`
+- `src/main/resources/assets/kvr/lang/ru_ru.json`
+- `src/main/resources/assets/kvr/lang/en_us.json`
+
+## 0033 — Virtual Spaces (слоты реальностей), AR-кокон, AR-сканер мира — ГОТОВО К ЗАБОРУ (не проверено сборкой)
+
+По утверждённой Создателем архитектуре (ADR-001, жест 4).
+
+### 1. Слоты виртуальных реальностей (`spatial/space/VirtualSpaces`)
+- Слот `0` — **Реальный мир**, слоты `1..N` — пространства (по умолчанию N = 3: «Работа», «Медиа», «База»; 2–5 в Настройках).
+- Каждое APP/VANILLA-окно при открытии привязывается к активному слоту. SYSTEM-окна (док, тосты, настройки, лаунчеры, питание, звонки, колесо жестов, пикер) глобальные.
+- Переключение меняет только то, какой слот рисуется и ловит луч руки. Окна других слотов **продолжают тикать**, сохраняют 3D-позы и слот RAM — ничего не выгружается, возврат мгновенный.
+- Изоляция: `drawable()`, `pick()`, `minimized()`, жесты 2/3 и `publicWindows()` (то, что видят другие игроки и HackGlasses) — только активный слот.
+- Клик в доке/лаунчере по приложению, открытому в другом слоте → `restore()` переключает на тот слот (как Spaces в macOS). Одно приложение = одно окно на все слоты (id `app:<id>` уникален, как и раньше).
+- Снятие очков / выход с сервера (`closeAll`) → назад в реальный мир, привязки очищены.
+- Принадлежность хранится в `WeakHashMap` внутри `VirtualSpaces`, **не** в `SpatialWindow` (в песочнице он устаревший — его не трогал).
+
+**Жест 4** (`BuiltinApps.enterVirtualSpace` → `VirtualSpaces.onGesture()`):
+- режим «Меню» (по умолчанию) — `SpacePickerWindow`: карточки «Мир / 1 / 2 / 3» с числом окон, клик = переключить; жест 4 ещё раз закрывает;
+- режим «Цикл» — Мир → 1 → 2 → 3 → Мир.
+- При каждом переключении — тост «Пространство 2 · Медиа — окна восстановлены: N».
+
+### 2. AR-кокон (`spatial/space/CocoonRenderer`)
+- Рисуется, пока активно пространство (слот ≠ 0). ~4 блока в ширину (R = 2) и 4 в высоту, центр на 1.4 над ногами.
+- Форма — веретено: `r(t) = R·(1−|t|^2.2)^0.9`. У полюсов радиус убывает почти линейно → заострённые кончики (у сферы показатель 0.5 → тупые).
+- Визуал: мягкая дымка (14×28 ячеек), неоновая сетка (кольца + меридианы, медленно дрейфует), скан-полоса, бегающая между полюсами, светящиеся точки на кончиках. Вход — разворачивается за 350 мс, выход — гаснет за 250 мс, при переключении между пространствами сетка вспыхивает.
+- Рисуется **до** окон, render type без записи глубины → окна внутри всегда поверх стенки.
+- Настройки → **Пространство**: вкл/выкл, цвет (Cyan, Neon Purple, Emerald, Amber, Custom HEX — поле ввода через `TextInputScreen`, неверный HEX подсвечивается красным и не сохраняется), плотность 5–100 % с превью.
+
+### 3. AR-сканер мира (`spatial/ar/ArScanner` + `ArRenderer`)
+Работает **всегда**, пока очки надеты, включены и дисплей горит (не HUD_OFF), и не только в коконе. При F1 скрыт.
+- **Редстоун:** все блоки с `POWER > 0` (провод, плиты, датчик дня, скалк, мишень…) и с `POWERED = true` (повторитель, компаратор, рычаг, кнопка, рельсы, наблюдатель…). Провод — цветная подложка по уровню сигнала (тёмно-красный → ярко-розовый) + цифра уровня (до 8 блоков, ≤ 48 подписей); остальное — маркер над блоком. Радиус зависит от GPU: 4 + 2·T (T1 = 6 … T5 = 14 блоков), ±4 по вертикали, скан раз в 10 тиков, ≤ 384 маркера.
+- **Эфир Rednet:** на каждую отправку — волна от игрока (фиолетовая, `TX → #id [протокол]`), на приём — волна к игроку (зелёная, `RX ← #id [протокол] · Nм`). Хук в `RednetClient.send/deliver`.
+- **Мобы:** тот, на кого смотрит визор (≤ 7° от оси взгляда, до 24 блоков, в прямой видимости), — кибер-окантовка хитбокса (тонкие рёбра + яркие уголки), полоска здоровья, `❤ 14/20`, имя. Остальные раненые в радиусе 12 блоков — тонкая полоска. Враждебные — красные, игроки — фиолетовые, прочие — акцент темы.
+- **Сетка пола:** блочная сетка 13×13 на высоте последней опоры (не прыгает при прыжке), затухает к краям, цвет — акцент темы. Пока вытянут луч руки — ещё кольцо горизонта на уровне глаз (выравнивать окна).
+- Настройки → **Дисплей и док** → «AR-сканер»: 4 тумблера (Редстоун, Эфир Rednet, Мобы, Сетка пола), по два в строке. Окно настроек стало выше: 272 → 288.
+
+### Конфиг
+Новый файл `config/kvr-space.toml` (`KvrSpaceConfig`, папка = `KvrConfig.directory()`, в загрузчиках ничего подключать не нужно): `space_slots`, `space_gesture`, `cocoon_enabled`, `cocoon_color`, `cocoon_custom_hex`, `cocoon_opacity`, `ar_redstone`, `ar_rednet`, `ar_mobs`, `ar_grid`. Отдельный файл — чтобы не расширять record `KvrUiConfig.Prefs`.
+
+### Агенту: слияние
+- `WindowManager` — если в репо версия отличается, перенести 8 правок вручную: `claim` в `open`, `forget` в `close`, фильтр `VirtualSpaces.shown` в `minimizeAll`, `minimizeFocused`, `publicWindows`, `pick`, `drawable`, `minimized`; `reveal` в начале `restore`; `reset` в конце `closeAll`.
+- `KVRSpatial.initClient` — одна строка `SpaceClient.init(client)` **перед** `onWorldRender(SpatialRenderer::render)`.
+- `BuiltinApps.enterVirtualSpace` — вызывает `VirtualSpaces.onGesture()` вместо `soon()`.
+- `RednetClient` — две строки `ArScanner.rednet(...)`.
+- `SettingsWindow` — раздел `SPACE`, метод `space(...)`, `editHex()`, блок AR в `display(...)`, H = 288. Использует `GlassStyle.surface` и `GlassStyle.text(g, String, …)` из репо (в песочнице `GlassStyle` устаревший).
+- `DockBar`: если трей свёрнутых окон собирается не через `windows.minimized()`, а через `all()`, добавить фильтр `VirtualSpaces.shown(w)`.
+- Сплошной цвет AR берётся из центрального тексела `grab_handle.png` (`ArDraw.WHITE`). Если линии выглядят тусклыми или цветными — положить белый PNG 1×1 (`textures/misc/ar_white.png`) и поменять одну константу.
+- 1.21.11: `RenderCompat.SUPPORTED = false` → `KVRSpatial` не стартует → кокон/сканер тоже не запускаются (события Rednet просто копятся, ≤ 8 штук).
+
+### VERIFY
+| # | Проверка | Ожидание |
+|---|---|---|
+| 1 | Жест 4 | Пикер: Мир / 1 / 2 / 3, текущий выделен |
+| 2 | Пространство 1, открыть 2 окна (терминал ПК, заметки) | Кокон разворачивается, окна на местах |
+| 3 | Жест 4 → 2, открыть плеер/мессенджер | Окна из 1 исчезли мгновенно, кокон вспыхнул |
+| 4 | Обратно в 1 | Окна 1 на тех же 3D-позициях, их состояние не сбросилось (таймер/видео шёл) |
+| 5 | Жест 4 → Мир | Кокон гаснет, видны только окна реального мира |
+| 6 | Счётчик RAM при окнах в 3 пространствах | Учитываются все (окна в памяти) |
+| 7 | Клик в доке по приложению из другого пространства | Переключает туда |
+| 8 | Жест 2 (свернуть всё) в пространстве 2 | Сворачиваются только окна пространства 2 |
+| 9 | Снять очки в пространстве 2, надеть | Реальный мир, окон нет, кокона нет |
+| 10 | Настройки → Пространство: цвет Purple, плотность 80 % | Кокон меняется сразу |
+| 11 | Свой HEX `#ff8800` / `zzz` | Оранжевый / поле красное, ничего не сохранено |
+| 12 | Режим «Цикл» | Жест 4: Мир → 1 → 2 → 3 → Мир |
+| 13 | Очки надеты, линия редстоуна с рычагом | Подсветка по уровню сигнала, цифры 15…1 |
+| 14 | GPU T1 и T5 | Радиус редстоуна 6 и 14 блоков |
+| 15 | Приложение шлёт rednet / приходит сообщение | Волна наружу TX / внутрь RX с подписью |
+| 16 | Посмотреть на зомби / корову | Красная / акцентная окантовка, полоска, ❤ |
+| 17 | Сетка пола, прыжок | Сетка на месте, не прыгает |
+| 18 | Тумблеры AR по одному | Каждый слой выключается отдельно |
+| 19 | HUD_OFF / F1 | AR и кокон не рисуются |
+| 20 | FPS на ферме с редстоуном | Без заметной просадки (скан раз в 0.5 с) |
+
+### Чек-лист
+- [ ] Правки `WindowManager` перенесены (если версия в репо другая)
+- [ ] `SpaceClient.init` до `SpatialRenderer` в `KVRSpatial`
+- [ ] Проверен трей `DockBar` (фильтр по пространству)
+- [ ] Lang слит (ключи `kvr.space.*`, `kvr.settings.space.*`, `kvr.settings.cocoon*`, `kvr.settings.ar*`, `kvr.settings.section.space`)
+- [ ] Сборка всех нод Stonecutter (1.20.1 / 1.20.4 / 1.21.1; на 1.21.11 модуль неактивен)
+
+### Файлы
+Новые:
+- `src/main/java/com/kasperstudios/kvr/config/KvrSpaceConfig.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/space/VirtualSpaces.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/space/SpacePickerWindow.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/space/CocoonRenderer.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/space/SpaceClient.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ar/ArDraw.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ar/ArScanner.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ar/ArRenderer.java`
+
+Изменены:
+- `src/main/java/com/kasperstudios/kvr/spatial/window/WindowManager.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/KVRSpatial.java`
+- `src/main/java/com/kasperstudios/kvr/script/BuiltinApps.java`
+- `src/main/java/com/kasperstudios/kvr/rednet/client/RednetClient.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ui/SettingsWindow.java`
+- `src/main/resources/assets/kvr/lang/ru_ru.json`
+- `src/main/resources/assets/kvr/lang/en_us.json`
+
+## 0032 — Док без автодобавления, непрозрачная модалка Маркета, все lang-ключи, новый URL каталога — ГОТОВО К ЗАБОРУ (не проверено сборкой)
+
+### 1. Док: только закреплённое вручную
+**Причина:** `AppCatalog.packageItems()` выдавал в док все установленные пакеты; плюс миграция 0028 «закрепить всё установленное» и `DockPrefs.pin(...)` после установки в Маркете.
+
+**Исправлено в дереве:**
+- `AppCatalog.packageItems()` — только пакеты, закреплённые в `DockPrefs` и установленные (`AppsClient.installed(key)`), плюс закреплённые `dev:<id>` (если `DevApps.enabled`). Порядок — порядок закрепления.
+- По умолчанию в доке: Маркет, Мессенджер, Настройки (системные, не через `DockPrefs`).
+- Новые `AppCatalog.togglePin(dockId)` / `isPinned(dockId)`.
+- `AppsClient.uninstall` при успехе — `DockPrefs.unpin(appId)` (не остаётся «мёртвой» иконки).
+- `AppLauncherWindow`: кнопка ★/☆ (20px) на строках установленных — закрепить/открепить.
+
+**Агенту (в файлах, которых нет в песочнице):**
+- `AppMarketWindow` / `StoreClient` / repo-версия `AppsClient`: удалить любой `DockPrefs.pin(...)` после установки.
+- Удалить одноразовую миграцию 0028 «pin всё установленное» (`DockPrefs.migrated()/setMigrated()` и её вызов). Сами методы в `DockPrefs` можно оставить — флаг безвреден.
+- Звёздочка в Маркете (если есть) — `AppCatalog.togglePin(appId)`, состояние — `AppCatalog.isPinned(appId)`.
+
+### 2. Модалка подтверждения установки — непрозрачная
+**Вероятная причина:** диалог рисовался поверх стеклянной панели окна с альфой фона (`GlassStyle`), без своей подложки — сквозь него видно список.
+
+**Новое:** `spatial/ui/Modal` — затемнение `0xE6050810` на всё окно + тело `0xFF0F172A` (альфа FF), заголовок, перенос текста (`font.split`), кнопки «Отмена» (`gui.cancel`) / подтверждение. Пока открыта, `click()` съедает все клики.
+
+**Агенту — встроить в `AppMarketWindow`:**
+```java
+private final Modal modal = new Modal();
+// вместо текущего диалога:
+modal.open(Component.translatable("kvr.apps.install.title"),
+           Component.translatable("kvr.apps.install.message", app.name(), perms),
+           Component.translatable("kvr.apps.install.confirm"),
+           () -> AppsClient.install(app));
+// в конце renderContent(...) — ПОСЛЕДНИМ:
+modal.render(g, width, height, mx, my);
+// первой строкой обработчика клика:
+if (modal.isOpen()) return modal.click(mx, my);
+```
+Старый полупрозрачный диалог удалить.
+
+### 3. Lang-ключи
+`ru_ru.json` и `en_us.json` переписаны целиком, наборы ключей идентичны. Добавлено: `itemGroup`, все предметы (`glasses`, `hackglasses`, компоненты `cpu/gpu/ram/storage/battery/chassis` для tier 1–5), руда/слиток/шаблон улучшения/солнечный модуль, блоки (`item.*` и `block.*`), `container.kvr.chassis_assembly`, лаунчер (`kvr.launcher.running`, pin/unpin), Маркет (установка, разрешения, коды ошибок), Настройки (разделы, темы, подложки, названия тиров 1–5 на «Об устройстве», железо, rednet), звонки (`kvr.calls.app` и все причины, включая `peer_*`), ПК-рабочий стол (вкладки, поиск, состояния демона, ошибки), сообщение смерти `.player`.
+
+Тиры: ru — Бомжатский/Бедняжественный/Среднячковский/Нормальный/Фронтирный; en — Bomzh/Bednyak/Srednyak/Normal/Frontier.
+
+Точные id регистра в песочнице неизвестны, поэтому для компонентов даны обе формы: `item.kvr.cpu_tier1` и `item.kvr.cpu_t1` (то же для остальных); для руды — `up_raw` и `raw_up_ore`; для шаблона — `tier_upgrader_template` и `upgrader_template`; для солнца — `solar_upgrade` и `solar_module`. Лишние ключи безвредны.
+
+**Агенту — слияние:** не заменять файлы целиком. Добавить отсутствующие ключи; если ключ есть и в репо, и здесь — оставить значение репо, если оно не сырое. Ключи, которые есть только в репо, сохранить. После слияния:
+```
+grep -rhoE '"kvr\.[a-z0-9_.]+"|translatable\("[^"]+"' src/main/java | sort -u
+```
+и сверить с lang-файлом — прислать список оставшихся сырых ключей (вероятно, из `AppMarketWindow`, `DesktopConsentScreen`, `KvrSettingsScreen`, тексты шаблона кузнечного стола `item.kvr.smithing_template.*`).
+
+### 4. Онлайн-каталог: 404
+**Причина:** старый URL (`kasper-studios/...` из BLOCK5_PLAN) не существует.
+
+**Новое:** `apps/client/StoreIndexSource`:
+- `DEFAULT_URL = https://raw.githubusercontent.com/KasperStudios/kvr-apps-index/main/index.json`.
+- `url()` — переопределение через `KvrConfig.storeIndexUrl()` (ключ `app_store_index_url`, пусто = по умолчанию); если указан каталог — `index.json` дописывается один раз.
+- `fetchApps()` — async, HTTP/1.1, редиректы, User-Agent, повтор при 429/5xx/сетевой ошибке, BOM, принимает массив или `{"apps":[...]}`.
+- Ошибка — `IndexException` с полным URL в тексте; для 404 подсказка (репо публичный? ветка `main`? файл `index.json` в корне?).
+
+**Агенту:** в `StoreClient` заменить свою загрузку индекса на `StoreIndexSource.fetchApps()` (парсинг элементов оставить свой); убрать захардкоженный старый URL. Проверить URL из песочницы не могу (нет сети) — если 404 останется, в сообщении будет точный адрес.
+
+### VERIFY
+| # | Проверка | Ожидание |
+|---|---|---|
+| 1 | Новый мир, открыть док | Только Маркет, Мессенджер, Настройки |
+| 2 | Установить приложение из Маркета | В доке не появилось |
+| 3 | Лаунчер → ★ у установленного | Появилось в доке; повторно ☆ — пропало |
+| 4 | Удалить закреплённое | Исчезло из дока |
+| 5 | Маркет → «Установить» | Модалка непрозрачная, список под ней не виден и не кликается |
+| 6 | Модалка → «Отмена» / клик мимо | Закрылась, ничего не установлено |
+| 7 | Предметы в творческом инвентаре (ru/en) | Нет сырых `item.kvr.*` |
+| 8 | Настройки → «Об устройстве» | Названия тиров, не ключи |
+| 9 | Звонок / отказ / сброс | Тексты причин переведены |
+| 10 | Маркет → вкладка онлайн | Каталог загружен; при ошибке — текст с URL |
+| 11 | `app_store_index_url` = свой адрес | Загружается из него |
+
+### Чек-лист
+- [ ] Удалены `DockPrefs.pin` после установки и миграция 0028
+- [ ] `Modal` встроен в `AppMarketWindow`, старый диалог удалён
+- [ ] Lang слит, прислан список оставшихся сырых ключей
+- [ ] `StoreClient` использует `StoreIndexSource`
+- [ ] Сборка всех нод Stonecutter
+
+### Файлы
+Изменены:
+- `src/main/java/com/kasperstudios/kvr/apps/client/AppCatalog.java`
+- `src/main/java/com/kasperstudios/kvr/apps/client/AppsClient.java`
+- `src/main/java/com/kasperstudios/kvr/spatial/ui/AppLauncherWindow.java`
+- `src/main/java/com/kasperstudios/kvr/config/KvrConfig.java` (ключ `app_store_index_url`, `storeIndexUrl()`)
+- `src/main/resources/assets/kvr/lang/ru_ru.json`
+- `src/main/resources/assets/kvr/lang/en_us.json`
+
+Новые:
+- `src/main/java/com/kasperstudios/kvr/spatial/ui/Modal.java`
+- `src/main/java/com/kasperstudios/kvr/apps/client/StoreIndexSource.java`
+
 ## 0031 — Ввод в окнах ПК (раскладка, хоткеи, колесо, общий буфер) + лаунчер очков — ГОТОВО К ЗАБОРУ (не проверено сборкой)
 
 По живому тесту на Arch + niri (foot, Firefox).
@@ -174,359 +511,4 @@ if (DesktopInputSession.fromDaemon(type, payload)) continue;
   - вкладки «Недавние» (до 20, сначала новые) и «Все приложения» (по алфавиту); старт на «Недавних», если история есть;
   - строка: иконка 16×16 (`PackageIcons`, лениво, только видимые строки; без PNG — плитка с буквой), имя · описание (`Name[ru]`), ★/☆ справа;
   - файлы `.desktop` из XDG + Flatpak/Snap, `TryExec`, `Terminal=true` — всё из `DesktopApps` (0028);
-  - **поиск**: строка поиска под заголовком, клик → захват клавиатуры через `TextInputScreen`, список фильтруется на лету (имя, id, описание); Enter/Esc — готово, × — очистить;
-  - прокрутка колесом: `mouseScrolled(double, double, double)` **с `@Override`** (в присланной версии был четырёхаргументный метод без `@Override` — он никогда не вызывался);
-  - внизу: состояние демона · «программ: N».
-- **Единственное хранилище — `DockPrefs` (`config/kvr/dock.json`).** ★ в лаунчере пишет туда же, откуда читает док → закреплённое в доке со следующего кадра.
-  - `KvrUiConfig.getPinnedDesktopApps/togglePinnedDesktopApp/getRecentApps/recordRecentApp` помечены `@Deprecated`, KVR их больше не зовёт.
-  - **Миграция:** если в `kvr-ui.toml` есть ключ `desktop_pinned_apps`, его команды один раз переносятся в `dock.json` как `deskcmd:`-закрепления, ключ очищается.
-    Встроенный список по умолчанию (firefox/foot/thunar) **не** переносится: программы ПК сами не закрепляются (0028).
-  - `DockPrefs.recent(prefix, limit)` — новый метод для вкладки «Недавние».
-  - `SystemAppScanner` удалён (дубль `DesktopApps`). **Агенту:** удалите его и в репо, если `grep SystemAppScanner` больше ничего не находит.
-- **Запуск с проверкой политик (`HostDesktopClient.launchApp`, новый).** Док и лаунчер идут через ту же цепочку, что и пункт «Рабочий стол»:
-  локальный выключатель → политика сервера → согласие на этот бинарник → бинарник / проверенная загрузка → демон → лимит окон.
-  - Раньше `DesktopDock.launch` звал `launch()` напрямую, и до ответа сервера политика не проверялась.
-  - Всё, что требует ответа (запрос политики, экран согласия, загрузка), потом **повторяет именно этот запуск** (флаг `openWhenAnswered` заменён на `Runnable`).
-  - `launch(List)` стал private: запуск без проверок больше невозможен.
-  - В 0028 этот метод был назван `launchApp` — имя таким и осталось.
-
-### 2. Слот модема и настоящий мост к CC
-- **`WearableGlassesItem.overrideOtherStackedOnMe`** (новый): ПКМ модемом CC на курсоре по очкам — модем в слоте (`GlassesModem.install`, списывается один из стака);
-  ПКМ пустым курсором — модем на курсоре (`GlassesModem.remove`).
-  - В слоте уже есть модем → клик поглощается без изменений (никакой случайной подмены очков модемом).
-  - CC убрали из сборки → модем остаётся в слоте, ПКМ берёт очки как раньше.
-  - Как у мешочка: работает на обеих сторонах, серверный результат приходит обычной синхронизацией слота.
-- **`CcRednetProvider` — настоящий мост через рефлексию** (вместо заглушки «inert»):
-  - `ComputerCraftAPI.getWirelessNetwork(MinecraftServer)` (или без аргумента на старых сборках), `addReceiver/removeReceiver`, `transmitSameDimension(Packet, range)` / `transmitInterdimensional` для эндер-модема;
-  - `PacketReceiver` и `PacketSender` — `java.lang.reflect.Proxy` (equals/hashCode по идентичности, default-методы через `InvocationHandler.invokeDefault`);
-  - фильтр прямо на потоке CC: только наш канал `id % 65500` и broadcast, свои же пакеты отбрасываются. Для этого в `KVRRednet.Placement` добавлен `rednetId()`;
-  - дальность как в конфиге CC по умолчанию: 64 блока, выше Y 96 линейно до 384 к Y 320; эндер — без предела;
-  - никаких исключений в поток CC; смена имен в API CC = одна строка в логе «bridge failed to start», не краш.
-  - **Агенту (Gradle):** API CC при компиляции больше **не нужен** ни на одной ноде. Строки `compileOnly("cc.tweaked:…-common-api…")` и `exclude("com/kasperstudios/kvr/rednet/cc/**")` из 0029 можно убрать.
-    Репозиторий squiddev нужен только для `modLocalRuntime` в dev-запуске. SVC `compileOnly` остаётся (его использует `KvrVoicechatPlugin`).
-
-### 3. `ClientCompat.drawFace` — ветки Stonecutter
-| Нода | Реализация |
-|---|---|
-| 1.20.1 | `PlayerInfo#getSkinLocation()` / `DefaultPlayerSkin.getDefaultSkin(uuid)` + `PlayerFaceRenderer.draw(g, ResourceLocation, x, y, size)` |
-| 1.20.2 … 1.21.4 (вкл. 1.21.1) | `PlayerInfo#getSkin()` / `DefaultPlayerSkin.get(uuid)` (`PlayerSkin`) + `PlayerFaceRenderer.draw(g, PlayerSkin, x, y, size)` |
-| 1.21.5+ (1.21.11) | нейтральная плитка `fill`: рендера пространственного UI там нет (`RenderCompat.SUPPORTED = false`), `PlayerSkin` в 1.21.9 переехал — имена не угадываются |
-
-`PlayerFaceRenderer` рисует лицо вместе со слоем шляпы. Проблемный `g.blit(ResourceLocation, …)` (убран в 1.21.2) больше не используется.
-
-### 4. Мультиплеер: краши и утечки сессий
-Найденные в дереве пути к крашу и что с ними сделано:
-| Путь | Чем кончалось | Исправление |
-|---|---|---|
-| Исключение в колбэке `onServerTick` (SVC бросает на игрока, который только что вышел; CC сменил API) | **краш всего сервера** | `ServerSession.guard(…)`: тик теряется один раз, ошибка в лог (не чаще раза в 10 с). Подключено в Rednet, Calls, Spy relay. В `CallServer` все вызовы SVC (`join`, `createGroup`, `removeGroup`, `connected`, `groupOf`) в try/catch |
-| S2C-пакет игроку без KVR (ванильный / другой клиент) | NeoForge отклоняет, Fabric может отключить игрока | `KVRNetwork.canSend` / `sendIfAccepted`: Rednet, Calls, Spy relay |
-| C2S-пакет с KVR-клиента на сервер без KVR (сводка шпиона шлётся каждые 10 тиков) | NeoForge: исключение в тике клиента = краш клиента | `KVRNetwork.canSendToServer` / `sendToServerIfAccepted`: SpyClient, RednetClient, CallClient, запрос политики десктопа |
-| `WindowSummary.read` от любого клиента: отрицательное число окон, `kind` вне enum, NaN в позе | кик отправителя; **краш клиента хакера** в `GhostRenderer` | число ≥ 0, `kind` 0–2, координаты конечные и в пределах мира. Плохая запись выбрасывается, остальные остаются |
-| Одиночная игра: вышел из мира → зашёл в другой (новый `MinecraftServer`, статические карты старые) | утечка мёртвых `ServerPlayer`, ноды Rednet в сети старого сервера, «висящие» звонки | `ServerSession.Binding.rebind(server)`: при смене сервера система сбрасывает своё состояние (Rednet отсоединяет ноды, Calls/Spy очищаются) |
-| Игрок вышел с сервера | счётчики, отметки «говорит» и сводки шпиона оставались навсегда | `retainAll(online)`: Calls (`RATE`, `KVRVoice.retainOnly`) раз в 10 с, Spy relay каждый цикл релея. Rednet уже делал это сам |
-| Клиент отключился / перешёл на другой сервер | модем «онлайн» и звонок от старого сервера, пакеты туда, где канала нет | `ClientSession`: смена `Minecraft#getConnection()` → `RednetClient.reset`, `CallClient.reset` (закрывает окно звонка), `HostDesktopClient.reset`. Для этого событие дисконнекта в фасаде не нужно |
-
-Окна и очки для других игроков:
-- **Очки на голове** — ванильный слот HEAD: экипировка синхронизируется игрой, `CustomHeadLayer` поворачивает модель с головой. Кода не нужно.
-  Если у других очки не видны или смещены — это `display.head` в `models/item/<очки>.json` либо краска (color provider), не сеть.
-- **Окна для HackGlasses** — цепочка в дереве (`SpyClient` → `SpyRelay` → `GhostRenderer`) проверена и усилена (см. таблицу).
-- **Публичные окна и рука в Alt** — см. «Что не сделано».
-
-### Агенту: сетевые провайдеры (ваши файлы, в дереве их нет)
-В `KVRNetwork.Provider` добавлены два default-метода, старые провайдеры компилируются без них.
-Но защита от клиентов и серверов без KVR заработает, только когда вы их реализуете (VERIFY — по документации):
-```java
-// FabricKVRNetworkProvider (все ноды; на 1.20.5+ есть и перегрузка с Identifier/ResourceLocation)
-@Override public boolean canSend(ServerPlayer p, ResourceLocation ch) { return ServerPlayNetworking.canSend(p, ch); }
-@Override public boolean canSendToServer(ResourceLocation ch) { return ClientPlayNetworking.canSend(ch); }  // client-only класс — в клиентской части провайдера
-
-// NeoForgeKVRNetworkProvider (20.4 / 21.1): тип вашего payload для канала ch
-@Override public boolean canSend(ServerPlayer p, ResourceLocation ch) { return p.connection.hasChannel(typeOf(ch)); }
-@Override public boolean canSendToServer(ResourceLocation ch) { var c = Minecraft.getInstance().getConnection(); return c != null && c.hasChannel(typeOf(ch)); }
-```
-Если имя не сошлось — оставьте default `true` и пришлите ошибку компилятора.
-
-### Агенту: слияние
-- **Целые файлы (забрать как есть):**
-  - `desktop/client/{DesktopLauncherWindow,DesktopDock}.java`, `rednet/cc/CcRednetProvider.java`;
-  - `session/{ServerSession,ClientSession}.java` (новые).
-- **Точечные правки (дифф поверх ваших версий):** `HostDesktopClient`, `KVRNetwork`, `KVRRednet`, `RednetServer`, `RednetClient`, `CallServer`, `CallClient`, `KVRVoice`, `DockPrefs`, `KvrUiConfig`, `WearableGlassesItem`, `ClientCompat`.
-- **Файлы, которые в дереве в старой версии (0013):** `hack/SpyRelay`, `hack/client/SpyClient`, `hack/WindowSummary`. **Не копировать целиком** — перенесите только изменения:
-  - `SpyRelay`: `ServerSession.guard`, `rebind` → `SUMMARIES.clear()`, `retainAll(online)`, `sendIfAccepted`, `lookTarget(server, hacker)`;
-  - `SpyClient`: `sendToServerIfAccepted`;
-  - `WindowSummary.read`: санитайзинг. Если в вашем `SpatialWindow.Kind` больше трёх значений — поправьте `kind > 2`.
-- Предположения об API вашего репо (в дереве их нет, взяты из присланного кода):
-  - `SpatialWindow.requestClose()`, `GlassStyle.surface(g, x, y, w, h, false)`;
-  - `new DesktopConsentScreen(Screen parent, Runnable onAllow)`;
-  - `SpatialWindow.mouseScrolled(double, double, double)` (как у `HostDesktopWindow`). Если у вас другая сигнатура — одна строка в лаунчере.
-- Если в вашем репо у `SpatialWindow` есть свой захват клавиатуры (0014/0028: «рука на окне + печатать») — пришлите `SpatialWindow.java`.
-  Переведу поиск на него. Сейчас он сделан через `TextInputScreen`, который точно есть.
-- **Lang (слить в `ru_ru.json` / `en_us.json`):**
-```json
-"kvr.desktop.tab.recent": "Недавние" / "Recent",
-"kvr.desktop.tab.all": "Все приложения" / "All apps",
-"kvr.desktop.search": "Поиск — нажмите и печатайте" / "Search — click and type",
-"kvr.desktop.scanning": "Ищу программы…" / "Looking for programs…",
-"kvr.desktop.count": "программ: %s" / "programs: %s",
-"kvr.desktop.empty_recent": "Здесь появятся программы, которые вы запускали" / "Programs you start will show up here",
-"kvr.desktop.empty_search": "Ничего не найдено" / "Nothing found",
-"kvr.desktop.empty_all": "Программ не найдено. Свои команды — host_desktop_apps в kvr-client.toml" / "No programs found. Own commands: host_desktop_apps in kvr-client.toml"
-```
-
-### Чек-лист
-**Приложения ПК (Arch + niri, приложения ПК включены):**
-1. Док → «Рабочий стол» → «Все приложения»: список как в меню системы, с иконками (PNG) и русскими именами; есть Flatpak-приложения, если установлены.
-2. Клик по строке поиска → напечатать `fire` → остаётся Firefox; × — список снова полный. Колесо прокручивает, справа полоска позиции.
-3. ★ у Firefox → Firefox **сразу в доке**. В `config/kvr/dock.json` есть `desk:firefox.desktop` в `pins` и в `desktop`.
-4. Перезайти в мир → Firefox в доке до открытия лаунчера. Клик в доке сразу после входа: сперва ответ сервера, потом Firefox запускается сам (без второго клика).
-5. Сервер с `enable_host_desktop_windows = false` → клик по закреплённому Firefox в доке → тост «отключено сервером», ничего не запускается.
-6. Согласие отозвано → клик в доке → экран согласия → «Разрешить» → запускается именно Firefox (а не открывается лаунчер).
-7. Запустить 2–3 программы → вкладка «Недавние», последняя сверху; лаунчер открывается на ней.
-8. Старый `kvr-ui.toml` с `desktop_pinned_apps = "foot"` → после забора foot в доке, ключ в файле пустой.
-
-**Модем (нужен CC: Tweaked):** пункты 1–9 чек-листа Rednet из 0029 теперь должны проходить. Дополнительно:
-- в логе `KVR Rednet: bridge to CC: Tweaked ready` (без «inert»);
-- ПКМ вторым модемом по очкам с модемом → ничего не происходит;
-- стак из 3 модемов → вставлен один, два остались на курсоре;
-- компьютер на Y 200: сообщения доходят дальше 64 блоков.
-
-**Лица в «Звонках»:** 1.21.1 и 1.20.1 — скины с шляпой; игрок не в табе — стандартный скин; 1.21.11 компилируется.
-
-**Мультиплеер (выделенный сервер + 2 клиента):**
-1. A и B в звонке (SVC), B закрывает игру через Alt+F4 → сервер жив, у A «Звонок завершён».
-2. B выходит во время входящего звонка → у A «не в сети»; в логе сервера нет исключений (или только `KVR Calls: server tick failed, continuing`).
-3. Хакер в HackGlasses смотрит на B → видит окна; B выходит → призраки исчезают за ≤ 5 с, у хакера нет краша.
-4. Одиночная игра: в мире 1 очки с модемом и работающий Rednet → выйти → мир 2: модем работает (пункт 3 чек-листа 0029), в логе нет ошибок Rednet.
-5. KVR-клиент заходит на ванильный сервер (после реализации `canSendToServer`) → нет краша и кика через минуту игры.
-6. Дисконнект во время входящего звонка → зайти на другой сервер: окна «Звонки» нет, колокольчик не звонит, в Настройках Rednet «CC: Tweaked не установлен» до ответа нового сервера.
-
-### Что не сделано — нужны файлы или лог
-1. **`RegistrySyncManager.unmap` NPE.** Это код Fabric API: синхронизация реестров при выходе с сервера откатывает клиентские реестры к исходному состоянию. Кода регистрации KVR (`KVRContent`, Fabric-реализация `KVRRegistrar`, entrypoint'ы) в дереве нет, а без стектрейса причину можно только угадать. Частые причины именно такого NPE:
-   - регистрация чего-то (предмет, блок, menu type, recipe serializer, sound, data component) **вне `onInitialize`**: в `ClientModInitializer`, в статическом инициализаторе класса, который впервые грузится при входе в мир, лениво «при первом обращении»;
-   - регистрация, которая **зависит от стороны или конфига** (`if (isModLoaded("computercraft"))`, `if (client)`, ключи `kvr-client.toml`) → реестры клиента и сервера расходятся;
-   - один и тот же id регистрируется дважды (common + fabric).
-   В 0030 ничего в реестрах не регистрируется; модем CC ищется по id и ничего не добавляет.
-   **Пришлите:** полный стектрейс с `Caused by`; строки лога перед ним с `Registry` / `remap` / `Mismatched`; версии Fabric API и MC; сценарий (выход с сервера / кик / одиночная); файлы `KVRContent`, Fabric `KVRRegistrar*`, `KVRFabric` / `KVRFabricClient`.
-2. **`PublicWindowRelay`, `PublicWindowRenderer`, `HandPoseRelay`, `HandPoseClient`, `PlayerModelMixin`** в дереве отсутствуют — проверить их я не могу. Пришлите их, и я применю то же, что к `SpyRelay`. Или пройдитесь сами по этому списку:
-   - тик обёрнут в `ServerSession.guard`; `Binding.rebind` → очистка; `retainAll(ServerSession.online(server))`;
-   - все рассылки другим игрокам — через `sendIfAccepted`, клиентские отчёты — через `sendToServerIfAccepted`;
-   - декодер: счётчики ≥ 0 и с потолком, позы и углы `isFinite`, enum-индексы в границах;
-   - на клиенте данные других игроков чистятся по тайм-ауту и в `ClientSession.onLeave`;
-   - в `PlayerModelMixin` нет падения, если поза руки для игрока ещё не пришла (`null` → ванильная поза).
-
-### Файлы
-- **новые:** `session/ServerSession.java`, `session/ClientSession.java`
-- **переписаны:** `desktop/client/DesktopLauncherWindow.java`, `desktop/client/DesktopDock.java`, `rednet/cc/CcRednetProvider.java`
-- **изменены:** `desktop/client/HostDesktopClient.java` (`launchApp`, повтор после ответа, сброс сессии), `config/DockPrefs.java` (`recent`), `config/KvrUiConfig.java` (deprecated + миграция),
-  `glasses/WearableGlassesItem.java` (слот модема), `rednet/KVRRednet.java` (`Placement.rednetId`), `rednet/RednetServer.java`, `rednet/client/RednetClient.java`,
-  `voice/CallServer.java`, `voice/KVRVoice.java` (`retainOnly`), `voice/client/CallClient.java`, `compat/client/ClientCompat.java` (`drawFace`),
-  `platform/KVRNetwork.java` (`canSend`, `sendIfAccepted`, `canSendToServer`, `sendToServerIfAccepted`),
-  `hack/SpyRelay.java`, `hack/client/SpyClient.java`, `hack/WindowSummary.java` (только дифф, см. выше)
-- **удалён:** `desktop/client/SystemAppScanner.java`
-- **lang:** ключи выше (в дереве lang старые, не трогал)
-
-## 0029 — Rednet через модем в очках (CC: Tweaked) + Звонки (Simple Voice Chat) — ГОТОВО К ЗАБОРУ (не проверено сборкой)
-
-Последний открытый пункт SPEC §7 (Блок 5, тикет 5g). Оба мода **необязательные**:
-- без CC слот модема просто не находит модем;
-- без SVC звонок отвечает «на сервере нет Simple Voice Chat».
-
-Ни один класс CC/SVC не грузится, если мода нет.
-
-### 1. Слот расширения: модем CC в очках (`rednet/GlassesModem`)
-- **ПКМ модемом на курсоре по очкам** в инвентаре — модем вставлен (как в мешочек). **ПКМ пустым курсором** по очкам с модемом — модем снова на курсоре.
-  Без модема ПКМ работает как раньше (берёт очки).
-- Подходят `computercraft:wireless_modem_normal` (беспроводной: 64 блока, одно измерение) и `wireless_modem_advanced` (эндер: без предела, между измерениями).
-  Модемы узнаются по id предмета, без классов CC.
-- Хранится в `custom_data → kvr_modem` {kind, id}. **Rednet ID** очков — случайный 50000–64999 (выше id компьютеров), остаётся на очках и после снятия модема.
-- Если CC убрали из сборки, модем из слота не достаётся и не пропадает — лежит до возвращения CC.
-
-### 2. Очки = мобильная нода Rednet (`RednetServer`, `cc/CcRednetProvider`)
-- Раз в секунду: надетые очки + работающая ОС + модем → очки подключаются к беспроводной сети CC как приёмник **в глазах игрока** (позиция обновляется каждый тик).
-  Сняли очки, выключили (O), вынули модем — отключаются.
-- **Формат — ровно `rednet.lua`**, поэтому обычные Lua-программы говорят с очками без библиотек:
-  - таблица `{nMessageID, nRecipient, nSender, message, sProtocol}`;
-  - канал `id % 65500` (или 65535 = broadcast) + копия на 65533 для repeat;
-  - reply channel = наш id. Принимаем свой канал (с `nRecipient == id`) и broadcast, дубли отсекаются по `nMessageID`.
-  - Сырые `modem.transmit` (не rednet) игнорируются.
-- Lua ⇄ JSON (`RednetPayload`):
-  - таблица `1..n` → массив, остальные → объект;
-  - числа-целые остаются целыми;
-  - `nil`/`null` выпадают.
-  - Лимиты: 8 КБ JSON, глубина 16, 1024 значения. Больше — сообщение отбрасывается целиком.
-- Защита от спама: 10 отправок/с на очки (и на клиенте, и на сервере).
-- Поток: CC вызывает приёмник со своих потоков компьютеров → payload копируется сразу, доставка — через `server.execute`.
-- Мост к CC создаётся рефлексией после `Class.forName("dan200.computercraft.api.ComputerCraftAPI")`. Только `rednet/cc/**` линкуется с API CC.
-
-### 3. JS API (`prelude.js`, `ScriptHost`) — всё требует разрешения `network`
-- `kvr.rednet.available()` / `id()` / `status()` → `{available, modem, ender, id}`.
-- `kvr.rednet.send(id, message, protocol?)`, `kvr.rednet.broadcast(message, protocol?)` → `true`, если ушло в модем.
-- `kvr.rednet.on(m => m.sender, m.message, m.protocol, m.broadcast, m.distance)`.
-- **Шина CONCEPT §3:** `kvr.emit('base:toggle_power', {state:true})` дополнительно рассылает `{type:'base:toggle_power', state:true}` с протоколом `kvr_events`.
-  Входящие `kvr_events` приходят в `kvr.on(type, (data, meta) => …)`, в `meta` — `{sender, distance}`.
-  - **Решение (одна строка в prelude):** в сеть уходят только типы с `:` (namespaced), чтобы локальные `kvr.emit('refresh')` приложений не сыпались в эфир.
-- `kvr.calls.call(name | [names])`, `accept()`, `decline()`, `hangup()`, `show()`, `state()`, `on(fn)`.
-- Пример для компьютера: `examples/cc/kvr_base.lua` (редстоун по `base:toggle_power`, датчик раз в 5 с, `kvr_rpc` ping).
-
-### 4. Звонки (`voice/*`)
-- Плагин SVC `KvrVoicechatPlugin`:
-  - Fabric — entrypoint `voicechat`;
-  - NeoForge — аннотация `@ForgeVoicechatPlugin`.
-  - API SVC одинаковый на всех версиях MC — веток Stonecutter нет.
-- Звонок = **скрытая, с паролем, непостоянная ISOLATED-группа SVC**: участники слышат только друг друга, где бы ни были, посторонний не зайдёт из списка групп.
-- `CallServer`:
-  - INVITE → у вызываемого звонок 30 с (потом «пропущенный» / «не отвечает»);
-  - первый ACCEPT создаёт группу и переносит туда всех;
-  - ADD добавляет людей по ходу, до 8 участников.
-  - Выход: «Завершить», очки сняты/выключены, выход из игры, отключился голосовой клиент, вышел из группы в меню SVC.
-    Остался один — звонок кончается, группа удаляется.
-  - Кто говорит (`MicrophonePacketEvent`, 350 мс) — рассылка 5 раз в секунду, только при изменении.
-  - **Решение:** после звонка игрок выходит из всех групп. Довызывная группа не восстанавливается — SVC мог её уже удалить.
-- Нужно у обоих: надетые включённые очки и подключённый SVC. Причина отказа приходит тостом (BUSY, OFFLINE, PEER_NO_GLASSES, NO_VOICE_CLIENT, …).
-- Окно **«Звонки»** (`CallWindow`, системное, без слота RAM, плывёт за головой как «Питание»):
-  - входящий: имя, звонок колокольчиком раз в 2 с (выключается в Настройках → «Звук уведомлений»), Принять/Отклонить, × = отклонить;
-  - в звонке: лица участников (скин из таба), зелёная рамка + «говорит», таймер, Добавить (список онлайн) / Завершить;
-  - без звонка — тот же список как «номеронабиратель»; после конца звонка окно закрывается через 3 с.
-- Откуда звонить:
-  - Мессенджер → чат → **«Позвонить»**;
-  - Настройки → Система → **«Звонки»**;
-  - из любого приложения через `kvr.calls`.
-  - Отдельной иконки в доке нет — правило 0027 «ровно три программы».
-- Настройки → Система → О устройстве: строка **Rednet** — «ID 51234 · эндер-модем» / «модема в слоте нет (ID …)» / «CC: Tweaked не установлен».
-
-### Агенту: Gradle и метаданные
-1. Репозитории: `maven("https://maven.squiddev.cc")` (CC: Tweaked), `maven("https://maven.maxhenkel.de/repository/public")` (SVC).
-2. common, **все ноды:** `compileOnly("de.maxhenkel.voicechat:voicechat-api:2.5.+")` (последняя 2.5.x; API не зависит от MC).
-3. common, **по нодам:** `compileOnly("cc.tweaked:cc-tweaked-<mc>-common-api:<ver>")` — последняя версия CC:T для этой MC с maven.squiddev.cc.
-   Нет CC:T для ноды (возможно 1.21.11) → в этой ноде исключить мост:
-   `sourceSets.main { java { exclude("com/kasperstudios/kvr/rednet/cc/**") } }`. Тогда в логе будет «this KVR build has no CC bridge», остальное работает.
-4. `fabric.mod.json`: `"entrypoints": { "voicechat": ["com.kasperstudios.kvr.voice.svc.KvrVoicechatPlugin"] }` (рядом с вашими main/client/modmenu),
-   `"suggests": { "computercraft": "*", "voicechat": "*" }`.
-5. `neoforge.mods.toml`: необязательные зависимости `computercraft` и `voicechat` (`type="optional"`, `side="BOTH"`). Плагин SVC находится по аннотации — регистрировать не нужно.
-6. Для теста в dev-запуске: `modLocalRuntime` CC:T и SVC (fabric/neoforge артефакты) — по желанию.
-7. Новые S2C-каналы объявлены в `KVRCommonBootstrap.declareS2C`: `rednet_recv`, `rednet_state`, `call_state`. C2S: `rednet_send`, `call_op`.
-
-### Агенту: слияние
-- `ScriptHost`: новые host-op `rednet.status`, `rednet.send`, `calls.state`, `calls.op` (после `msg.pending`), метод `allRunning()`, хелпер `network()`.
-- `prelude.js`:
-  - `emitLocal` получил третий аргумент `meta`;
-  - `kvr.emit` зовёт `bridgeEmit`;
-  - новые блоки `kvr.rednet` / `kvr.calls` после `msgAck`;
-  - две строки в `__kvr_event` (`rednet`, `call`).
-  Ваши правки prelude (если есть) — сохранить.
-- `WearableGlassesItem.overrideOtherStackedOnMe` — если у вас в `GlassesItem`/`HackGlasses` есть свой override, вызовите `super` первым.
-- Бутстрапы: по две строки (`RednetServer`/`CallServer`, `RednetClient`/`CallClient`) + 3 канала в `declareS2C`.
-- `SettingsWindow` (строка Rednet + пункт «Звонки»), `messenger/main.js` (кнопка «Позвонить»), lang.
-
-### VERIFY (написано по документации, не компилятором)
-| Где | Что | Если не сошлось |
-|---|---|---|
-| `CcRednetProvider` | `ComputerCraftAPI.getWirelessNetwork(MinecraftServer)`, record `Packet(channel, replyChannel, payload, sender)`, `PacketNetwork.transmitSameDimension/transmitInterdimensional/addReceiver/removeReceiver`, методы `PacketReceiver`/`PacketSender` | имена из ошибки — правка только в этом файле |
-| `KvrVoicechatPlugin` | `Group.Builder.setHidden` (API 2.5.0+), `VoicechatServerApi.removeGroup(UUID)` | удалить строку `setHidden`; `removeGroup` — убрать вызов (пустая группа умрёт сама) |
-| `WearableGlassesItem` | `overrideOtherStackedOnMe(ItemStack, ItemStack, Slot, ClickAction, Player, SlotAccess)` на 1.21.11 | сигнатура из ошибки |
-| `GlassesModem` | `BuiltInRegistries.ITEM.getOptional(ResourceLocation)` на 1.21.11 | одна строка в `remove()` |
-| `ClientCompat.drawFace` | `PlayerFaceRenderer.draw(g, PlayerSkin, …)` 1.20.2–1.21.4, `(g, ResourceLocation, …)` + `getSkinLocation()` на 1.20.1 | только этот метод |
-| `CallWindow` | `SoundEvents.NOTE_BLOCK_BELL.value()` | `SoundEvents.NOTE_BLOCK_BELL` без `.value()` |
-
-### Чек-лист
-**Rednet (нужен CC: Tweaked):**
-1. Без CC:
-   - в логе `KVR Rednet: CC: Tweaked not installed`;
-   - Настройки → Система → `Rednet: CC: Tweaked не установлен`;
-   - ПКМ предметами по очкам — как раньше.
-2. С CC:
-   - беспроводной модем на курсор, ПКМ по очкам → модем исчез, в Настройках `ID 5xxxx · беспроводной модем`;
-   - ПКМ пустым курсором → модем на курсоре, строка `модема в слоте нет (ID 5xxxx)`;
-   - вставить снова → тот же ID.
-3. Компьютер с беспроводным модемом:
-   - на нём `rednet.open("back") print(rednet.receive())`;
-   - в dev-приложении `kvr.rednet.send(<id компьютера>, {hello: 1}, 'test')`;
-   - компьютер печатает `5xxxx table test`, `msg.hello == 1`.
-4. Компьютер: `rednet.send(5xxxx, {x=1, list={1,2,3}}, "t")`. Приложение с `kvr.rednet.on(m => kvr.log(JSON.stringify(m)))` → в логе
-   `{"type":"rednet","sender":<id>,"protocol":"t","message":{"x":1,"list":[1,2,3]},"broadcast":false,"distance":N}`.
-5. `examples/cc/kvr_base.lua` на компьютере (лампа сверху, рычаг сзади):
-   - `kvr.emit('base:toggle_power', {state: true})` → лампа горит, приложению приходит `kvr.on('base:power_state')`;
-   - рычаг сзади → каждые 5 с `base:sensor_update` с `value 15`.
-6. Дальность:
-   - беспроводной — отойти на 100+ блоков у земли → сообщения пропадают. Компьютер высоко в небе «слышит» дальше: правило CC, берётся бо́льшая дальность из двух;
-   - эндер-модем — работает из Незера.
-7. O (выключить очки) → не позднее чем через 1 с `kvr.rednet.available() === false`, компьютер больше не достаёт очки.
-8. `.vrapp` без `network` → `available()` false, событий `rednet` нет.
-9. Цикл из 100 `send` → компьютер получает около 10 в секунду, игра не тормозит.
-
-**Звонки (нужен Simple Voice Chat на сервере и у обоих):**
-1. Без SVC: Мессенджер → чат → «Позвонить» → тост «на сервере нет Simple Voice Chat».
-2. A и B в очках, SVC подключён. A: Мессенджер → B → «Позвонить».
-   - У A окно «Звонки» — «Вызов…».
-   - У B тост «Входящий звонок», окно с колокольчиком.
-   - B «Принять» → оба слышат друг друга на любом расстоянии; в списке групп SVC группы не видно.
-   - В окне: лица, таймер, зелёная рамка у того, кто говорит.
-3. «Завершить» → у обоих тост «Звонок завершён: трубку положили». Обычный голос по расстоянию снова работает.
-4. Не отвечать 30 с → у B «пропущенный звонок», у A «не отвечает».
-5. B снимает очки посреди звонка → через ≤1 с звонок кончается у обоих.
-6. Втроём: A в звонке → «Добавить» → C. C принимает → три лица; один «Завершить» → двое продолжают.
-7. B выходит из группы через меню SVC → «вышел из голосовой группы».
-8. Настройки → Система → «Звонки» → список онлайн, клик — вызов.
-9. B уже в звонке, C звонит B → у C «игрок уже в другом звонке».
-
-### Не сделано (вне этого задания)
-- Расход батареи на «сетевой опрос Rednet» (CONCEPT §1.3) — добавлю в `PowerBuild.draw`, если нужен.
-- Перехват Rednet HackGlasses (SPEC 5) и Plasmo Voice (через тот же `KVRVoice.Backend`) — по запросу.
-
-### Файлы
-- **новые:**
-  - `rednet/{GlassesModem,KVRRednet,RednetPayload,RednetProtocol,RednetServer}.java`, `rednet/cc/CcRednetProvider.java`, `rednet/client/RednetClient.java`;
-  - `voice/{KVRVoice,CallProtocol,CallServer}.java`, `voice/svc/KvrVoicechatPlugin.java`, `voice/client/{CallClient,CallWindow}.java`;
-  - `examples/cc/kvr_base.lua`.
-- **изменены:**
-  - `glasses/WearableGlassesItem.java` (слот модема);
-  - `script/ScriptHost.java`, `assets/kvr/kvr_os/prelude.js`, `assets/kvr/apps/messenger/main.js`;
-  - `bootstrap/KVRCommonBootstrap.java`, `bootstrap/KVRClientBootstrap.java`;
-  - `compat/client/ClientCompat.java` (`drawFace`), `spatial/ui/SettingsWindow.java`;
-  - `lang/ru_ru.json`, `en_us.json`.
-
-## 0028 — Программы ПК из системы, закрепление ★ и недавние, точная посадка дока — ГОТОВО К ЗАБОРУ (не проверено сборкой)
-
-Отчёт по 0027 / 0027a принят: руда грузится, в чистых очках три программы.
-
-### 1. Все программы ПК (`DesktopApps`, новый)
-- Сканируются freedesktop `.desktop`, порядок и правила — как в меню любого рабочего стола:
-  - папки: `$XDG_DATA_HOME/applications` (по умолчанию `~/.local/share/applications`), затем каждая `$XDG_DATA_DIRS/applications`
-    (по умолчанию `/usr/local/share:/usr/share`) + экспорты Flatpak и Snap;
-  - id по спецификации (`sub/foo.desktop` → `sub-foo.desktop`), побеждает первый найденный.
-    Пользовательский `Hidden=true` прячет системный ярлык.
-  - Пропускаются:
-    - `Type` ≠ Application;
-    - `NoDisplay` / `Hidden`;
-    - `OnlyShowIn` (служебные утилиты конкретных DE);
-    - `TryExec`, которого нет в PATH.
-  - Имя и описание локализуются по языку игры: `Name[ru_RU]` → `Name[ru]` → `Name`.
-  - `Exec` разбирается по правилам спецификации (кавычки, `\" \$ \` \\`), field codes `%f %F %u %U %i %c %k` убираются,
-    `%%` → `%`. Шелла нет — как и для `host_desktop_apps`.
-  - `Terminal=true` запускается через терминал (`foot -e …`) в том же скрытом композиторе.
-    Терминал меняется ключом `"terminal"` в `config/kvr/dock.json`.
-  - Иконки: тема hicolor (PNG 48/64/32/96/128/256/24), затем `pixmaps`.
-    Рисуются 16×16 через `PackageIcons`, подгружаются лениво (только видимые строки). У SVG-иконок — плитка с буквой.
-- Скан идёт в фоновом потоке, не чаще раза в 30 с (при открытии лаунчера), игру не дёргает.
-- Свои команды из `host_desktop_apps` остались — они идут первыми.
-- Windows: `.desktop` нет, там только свои команды (демон всё равно Linux-only до D5).
-
-### 2. Лаунчер «Приложения ПК» (`DesktopLauncherWindow`, переписан)
-- Вкладки:
-  - **«Недавние»** — история запусков, сначала новые, до 20;
-  - **«Все приложения»** — всё найденное, по алфавиту.
-  При открытии — «Недавние», если история есть.
-- Строка: иконка, имя · описание; клик — запуск; **★/☆ справа — закрепить в док / убрать**.
-- **Поиск**: навести руку на окно в Alt-режиме и печатать — клавиатура уходит окну, как у приложений ПК.
-  Backspace — стереть, Esc — очистить. Ищет по имени и id. Прокрутка — колесом.
-- Внизу: состояние демона и число найденных программ.
-
-### 3. Док — только закреплённое (`DockPrefs`, новый, `config/kvr/dock.json`)
-- Док = 3 системные программы (+ «Рабочий стол», если включены приложения ПК) + **то, что игрок закрепил**, в порядке закрепления.
-- ★ есть также в App Market: у установленных `.vrapp` и у dev-папок.
-- «Установленные» в Market сортируются по недавнему запуску, незапускавшиеся — по алфавиту.
-  Незакреплённое запускается оттуда (жест 1 = Market).
-- Закреплённая программа ПК хранится вместе с именем, argv и иконкой — в доке она сразу, до скана.
-  Клик в доке → `HostDesktopClient.launchApp`: если всё готово (сервер разрешил, согласие, бинарник) — сразу запуск.
-  Иначе обычная цепочка через лаунчер.
-- **Р
+  - **поиск**: строка поиск�

@@ -42,6 +42,7 @@ public final class AppLauncherWindow extends SpatialWindow {
     private static final int TOP = 30;
     private static final int MAX_ROWS = 10;
     private static final int TILE = 0xFF334155;
+    private static final int STAR_W = 20;
 
     private enum Type { SYSTEM, DESKTOP, INSTALLED, MORE }
 
@@ -124,7 +125,17 @@ public final class AppLauncherWindow extends SpatialWindow {
             if (e.type() != Type.MORE) {
                 Component status = Component.translatable(e.running() ? "kvr.launcher.running" : "kvr.launcher.start");
                 int sc = e.running() ? GlassStyle.OK : hot ? GlassStyle.TEXT : GlassStyle.MUTED;
-                GlassStyle.text(g, status, width - 16 - Minecraft.getInstance().font.width(status), y + 9, sc);
+                int right = e.type() == Type.INSTALLED ? width - 16 - STAR_W - 4 : width - 16;
+                GlassStyle.text(g, status, right - Minecraft.getInstance().font.width(status), y + 9, sc);
+            }
+            if (e.type() == Type.INSTALLED) {
+                // 0032: the ONLY way an installed app gets into the dock — never automatically
+                boolean pinned = com.kasperstudios.kvr.config.DockPrefs.isPinned(e.id());
+                int sx = width - 10 - STAR_W - 2;
+                boolean hotStar = GlassStyle.inside(mx, my, sx, y + 3, STAR_W, CARD_H - 6);
+                GlassStyle.panel(g, sx, y + 3, STAR_W, CARD_H - 6, hotStar);
+                GlassStyle.centered(g, Component.literal(pinned ? "\u2605" : "\u2606"), sx + STAR_W / 2, y + 9,
+                    pinned ? GlassStyle.ACCENT : hotStar ? GlassStyle.TEXT : GlassStyle.MUTED);
             }
         }
     }
@@ -154,6 +165,10 @@ public final class AppLauncherWindow extends SpatialWindow {
         for (int i = scroll; i < end; i++) {
             if (!GlassStyle.inside(mx, my, 10, rowY(i), width - 20, CARD_H)) continue;
             Entry e = entries.get(i);
+            if (e.type() == Type.INSTALLED && GlassStyle.inside(mx, my, width - 10 - STAR_W - 2, rowY(i) + 3, STAR_W, CARD_H - 6)) {
+                com.kasperstudios.kvr.config.DockPrefs.togglePin(e.id()); // ★: dock pin, the launcher stays open
+                return true;
+            }
             if (e.type() == Type.MORE) AppCatalog.openMarket();
             else appHost.launch(e.id());
             requestClose();

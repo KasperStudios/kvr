@@ -46,6 +46,7 @@ public final class KVRCommonBootstrap {
         PublicWindowRelay.init();              // kvr:public_windows (reads SpyRelay's summaries)
         HostDesktopServer.init();              // kvr:desktop_query / kvr:desktop_policy
         com.kasperstudios.kvr.rednet.RednetServer.init(); // kvr:rednet_* (0029; inert without CC: Tweaked)
+        com.kasperstudios.kvr.inspect.InspectServer.init(); // 0034a: kvr:inspect_* (block inspector chest slots)
         com.kasperstudios.kvr.voice.CallServer.init();    // kvr:call_* (0029; answers NO_VOICE without Simple Voice Chat)
         // 0026: every S2C channel known on both sides before the first packet (dedicated server!).
         // Agent: add your HackProtocol / HandPoseRelay S2C channels (inject_input, hack_targets, hand_view) here too.
@@ -59,7 +60,8 @@ public final class KVRCommonBootstrap {
             HostDesktopServer.POLICY,
             com.kasperstudios.kvr.rednet.RednetProtocol.RECEIVE,
             com.kasperstudios.kvr.rednet.RednetProtocol.STATE,
-            com.kasperstudios.kvr.voice.CallProtocol.STATE);
+            com.kasperstudios.kvr.voice.CallProtocol.STATE,
+            com.kasperstudios.kvr.inspect.InspectServer.REPLY);
         KVR.logger().info("KVR common systems ready (power, VFS, apps, messenger, spy/public relays, desktop policy, rednet, calls)");
     }
 }

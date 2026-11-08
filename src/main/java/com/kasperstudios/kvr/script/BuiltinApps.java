@@ -131,9 +131,10 @@ public final class BuiltinApps implements SpatialConfig.AppHost {
         );
     }
 
+    /** 0033: gesture 4 — Virtual Space slots (picker or cycle, Settings → Space). */
     @Override
     public void enterVirtualSpace() {
-        soon();
+        com.kasperstudios.kvr.spatial.space.VirtualSpaces.onGesture();
     }
 
     @Override

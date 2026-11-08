@@ -394,11 +394,13 @@ public final class AppMarketWindow extends SpatialWindow {
     private void paintConfirm(GuiGraphics g, int mx, int my) {
         Confirm c = confirm;
         if (c == null) return;
-        g.fill(0, 0, width, height, 0x90000000);
+        // Полное затемнение фона и сплошная непрозрачная подложка модалки
+        g.fill(0, 0, width, height, 0xCC000000);
         int w = 280;
         int h = 54 + c.lines().size() * 11;
         int x = (width - w) / 2;
         int y = (height - h) / 2;
+        g.fill(x, y, x + w, y + h, 0xFF141923); // сплошной темный фон
         GlassStyle.surface(g, x, y, w, h, false);
         fitted(g, c.title().getString(), x + 8, y + 8, w - 16, GlassStyle.TEXT);
         int ly = y + 22;

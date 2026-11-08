@@ -3,6 +3,7 @@ package com.kasperstudios.kvr.spatial.ui;
 import com.kasperstudios.kvr.apps.client.AppsClient;
 import com.kasperstudios.kvr.config.KvrConfig;
 import com.kasperstudios.kvr.config.KvrSettingsScreen;
+import com.kasperstudios.kvr.config.KvrSpaceConfig;
 import com.kasperstudios.kvr.config.KvrUiConfig;
 import com.kasperstudios.kvr.power.GlassesPower;
 import com.kasperstudios.kvr.power.PowerBuild;
@@ -50,19 +51,21 @@ public final class SettingsWindow extends SpatialWindow {
     public static final String KVR_OS_VERSION = "1.0.0";
 
     private static final int W = 384;
-    private static final int H = 272;
+    private static final int H = 328;
     private static final int SIDE_W = 96;
     private static final int TOP = 28;
     private static final int ROW = 22;
     private static final int LINE = 12;
     private static final int BTN_H = 14;
 
-    private enum Section { PERSONAL, DISPLAY, SOUND, SYSTEM }
+    private enum Section { PERSONAL, SPACE, DISPLAY, SOUND, SYSTEM }
 
     private record Hit(int x, int y, int w, int h, Runnable action) {}
 
     private final List<Hit> hits = new ArrayList<>();
     private Section section = Section.PERSONAL;
+    /** 0033: custom cocoon hex while the keyboard capture screen is open (null = not editing). */
+    private String hexDraft;
 
     public SettingsWindow(SpatialAnchor anchor) {
         super("kvr:settings", Kind.SYSTEM, W, H, anchor);
@@ -112,6 +115,7 @@ public final class SettingsWindow extends SpatialWindow {
         int cw = width - x - 10;
         switch (section) {
             case PERSONAL -> personal(g, mx, my, x, cw);
+            case SPACE -> space(g, mx, my, x, cw);
             case DISPLAY -> display(g, mx, my, x, cw);
             case SOUND -> sound(g, mx, my, x, cw);
             case SYSTEM -> system(g, mx, my, x, cw);
@@ -194,6 +198,122 @@ public final class SettingsWindow extends SpatialWindow {
         toggle(g, mx, my, x, y, cw, Component.translatable("kvr.settings.dock_clock"), p.showClock(), v -> KvrUiConfig.update("dock_show_clock", v));
         y += ROW;
         toggle(g, mx, my, x, y, cw, Component.translatable("kvr.settings.dock_battery"), p.showBattery(), v -> KvrUiConfig.update("dock_show_battery", v));
+        y += ROW + 4;
+
+        // 0033: AR vision layers (always on while the glasses are worn and lit), two per row
+        KvrSpaceConfig.Prefs s = KvrSpaceConfig.get();
+        GlassStyle.text(g, Component.translatable("kvr.settings.ar").withStyle(ChatFormatting.BOLD), x, y + 2, GlassStyle.ACCENT);
+        y += LINE + 2;
+        int half = (cw - 8) / 2;
+        toggle(g, mx, my, x, y, half, Component.translatable("kvr.settings.ar.redstone"), s.arRedstone(), v -> KvrSpaceConfig.update("ar_redstone", v));
+        toggle(g, mx, my, x + half + 8, y, half, Component.translatable("kvr.settings.ar.rednet"), s.arRednet(), v -> KvrSpaceConfig.update("ar_rednet", v));
+        y += ROW;
+        toggle(g, mx, my, x, y, half, Component.translatable("kvr.settings.ar.mobs"), s.arMobs(), v -> KvrSpaceConfig.update("ar_mobs", v));
+        toggle(g, mx, my, x + half + 8, y, half, Component.translatable("kvr.settings.ar.inspector"), s.arInspector(), v -> KvrSpaceConfig.update("ar_inspector", v));
+        y += ROW;
+        // 0034a: Block Inspector plate — above the block / on its centre / HUD corner
+        KvrSpaceConfig.InspectorPosition[] places = KvrSpaceConfig.InspectorPosition.values();
+        List<Component> placeNames = new ArrayList<>();
+        for (KvrSpaceConfig.InspectorPosition ip : places) placeNames.add(Component.translatable(ip.langKey()));
+        choice(g, mx, my, x, y, cw, Component.translatable("kvr.settings.inspector.position"), placeNames, s.inspectorPosition().ordinal(),
+            i -> KvrSpaceConfig.update("inspector_position", places[i]));
+        y += ROW;
+        int off = s.inspectorOffsetCm();
+        stepper(g, mx, my, x, y, cw, Component.translatable("kvr.settings.inspector.offset"), off + " cm",
+            () -> KvrSpaceConfig.update("inspector_offset_cm", Math.max(KvrSpaceConfig.INSPECTOR_OFFSET_MIN, off - 5)),
+            () -> KvrSpaceConfig.update("inspector_offset_cm", Math.min(KvrSpaceConfig.INSPECTOR_OFFSET_MAX, off + 5)));
+    }
+
+    /** 0033: Virtual Space slots + AR cocoon look. */
+    private void space(GuiGraphics g, int mx, int my, int x, int cw) {
+        KvrSpaceConfig.Prefs s = KvrSpaceConfig.get();
+        int y = TOP;
+        label(g, Component.translatable("kvr.settings.space.active"), x, y);
+        Component now = com.kasperstudios.kvr.spatial.space.VirtualSpaces.name(com.kasperstudios.kvr.spatial.space.VirtualSpaces.active());
+        int nw = Minecraft.getInstance().font.width(now);
+        GlassStyle.text(g, now, x + cw - nw, y + 5, GlassStyle.ACCENT);
+        y += ROW;
+        int slots = s.slots();
+        int bw = (cw - slots * 4) / (slots + 1);
+        for (int i = 0; i <= slots; i++) {
+            int bx = x + i * (bw + 4);
+            int slot = i;
+            boolean on = slot == com.kasperstudios.kvr.spatial.space.VirtualSpaces.active();
+            boolean hot = GlassStyle.inside(mx, my, bx, y + 3, bw, BTN_H);
+            GlassStyle.panel(g, bx, y + 3, bw, BTN_H, hot || on);
+            if (on) g.fill(bx + 3, y + BTN_H + 1, bx + bw - 3, y + BTN_H + 2, 0xFF000000 | s.cocoonRgb());
+            String text = slot == 0 ? Component.translatable("kvr.space.real_short").getString() : String.valueOf(slot);
+            GlassStyle.centered(g, Component.literal(text), bx + bw / 2, y + 6, on ? GlassStyle.TEXT : GlassStyle.MUTED);
+            hits.add(new Hit(bx, y + 3, bw, BTN_H, () -> com.kasperstudios.kvr.spatial.space.VirtualSpaces.switchTo(slot)));
+        }
+        y += ROW;
+        choice(g, mx, my, x, y, cw, Component.translatable("kvr.settings.space.gesture"),
+            List.of(Component.translatable("kvr.settings.space.gesture.picker"), Component.translatable("kvr.settings.space.gesture.cycle")),
+            s.gesture().ordinal(), i -> KvrSpaceConfig.update("space_gesture", KvrSpaceConfig.GestureMode.values()[i]));
+        y += ROW;
+        stepper(g, mx, my, x, y, cw, Component.translatable("kvr.settings.space.slots"), String.valueOf(slots),
+            () -> KvrSpaceConfig.update("space_slots", Math.max(KvrSpaceConfig.SLOTS_MIN, slots - 1)),
+            () -> KvrSpaceConfig.update("space_slots", Math.min(KvrSpaceConfig.SLOTS_MAX, slots + 1)));
+        y += ROW + 6;
+
+        toggle(g, mx, my, x, y, cw, Component.translatable("kvr.settings.cocoon"), s.cocoon(), v -> KvrSpaceConfig.update("cocoon_enabled", v));
+        y += ROW;
+        label(g, Component.translatable("kvr.settings.cocoon.color"), x, y);
+        KvrSpaceConfig.CocoonColor[] colors = KvrSpaceConfig.CocoonColor.values();
+        for (int i = 0; i < colors.length; i++) {
+            KvrSpaceConfig.CocoonColor c = colors[i];
+            int sx = x + cw - colors.length * 22 + i * 22;
+            int rgb = c == KvrSpaceConfig.CocoonColor.CUSTOM ? KvrSpaceConfig.parseHex(s.customHex(), KvrSpaceConfig.CocoonColor.CYAN.rgb) : c.rgb;
+            if (c == s.color()) g.fill(sx - 2, y + 1, sx + 18, y + 21, GlassStyle.TEXT);
+            g.fill(sx - 1, y + 2, sx + 17, y + 20, 0xFF0F172A);
+            g.fill(sx, y + 3, sx + 16, y + 19, 0xFF000000 | rgb);
+            if (c == KvrSpaceConfig.CocoonColor.CUSTOM) GlassStyle.centered(g, Component.literal("#"), sx + 8, y + 7, 0xFF0F172A);
+            hits.add(new Hit(sx - 2, y + 1, 20, 20, () -> KvrSpaceConfig.update("cocoon_color", c)));
+        }
+        y += ROW;
+        GlassStyle.text(g, Component.translatable(s.color().langKey()), x + 8, y + 2, 0xFF000000 | s.cocoonRgb());
+        y += LINE + 4;
+
+        // custom hex: click opens keyboard capture; Enter/Esc applies, an invalid value is ignored
+        label(g, Component.translatable("kvr.settings.cocoon.custom"), x, y);
+        int fw = 90;
+        int fx = x + cw - fw;
+        String shown = hexDraft != null ? hexDraft + "_" : s.customHex();
+        boolean valid = KvrSpaceConfig.validHex(hexDraft != null ? hexDraft : s.customHex());
+        boolean hotField = GlassStyle.inside(mx, my, fx, y + 3, fw, BTN_H);
+        GlassStyle.panel(g, fx, y + 3, fw, BTN_H, hotField || hexDraft != null);
+        GlassStyle.text(g, Component.literal(shown), fx + 6, y + 6, valid ? GlassStyle.TEXT : GlassStyle.DANGER);
+        hits.add(new Hit(fx, y + 3, fw, BTN_H, this::editHex));
+        y += ROW;
+        int opacity = s.opacityPct();
+        stepper(g, mx, my, x, y, cw, Component.translatable("kvr.settings.cocoon.opacity"), opacity + "%",
+            () -> KvrSpaceConfig.update("cocoon_opacity", Math.max(KvrSpaceConfig.OPACITY_MIN, opacity - 5)),
+            () -> KvrSpaceConfig.update("cocoon_opacity", Math.min(KvrSpaceConfig.OPACITY_MAX, opacity + 5)));
+        y += ROW + 2;
+        // preview strip: solid dark shell (0034) + neon line at the chosen brightness
+        g.fill(x, y, x + cw, y + 12, 0xFF070B14);
+        int la = Math.max(30, Math.round(opacity * 2.55f));
+        g.fill(x, y + 5, x + cw, y + 7, (Math.min(255, la) << 24) | s.cocoonRgb());
+        g.fill(x + cw / 3, y, x + cw / 3 + 1, y + 12, (Math.min(255, la / 2) << 24) | s.cocoonRgb());
+        g.fill(x + 2 * cw / 3, y, x + 2 * cw / 3 + 1, y + 12, (Math.min(255, la / 2) << 24) | s.cocoonRgb());
+    }
+
+    private void editHex() {
+        hexDraft = KvrSpaceConfig.get().customHex();
+        Minecraft.getInstance().setScreen(new com.kasperstudios.kvr.script.ui.TextInputScreen(new com.kasperstudios.kvr.script.ui.TextInputScreen.Target() {
+            @Override public String value() { return hexDraft == null ? "" : hexDraft; }
+            @Override public void set(String value) { hexDraft = value; }
+            @Override public void submit() {
+                String v = hexDraft;
+                hexDraft = null;
+                if (v != null && KvrSpaceConfig.validHex(v)) {
+                    KvrSpaceConfig.update("cocoon_custom_hex", KvrSpaceConfig.hex(KvrSpaceConfig.parseHex(v, 0)));
+                    KvrSpaceConfig.update("cocoon_color", KvrSpaceConfig.CocoonColor.CUSTOM);
+                }
+            }
+            @Override public int maxLength() { return 7; }
+            @Override public boolean multiline() { return false; }
+        }));
     }
 
     private void sound(GuiGraphics g, int mx, int my, int x, int cw) {

@@ -74,20 +74,22 @@ public final class AppCatalog {
             KVRSpatial.windows().find(AppMarketWindow.class).isPresent());
     }
 
-    /** Installed packages (incl. built-in catalog apps once installed), then developer folders. */
+    /** Installed packages: only if pinned manually by the player in the launcher. */
     public static List<SpatialConfig.DockItem> packageItems() {
         List<SpatialConfig.DockItem> out = new ArrayList<>();
         int n = 0;
         for (AppsClient.Installed i : AppsClient.installed()) {
-            if (n++ >= DOCK_MAX_INSTALLED) break;
             String id = i.manifest().id();
+            if (!com.kasperstudios.kvr.config.DockPrefs.isPinned("app:" + id) && !com.kasperstudios.kvr.config.DockPrefs.isPinned(id)) continue;
+            if (n++ >= DOCK_MAX_INSTALLED) break;
             out.add(new SpatialConfig.DockItem(id, GlassStyle.id("gesture/launcher"), Component.literal(i.manifest().name()), running(id)));
         }
         if (DevApps.enabled()) {
             n = 0;
             for (DevApps.Folder f : DevApps.folders()) {
-                if (n++ >= DOCK_MAX_DEV) break;
                 String id = f.manifest().id();
+                if (!com.kasperstudios.kvr.config.DockPrefs.isPinned("dev:" + id)) continue;
+                if (n++ >= DOCK_MAX_DEV) break;
                 out.add(new SpatialConfig.DockItem(DEV_PREFIX + id, GlassStyle.id("gesture/launcher"), Component.literal("DEV " + f.manifest().name()), running(id)));
             }
         }

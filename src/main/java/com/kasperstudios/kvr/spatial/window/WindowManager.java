@@ -1,14 +1,13 @@
 package com.kasperstudios.kvr.spatial.window;
 
-import com.kasperstudios.kvr.config.KvrConfig;
 import com.kasperstudios.kvr.spatial.PlayerView;
 import com.kasperstudios.kvr.spatial.input.SpatialRaycast;
+import com.kasperstudios.kvr.spatial.space.VirtualSpaces;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.BooleanSupplier;
 import java.util.function.IntSupplier;
 import org.jetbrains.annotations.Nullable;
 
@@ -17,9 +16,8 @@ import org.jetbrains.annotations.Nullable;
  * {@link SpatialWindow.Kind#APP} windows is capped by the RAM tier; detached vanilla screens and
  * system panels never count.
  *
- * <p>Window settings from the gear menu: the × is honoured on the next {@link #tick()}, locked
- * windows ignore the minimise gestures, new windows without an explicit Public/Private choice get
- * {@code default_window_public} from {@code kvr-client.toml}.
+ * <p>0033: APP/VANILLA windows belong to a Virtual Space slot ({@link VirtualSpaces}). Only the active slot is
+ * drawn, hit by the ray and touched by the minimise gestures; the others keep ticking and keep their RAM slot.
  */
 public final class WindowManager {
 
@@ -27,33 +25,27 @@ public final class WindowManager {
 
     private final List<SpatialWindow> windows = new ArrayList<>();
     private final IntSupplier ramWindows;
-    private final BooleanSupplier defaultPublic;
     @Nullable private SpatialWindow focused;
     /** HUD_OFF: the OS keeps running (apps tick), but nothing is drawn or hit by the hand ray. */
     private boolean hidden;
 
     /** @param ramWindows current RAM limit (1/2/4/8/16), read from the worn glasses build */
     public WindowManager(IntSupplier ramWindows) {
-        this(ramWindows, () -> KvrConfig.client().defaultWindowPublic());
-    }
-
-    /** Test / tooling constructor: explicit default visibility, no config file. */
-    public WindowManager(IntSupplier ramWindows, BooleanSupplier defaultPublic) {
         this.ramWindows = ramWindows;
-        this.defaultPublic = defaultPublic;
     }
 
     public OpenResult open(SpatialWindow window) {
         if (windows.stream().anyMatch(w -> w.id().equals(window.id()))) return OpenResult.ALREADY_OPEN;
         if (window.kind() == SpatialWindow.Kind.APP && appsOpen() >= ramWindows.getAsInt()) return OpenResult.RAM_FULL;
-        if (window.hasSettings() && !window.hasPublicChoice()) window.setPublic(defaultPublic.getAsBoolean());
         windows.add(window);
+        VirtualSpaces.claim(window);
         focused = window;
         return OpenResult.OPENED;
     }
 
     public void close(SpatialWindow window) {
         if (windows.remove(window)) window.onClosed();
+        VirtualSpaces.forget(window);
         if (focused == window) focused = null;
     }
 
@@ -67,30 +59,22 @@ public final class WindowManager {
 
     /** Gesture 2: hide every app/vanilla window into the dock (locked windows stay). */
     public void minimizeAll() {
-        windows.stream().filter(w -> w.kind() != SpatialWindow.Kind.SYSTEM && !w.isLocked()).forEach(w -> w.setMinimized(true));
+        windows.stream().filter(w -> w.kind() != SpatialWindow.Kind.SYSTEM && !w.isLocked() && VirtualSpaces.shown(w)).forEach(w -> w.setMinimized(true));
     }
 
-    /** Gesture 3: the window in focus (last clicked or under the hand ray), unless it is locked. */
+    /** Gesture 3: the window in focus (last clicked or under the hand ray). */
     public void minimizeFocused() {
-        SpatialWindow target = focused;
-        if (target == null || target.isMinimized() || target.kind() == SpatialWindow.Kind.SYSTEM || target.isLocked()) {
-            // Fallback: pick the closest non-minimized app/vanilla window
-            target = windows.stream()
-                    .filter(w -> w.kind() != SpatialWindow.Kind.SYSTEM && !w.isMinimized() && !w.isLocked())
-                    .findFirst()
-                    .orElse(null);
-        }
-        if (target != null) {
-            target.setMinimized(true);
-        }
+        if (focused != null && focused.kind() != SpatialWindow.Kind.SYSTEM && !focused.isLocked() && VirtualSpaces.shown(focused)) focused.setMinimized(true);
     }
 
-    /** Windows set to Public in the gear menu: materialised for other players, readable by HackGlasses. */
-    public List<SpatialWindow> publicWindows() {
-        return windows.stream().filter(SpatialWindow::isPublic).toList();
+    /** Windows other players may see (HackGlasses projection, future public windows). Only the active space. */
+    public java.util.List<SpatialWindow> publicWindows() {
+        return windows.stream().filter(w -> w.isPublic() && VirtualSpaces.shown(w)).toList();
     }
 
+    /** 0033: a window of another space (dock / launcher click) switches to that space first. */
     public void restore(SpatialWindow window) {
+        VirtualSpaces.reveal(window);
         window.setMinimized(false);
         focused = window;
     }
@@ -104,14 +88,8 @@ public final class WindowManager {
         for (SpatialWindow w : windows) w.update(view, dt);
     }
 
-    /**
-     * Client tick. Windows whose × was clicked are closed first; then every window ticks.
-     * Copy first: a window may close itself (e.g. its container menu went away).
-     */
+    /** Client tick. Copy first: a window may close itself (e.g. its container menu went away). */
     public void tick() {
-        for (SpatialWindow w : List.copyOf(windows)) {
-            if (w.closeRequested()) close(w);
-        }
         for (SpatialWindow w : List.copyOf(windows)) w.tick();
     }
 
@@ -119,7 +97,7 @@ public final class WindowManager {
     public Optional<SpatialRaycast.RayHit> pick(SpatialRaycast.Ray ray) {
         if (hidden) return Optional.empty();
         return windows.stream()
-            .filter(SpatialWindow::isVisible)
+            .filter(w -> w.isVisible() && VirtualSpaces.shown(w))
             .map(w -> SpatialRaycast.intersect(ray, w))
             .flatMap(Optional::stream)
             .min(Comparator.comparingDouble(SpatialRaycast.RayHit::distance));
@@ -129,7 +107,9 @@ public final class WindowManager {
     public List<SpatialWindow> drawable() {
         List<SpatialWindow> out = new ArrayList<>();
         if (hidden) return out;
-        for (SpatialWindow w : windows) if (w.pose() != null && (w.isVisible() || (w.isMinimized() && w.scale() > 0.02f))) out.add(w);
+        for (SpatialWindow w : windows) {
+            if (w.pose() != null && VirtualSpaces.shown(w) && (w.isVisible() || (w.isMinimized() && w.scale() > 0.02f))) out.add(w);
+        }
         return out;
     }
 
@@ -137,8 +117,9 @@ public final class WindowManager {
         return Collections.unmodifiableList(windows);
     }
 
+    /** Minimised windows of the active space (dock tray). */
     public List<SpatialWindow> minimized() {
-        return windows.stream().filter(SpatialWindow::isMinimized).toList();
+        return windows.stream().filter(w -> w.isMinimized() && VirtualSpaces.shown(w)).toList();
     }
 
     public <T extends SpatialWindow> Optional<T> find(Class<T> type) {
@@ -147,6 +128,7 @@ public final class WindowManager {
 
     public void closeAll() {
         for (SpatialWindow w : List.copyOf(windows)) close(w);
+        VirtualSpaces.reset(); // glasses off / left the world: back to the real world
     }
 
     public void setHidden(boolean hidden) {

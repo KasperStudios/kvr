@@ -9,6 +9,7 @@ import com.kasperstudios.kvr.platform.KVRNetwork;
 import com.kasperstudios.kvr.rednet.RednetPayload;
 import com.kasperstudios.kvr.rednet.RednetProtocol;
 import com.kasperstudios.kvr.script.ScriptHost;
+import com.kasperstudios.kvr.session.ClientSession;
 import net.minecraft.client.Minecraft;
 
 /**
@@ -34,6 +35,16 @@ public final class RednetClient {
             RednetProtocol.Receive r = RednetProtocol.Receive.read(buf);
             Minecraft.getInstance().execute(() -> deliver(r));
         });
+        ClientSession.onLeave(RednetClient::reset);
+    }
+
+    /** Left the server: the modem state belonged to it (0030). */
+    public static void reset() {
+        state = RednetProtocol.State.NONE;
+        synchronized (RednetClient.class) {
+            rateSecond = -1;
+            rateCount = 0;
+        }
     }
 
     public static RednetProtocol.State state() {
@@ -46,6 +57,7 @@ public final class RednetClient {
      */
     public static boolean send(int to, String protocol, String json) {
         if (!state.online() || json.length() > RednetPayload.MAX_JSON) return false;
+        if (Minecraft.getInstance().getConnection() == null) return false;
         synchronized (RednetClient.class) {
             long second = System.currentTimeMillis() / 1000L;
             if (second != rateSecond) {
@@ -56,7 +68,10 @@ public final class RednetClient {
         }
         String p = protocol.length() > 64 ? protocol.substring(0, 64) : protocol;
         RednetProtocol.Send msg = new RednetProtocol.Send(to < 0 ? RednetProtocol.BROADCAST : to, p, json);
-        Minecraft.getInstance().execute(() -> KVRNetwork.sendToServer(RednetProtocol.SEND, msg::write));
+        com.kasperstudios.kvr.spatial.ar.ArScanner.rednet(true, to < 0 ? -1 : to, p, -1); // 0033: AR ether (thread-safe)
+        Minecraft.getInstance().execute(() -> {
+            if (Minecraft.getInstance().getConnection() != null) KVRNetwork.sendToServerIfAccepted(RednetProtocol.SEND, msg::write);
+        });
         return true;
     }
 
@@ -72,6 +87,7 @@ public final class RednetClient {
     }
 
     private static void deliver(RednetProtocol.Receive r) {
+        com.kasperstudios.kvr.spatial.ar.ArScanner.rednet(false, r.sender(), r.protocol(), r.distance()); // 0033
         JsonElement message;
         try {
             message = JsonParser.parseString(r.json());
